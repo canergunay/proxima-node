@@ -56,8 +56,12 @@ SYSCTL
     ufw default deny incoming > /dev/null 2>&1
     ufw default allow outgoing > /dev/null 2>&1
 
-    # SSH
-    ufw allow 22/tcp comment "SSH" > /dev/null 2>&1
+    # SSH — detect actual port from sshd config
+    local ssh_port
+    ssh_port=$(grep -E "^Port " /etc/ssh/sshd_config 2>/dev/null | awk '{print $2}')
+    ssh_port="${ssh_port:-22}"
+    ufw allow "${ssh_port}/tcp" comment "SSH" > /dev/null 2>&1
+    log_info "SSH port: ${ssh_port}"
     # Outline SS
     ufw allow 8388/tcp comment "Outline SS TCP" > /dev/null 2>&1
     ufw allow 8388/udp comment "Outline SS UDP" > /dev/null 2>&1
