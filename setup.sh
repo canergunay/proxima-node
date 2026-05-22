@@ -6,6 +6,9 @@
 #   curl -sSL https://raw.githubusercontent.com/canergunay/proxima-node/main/setup.sh | bash
 #   or:
 #   git clone https://github.com/canergunay/proxima-node.git && cd proxima-node && bash setup.sh
+#   or with component selection:
+#   bash setup.sh --no-adguard
+#   bash setup.sh --only harden
 #
 # Components installed:
 #   1. System hardening (sysctl, SSH, UFW)
@@ -19,6 +22,7 @@
 #
 
 set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
 
 REPO_URL="https://github.com/canergunay/proxima-node.git"
 INSTALL_DIR="/opt/proxima-node"
@@ -32,6 +36,13 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m'
 
+# Default: install everything
+INSTALL_HARDEN=1
+INSTALL_OUTLINE=1
+INSTALL_SSCONF=1
+INSTALL_SPEEDTEST=1
+INSTALL_ADGUARD=1
+
 banner() {
     echo -e "${CYAN}"
     echo "  ____                 _                                       _      "
@@ -42,6 +53,45 @@ banner() {
     echo -e "${NC}"
     echo -e "${BOLD}  VPN Exit Node Setup${NC}"
     echo ""
+}
+
+# ─── Parse arguments ─────────────────────────────────────────────────
+
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --no-adguard)
+                INSTALL_ADGUARD=0; shift ;;
+            --no-outline)
+                INSTALL_OUTLINE=0; INSTALL_SSCONF=0; shift ;;
+            --no-speedtest)
+                INSTALL_SPEEDTEST=0; shift ;;
+            --only)
+                # Reset all, then enable only the specified component
+                INSTALL_HARDEN=0; INSTALL_OUTLINE=0; INSTALL_SSCONF=0
+                INSTALL_SPEEDTEST=0; INSTALL_ADGUARD=0
+                case "${2:-}" in
+                    harden)    INSTALL_HARDEN=1 ;;
+                    outline)   INSTALL_OUTLINE=1; INSTALL_SSCONF=1 ;;
+                    speedtest) INSTALL_SPEEDTEST=1 ;;
+                    adguard)   INSTALL_ADGUARD=1 ;;
+                    *) echo -e "${RED}Unknown component: ${2:-}${NC}"; exit 1 ;;
+                esac
+                shift 2 ;;
+            -h|--help)
+                echo "Usage: bash setup.sh [OPTIONS]"
+                echo ""
+                echo "Options:"
+                echo "  --no-adguard     Skip AdGuard Home installation"
+                echo "  --no-outline     Skip Outline SS + ssconf"
+                echo "  --no-speedtest   Skip speed test server"
+                echo "  --only <comp>    Install only: harden, outline, speedtest, adguard"
+                echo "  -h, --help       Show this help"
+                exit 0 ;;
+            *)
+                echo -e "${RED}Unknown option: $1${NC}"; exit 1 ;;
+        esac
+    done
 }
 
 # ─── Pre-flight checks ───────────────────────────────────────────────
@@ -63,8 +113,9 @@ preflight() {
 
     # Install git if needed
     if ! command -v git &>/dev/null; then
-        echo -e "${GREEN}[INFO]${NC} Installing git..."
-        apt-get update -qq && apt-get install -y -qq git curl openssl > /dev/null 2>&1
+        echo -e "${GREEN}[INFO]${NC} Installing prerequisites..."
+        apt-get update -qq > /dev/null 2>&1
+        apt-get install -y -qq git curl openssl > /dev/null 2>&1
     fi
 
     # Ensure required tools
@@ -91,68 +142,49 @@ setup_repo() {
     fi
 }
 
-# ─── Component selection ─────────────────────────────────────────────
-
-select_components() {
-    echo ""
-    echo -e "${BOLD}Select components to install:${NC}"
-    echo ""
-    echo "  1) Full setup (all components)"
-    echo "  2) Outline SS + ssconf + speedtest only (no AdGuard Home)"
-    echo "  3) AdGuard Home only"
-    echo "  4) System hardening only"
-    echo ""
-    read -rp "Choice [1]: " choice
-    choice="${choice:-1}"
-
-    case "$choice" in
-        1) INSTALL_HARDEN=1; INSTALL_OUTLINE=1; INSTALL_SSCONF=1; INSTALL_SPEEDTEST=1; INSTALL_ADGUARD=1 ;;
-        2) INSTALL_HARDEN=1; INSTALL_OUTLINE=1; INSTALL_SSCONF=1; INSTALL_SPEEDTEST=1; INSTALL_ADGUARD=0 ;;
-        3) INSTALL_HARDEN=0; INSTALL_OUTLINE=0; INSTALL_SSCONF=0; INSTALL_SPEEDTEST=0; INSTALL_ADGUARD=1 ;;
-        4) INSTALL_HARDEN=1; INSTALL_OUTLINE=0; INSTALL_SSCONF=0; INSTALL_SPEEDTEST=0; INSTALL_ADGUARD=0 ;;
-        *) echo -e "${RED}Invalid choice${NC}"; exit 1 ;;
-    esac
-}
-
 # ─── Run setup ────────────────────────────────────────────────────────
 
 run_setup() {
     echo ""
 
-    # System update
+    # System update (fully non-interactive)
     echo -e "${BLUE}[STEP]${NC} ${BOLD}Updating system packages...${NC}"
-    apt-get update -qq && apt-get upgrade -y -qq > /dev/null 2>&1
+    apt-get update -qq > /dev/null 2>&1
+    apt-get upgrade -y -qq \
+        -o Dpkg::Options::="--force-confdef" \
+        -o Dpkg::Options::="--force-confold" > /dev/null 2>&1
     apt-get install -y -qq python3 curl openssl > /dev/null 2>&1
+    echo -e "${GREEN}[INFO]${NC} System packages updated"
 
-    if [[ "${INSTALL_HARDEN:-1}" -eq 1 ]]; then
+    if [[ "${INSTALL_HARDEN}" -eq 1 ]]; then
         # shellcheck disable=SC1091
         source "$INSTALL_DIR/scripts/01-harden.sh"
         setup_harden
         echo ""
     fi
 
-    if [[ "${INSTALL_OUTLINE:-1}" -eq 1 ]]; then
+    if [[ "${INSTALL_OUTLINE}" -eq 1 ]]; then
         # shellcheck disable=SC1091
         source "$INSTALL_DIR/scripts/02-outline-ss.sh"
         setup_outline_ss
         echo ""
     fi
 
-    if [[ "${INSTALL_SSCONF:-1}" -eq 1 ]]; then
+    if [[ "${INSTALL_SSCONF}" -eq 1 ]]; then
         # shellcheck disable=SC1091
         source "$INSTALL_DIR/scripts/03-ssconf.sh"
         setup_ssconf
         echo ""
     fi
 
-    if [[ "${INSTALL_SPEEDTEST:-1}" -eq 1 ]]; then
+    if [[ "${INSTALL_SPEEDTEST}" -eq 1 ]]; then
         # shellcheck disable=SC1091
         source "$INSTALL_DIR/scripts/04-speedtest.sh"
         setup_speedtest
         echo ""
     fi
 
-    if [[ "${INSTALL_ADGUARD:-1}" -eq 1 ]]; then
+    if [[ "${INSTALL_ADGUARD}" -eq 1 ]]; then
         # shellcheck disable=SC1091
         source "$INSTALL_DIR/scripts/05-adguard.sh"
         setup_adguard
@@ -183,7 +215,7 @@ print_summary() {
     echo -e "${BOLD}Node ID:${NC}   ${node_id}"
     echo ""
 
-    if [[ "${INSTALL_OUTLINE:-0}" -eq 1 ]]; then
+    if [[ "${INSTALL_OUTLINE}" -eq 1 ]]; then
         echo -e "${BOLD}── Outline Shadowsocks ──────────────────────────────────${NC}"
         echo -e "  Port:     8388 (TCP+UDP)"
         echo -e "  Cipher:   chacha20-ietf-poly1305"
@@ -197,13 +229,13 @@ print_summary() {
         echo ""
     fi
 
-    if [[ "${INSTALL_SSCONF:-0}" -eq 1 ]]; then
+    if [[ "${INSTALL_SSCONF}" -eq 1 ]]; then
         echo -e "${BOLD}── ssconf Server ───────────────────────────────────────${NC}"
         echo -e "  URL: https://${server_ip}:8390/${ssconf_token}"
         echo ""
     fi
 
-    if [[ "${INSTALL_SPEEDTEST:-0}" -eq 1 ]]; then
+    if [[ "${INSTALL_SPEEDTEST}" -eq 1 ]]; then
         echo -e "${BOLD}── Speed Test Server ───────────────────────────────────${NC}"
         echo -e "  URL:     https://${server_ip}:8999"
         echo -e "  API Key: ${speedtest_key}"
@@ -211,7 +243,7 @@ print_summary() {
         echo ""
     fi
 
-    if [[ "${INSTALL_ADGUARD:-0}" -eq 1 ]]; then
+    if [[ "${INSTALL_ADGUARD}" -eq 1 ]]; then
         echo -e "${BOLD}── AdGuard Home ────────────────────────────────────────${NC}"
         echo -e "  Admin: http://${server_ip}:3000"
         echo -e "  DNS:   ${server_ip}:53"
@@ -221,7 +253,7 @@ print_summary() {
     echo -e "${YELLOW}── Next Steps ──────────────────────────────────────────${NC}"
     echo -e "  1. Use AmneziaVPN client to set up AWG + Xray on this server"
     echo -e "  2. Add the SS key and speedtest credentials to your Proxima instance"
-    if [[ "${INSTALL_ADGUARD:-0}" -eq 1 ]]; then
+    if [[ "${INSTALL_ADGUARD}" -eq 1 ]]; then
         echo -e "  3. Open http://${server_ip}:3000 to complete AdGuard Home setup"
     fi
     echo ""
@@ -232,10 +264,10 @@ print_summary() {
 # ─── Main ─────────────────────────────────────────────────────────────
 
 main() {
+    parse_args "$@"
     banner
     preflight
     setup_repo
-    select_components
     run_setup
     print_summary
 }
