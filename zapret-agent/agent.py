@@ -1,6 +1,6 @@
 """Zapret Agent — lightweight management API for remote zapret nodes.
 
-Runs on port 5050 (HTTPS), provides endpoints for:
+Runs on configurable port (HTTPS, default 5050), provides endpoints for:
 - Health check
 - Service status (nfqws2, shadowsocks)
 - DPI args management
@@ -239,8 +239,9 @@ def get_ss_key():
 
     # Build ssconf:// URL (points to this agent's /ssconf endpoint)
     sync_key = config.get("sync_key", "")
-    agent_port = config.get("agent_port", 5050)
-    ssconf_url = f"ssconf://{server_ip}:{agent_port}/ssconf/{sync_key}"
+    # external_port allows different public port (e.g. when NAT maps 5051→5050)
+    ssconf_port = config.get("external_port") or config.get("agent_port", 5050)
+    ssconf_url = f"ssconf://{server_ip}:{ssconf_port}/ssconf/{sync_key}"
 
     return jsonify({
         "ok": True,
