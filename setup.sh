@@ -16,6 +16,8 @@
 #   3. ssconf HTTPS server (port 8390)
 #   4. Proxima speed test server (port 8999)
 #   5. AdGuard Home via Docker (port 53, 3000)
+#   6. Zapret agent (management API, port 5050)
+#   7. Zapret nfqws2 (DPI bypass, --zapret flag)
 #
 # AmneziaWG + Xray are NOT installed by this script.
 # Use the AmneziaVPN client app to set up AWG + Xray on the server.
@@ -42,6 +44,8 @@ INSTALL_OUTLINE=1
 INSTALL_SSCONF=1
 INSTALL_SPEEDTEST=1
 INSTALL_ADGUARD=1
+INSTALL_ZAPRET=0
+INSTALL_ZAPRET_AGENT=0
 
 banner() {
     echo -e "${CYAN}"
@@ -66,15 +70,21 @@ parse_args() {
                 INSTALL_OUTLINE=0; INSTALL_SSCONF=0; shift ;;
             --no-speedtest)
                 INSTALL_SPEEDTEST=0; shift ;;
+            --zapret)
+                INSTALL_ZAPRET=1; INSTALL_ZAPRET_AGENT=1; shift ;;
             --only)
                 # Reset all, then enable only the specified component
                 INSTALL_HARDEN=0; INSTALL_OUTLINE=0; INSTALL_SSCONF=0
                 INSTALL_SPEEDTEST=0; INSTALL_ADGUARD=0
+                INSTALL_ZAPRET=0; INSTALL_ZAPRET_AGENT=0
                 case "${2:-}" in
-                    harden)    INSTALL_HARDEN=1 ;;
-                    outline)   INSTALL_OUTLINE=1; INSTALL_SSCONF=1 ;;
-                    speedtest) INSTALL_SPEEDTEST=1 ;;
-                    adguard)   INSTALL_ADGUARD=1 ;;
+                    harden)        INSTALL_HARDEN=1 ;;
+                    outline)       INSTALL_OUTLINE=1; INSTALL_SSCONF=1 ;;
+                    speedtest)     INSTALL_SPEEDTEST=1 ;;
+                    adguard)       INSTALL_ADGUARD=1 ;;
+                    zapret)        INSTALL_ZAPRET=1 ;;
+                    zapret-agent)  INSTALL_ZAPRET_AGENT=1 ;;
+                    zapret-all)    INSTALL_ZAPRET=1; INSTALL_ZAPRET_AGENT=1 ;;
                     *) echo -e "${RED}Unknown component: ${2:-}${NC}"; exit 1 ;;
                 esac
                 shift 2 ;;
@@ -85,7 +95,9 @@ parse_args() {
                 echo "  --no-adguard     Skip AdGuard Home installation"
                 echo "  --no-outline     Skip Outline SS + ssconf"
                 echo "  --no-speedtest   Skip speed test server"
-                echo "  --only <comp>    Install only: harden, outline, speedtest, adguard"
+                echo "  --zapret         Include zapret (nfqws2) + agent"
+                echo "  --only <comp>    Install only: harden, outline, speedtest, adguard,"
+                echo "                   zapret, zapret-agent, zapret-all"
                 echo "  -h, --help       Show this help"
                 exit 0 ;;
             *)
@@ -190,6 +202,20 @@ run_setup() {
         setup_adguard
         echo ""
     fi
+
+    if [[ "${INSTALL_ZAPRET}" -eq 1 ]]; then
+        # shellcheck disable=SC1091
+        source "$INSTALL_DIR/scripts/07-zapret.sh"
+        setup_zapret
+        echo ""
+    fi
+
+    if [[ "${INSTALL_ZAPRET_AGENT}" -eq 1 ]]; then
+        # shellcheck disable=SC1091
+        source "$INSTALL_DIR/scripts/06-zapret-agent.sh"
+        setup_zapret_agent
+        echo ""
+    fi
 }
 
 # ─── Summary ──────────────────────────────────────────────────────────
@@ -247,6 +273,24 @@ print_summary() {
         echo -e "${BOLD}── AdGuard Home ────────────────────────────────────────${NC}"
         echo -e "  Admin: http://${server_ip}:3000"
         echo -e "  DNS:   ${server_ip}:53"
+        echo ""
+    fi
+
+    if [[ "${INSTALL_ZAPRET}" -eq 1 ]]; then
+        echo -e "${BOLD}── Zapret (nfqws2) ─────────────────────────────────────${NC}"
+        echo -e "  Binary:   /opt/zapret/bin/nfqws2"
+        echo -e "  DPI Args: /etc/zapret/dpi-args.conf"
+        echo -e "  Service:  zapret-nfqws2.service"
+        echo ""
+    fi
+
+    if [[ "${INSTALL_ZAPRET_AGENT}" -eq 1 ]]; then
+        local agent_sync_key
+        agent_sync_key=$(read_config "ZAPRET_AGENT_SYNC_KEY")
+        echo -e "${BOLD}── Zapret Agent ────────────────────────────────────────${NC}"
+        echo -e "  URL:      http://${server_ip}:5050"
+        echo -e "  Sync Key: ${agent_sync_key}"
+        echo -e "  Health:   curl http://${server_ip}:5050/health"
         echo ""
     fi
 
