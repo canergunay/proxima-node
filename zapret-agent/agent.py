@@ -1,14 +1,15 @@
 """Zapret Agent — lightweight management API for remote zapret nodes.
 
-Runs on port 5050, provides HTTP endpoints for:
+Runs on port 5050 (HTTPS), provides endpoints for:
 - Health check
 - Service status (nfqws2, shadowsocks)
 - DPI args management
 - Service restart
-- SS key generation
+- SS key + ssconf URL generation
 - Blockcheck (DPI strategy testing)
 
 Auth: X-Sync-Key header must match config.json sync_key.
+ssconf endpoint uses URL-embedded token for auth (standard ssconf protocol).
 """
 
 import base64
@@ -50,6 +51,9 @@ def _get_sync_key() -> str:
 def check_auth():
     # /health is public
     if request.path == "/health":
+        return None
+    # /ssconf/<token> uses URL-embedded token auth (checked in handler)
+    if request.path.startswith("/ssconf/"):
         return None
     expected = _get_sync_key()
     if not expected:
@@ -233,15 +237,47 @@ def get_ss_key():
     user_info = base64.b64encode(f"{method}:{password}".encode()).decode()
     ss_uri = f"ss://{user_info}@{server_ip}:{port}#{node_name}"
 
+    # Build ssconf:// URL (points to this agent's /ssconf endpoint)
+    sync_key = config.get("sync_key", "")
+    agent_port = config.get("agent_port", 5050)
+    ssconf_url = f"ssconf://{server_ip}:{agent_port}/ssconf/{sync_key}"
+
     return jsonify({
         "ok": True,
         "data": {
             "uri": ss_uri,
+            "ssconf_url": ssconf_url,
             "server": server_ip,
             "port": port,
             "method": method,
             "password": password,
         },
+    })
+
+
+@app.get("/ssconf/<token>")
+def ssconf_config(token: str):
+    """Serve SS config in ssconf/SIP008 format.
+
+    The URL token serves as authentication (standard ssconf protocol).
+    This endpoint is what Proxima fetches when you add an ssconf:// key.
+    """
+    expected = _get_sync_key()
+    if not expected or token != expected:
+        return jsonify({"error": "Invalid token"}), 401
+
+    ss_config = _read_ss_config()
+    if not ss_config:
+        return jsonify({"error": "SS config not found"}), 404
+
+    config = _load_config()
+    server_ip = config.get("server_ip") or _get_public_ip() or socket.gethostname()
+
+    return jsonify({
+        "server": server_ip,
+        "server_port": ss_config.get("server_port", 8388),
+        "password": ss_config.get("password", ""),
+        "method": ss_config.get("method", "chacha20-ietf-poly1305"),
     })
 
 
@@ -425,5 +461,29 @@ def stop_blockcheck():
 
 # ── Main ────────────────────────────────────────────────────────────────────
 
+CERT_FILE = "/opt/zapret-agent/cert.pem"
+KEY_FILE = "/opt/zapret-agent/key.pem"
+
+
+def _ensure_tls_cert():
+    """Generate self-signed TLS cert if it doesn't exist."""
+    if os.path.exists(CERT_FILE) and os.path.exists(KEY_FILE):
+        return
+    subprocess.run([
+        "openssl", "req", "-x509", "-newkey", "rsa:2048",
+        "-keyout", KEY_FILE, "-out", CERT_FILE,
+        "-days", "3650", "-nodes",
+        "-subj", "/CN=zapret-agent",
+    ], check=True, capture_output=True)
+
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5050, threaded=True)
+    _ensure_tls_cert()
+    config = _load_config()
+    port = config.get("agent_port", 5050)
+    app.run(
+        host="0.0.0.0",
+        port=port,
+        threaded=True,
+        ssl_context=(CERT_FILE, KEY_FILE),
+    )
