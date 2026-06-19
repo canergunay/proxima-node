@@ -1,0 +1,17 @@
+[Unit]
+Description=Proxima ADM
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/erg/proxima-node/adm/backend
+ExecStart=/opt/erg/proxima-node/adm/backend/venv/bin/python app.py
+Restart=always
+RestartSec=5
+Environment=ADM_PORT=5002
+Environment=ADM_DB_PATH=/opt/erg/proxima-node/adm/data/adm.db
+Environment=ADM_REPO_ROOT=/opt/erg/proxima-node
+
+[Install]
+WantedBy=multi-user.target

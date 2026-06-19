@@ -28,3 +28,9 @@ Thumbs.db
 
 # Ansible
 *.retry
+
+# ADM
+adm/data/
+adm/backend/static/
+adm/frontend/node_modules/
+adm/frontend/dist/
