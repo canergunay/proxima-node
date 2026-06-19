@@ -1,0 +1,8 @@
+# outline-ss role defaults
+outline_ss_version: "1.5.0"
+outline_ss_dir: /opt/outline-ss
+ss_port: 8388
+ss_cipher: chacha20-ietf-poly1305
+ss_prefix: "FgMBAgABAAH8AwM="
+outline_ss_user: nobody
+outline_ss_group: nogroup

@@ -1,0 +1,10 @@
+# ERG-TR — VPN Exit Node (Turkey)
+# Copy to erg-tr.yml and fill in real values. NEVER commit the real file.
+
+server_ip: 82.26.94.37
+node_id: proxima-node-erg-tr
+ss_password: "CHANGE_ME"
+ssconf_token: "CHANGE_ME"
+speedtest_api_key: "CHANGE_ME"
+agent_api_key: "CHANGE_ME"
+install_adguard: false

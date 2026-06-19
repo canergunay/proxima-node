@@ -1,0 +1,10 @@
+[Unit]
+Description=Zapret watchdog timer (every 5 min)
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Unit=zapret-watchdog.service
+
+[Install]
+WantedBy=timers.target

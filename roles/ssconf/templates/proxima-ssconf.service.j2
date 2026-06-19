@@ -1,0 +1,24 @@
+[Unit]
+Description=Proxima ssconf HTTPS Server
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 {{ outline_ss_dir }}/ssconf-server.py
+Environment=SSCONF_TOKEN={{ ssconf_token }}
+Environment=SSCONF_SERVER_IP={{ server_ip | default(ansible_default_ipv4.address) }}
+Environment=SSCONF_SS_PORT={{ ss_port }}
+Environment=SSCONF_SS_PASSWORD={{ ss_password }}
+Environment=SSCONF_SS_CIPHER={{ ss_cipher }}
+Environment=SSCONF_SS_PREFIX={{ ss_prefix }}
+Environment=SSCONF_CERT={{ outline_ss_dir }}/cert.pem
+Environment=SSCONF_KEY={{ outline_ss_dir }}/key.pem
+Environment=SSCONF_PORT={{ ssconf_port }}
+Restart=always
+RestartSec=5
+User=nobody
+Group=nogroup
+WorkingDirectory={{ outline_ss_dir }}
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,57 @@
+---
+# Update proxima-agent on all servers
+# Deploys the latest agent.py and restarts the service.
+#
+# Usage:
+#   ansible-playbook playbooks/update-agent.yml              # all servers
+#   ansible-playbook playbooks/update-agent.yml -l erg-pl    # single server
+
+- name: Update proxima-agent
+  hosts: all
+  gather_facts: false
+
+  tasks:
+    - name: Deploy latest agent script
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../agent/agent.py"
+        dest: "{{ agent_dir | default('/opt/proxima-agent') }}/agent.py"
+        owner: root
+        group: root
+        mode: "0644"
+      register: agent_deployed
+
+    - name: Deploy latest requirements
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../agent/requirements.txt"
+        dest: "{{ agent_dir | default('/opt/proxima-agent') }}/requirements.txt"
+        owner: root
+        group: root
+        mode: "0644"
+      register: requirements_deployed
+
+    - name: Update venv packages
+      ansible.builtin.pip:
+        requirements: "{{ agent_dir | default('/opt/proxima-agent') }}/requirements.txt"
+        virtualenv: "{{ agent_dir | default('/opt/proxima-agent') }}/venv"
+      when: requirements_deployed.changed
+
+    - name: Restart proxima-agent
+      ansible.builtin.systemd:
+        name: proxima-agent
+        state: restarted
+      when: agent_deployed.changed or requirements_deployed.changed
+
+    - name: Wait for agent to come up
+      ansible.builtin.uri:
+        url: "https://{{ ansible_host }}:{{ agent_port | default(5051) }}/health"
+        validate_certs: false
+        status_code: 200
+      register: health_check
+      retries: 5
+      delay: 3
+      until: health_check.status == 200
+      delegate_to: localhost
+
+    - name: Report agent status
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: agent {{ 'updated and healthy' if agent_deployed.changed else 'already up to date' }}"

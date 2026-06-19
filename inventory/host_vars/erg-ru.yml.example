@@ -1,0 +1,13 @@
+# ERG-RU — DPI Bypass Node (Moscow LAN, Raspberry Pi 5)
+# Copy to erg-ru.yml and fill in real values. NEVER commit the real file.
+
+server_ip: 192.168.2.92
+node_id: zapret-erg-ru
+ss_password: "CHANGE_ME"
+agent_api_key: "CHANGE_ME"
+
+# Zapret nfqws2 arguments (without --qnum)
+nfqws2_args: >-
+  --dpi-desync=fake,split2
+  --dpi-desync-ttl=3
+  --dpi-desync-fooling=md5sig,badseq

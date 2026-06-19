@@ -1,0 +1,45 @@
+---
+- name: Ensure .ssh directory exists
+  ansible.builtin.file:
+    path: /root/.ssh
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Inject SSH public key
+  ansible.builtin.authorized_key:
+    user: root
+    key: "{{ ssh_public_key }}"
+    state: present
+  when: ssh_public_key | default('') | length > 10
+
+- name: Disable password authentication
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^#?PasswordAuthentication"
+    line: "PasswordAuthentication no"
+  notify: reload sshd
+  when: ssh_public_key | default('') | length > 10
+
+- name: Enable pubkey authentication
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^#?PubkeyAuthentication"
+    line: "PubkeyAuthentication yes"
+  notify: reload sshd
+
+- name: Set PermitRootLogin to prohibit-password
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^#?PermitRootLogin"
+    line: "PermitRootLogin prohibit-password"
+  notify: reload sshd
+  when: ssh_public_key | default('') | length > 10
+
+- name: Disable X11 forwarding
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^#?X11Forwarding"
+    line: "X11Forwarding no"
+  notify: reload sshd

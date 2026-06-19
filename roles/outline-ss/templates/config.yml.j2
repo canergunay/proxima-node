@@ -1,0 +1,11 @@
+services:
+  - listeners:
+      - type: tcp
+        address: "[::]:{{ ss_port }}"
+      - type: udp
+        address: "[::]:{{ ss_port }}"
+    keys:
+      - id: "{{ node_id | default('proxima-node-' + ansible_hostname) }}"
+        cipher: "{{ ss_cipher }}"
+        secret: "{{ ss_password }}"
+        prefix: "{{ ss_prefix }}"

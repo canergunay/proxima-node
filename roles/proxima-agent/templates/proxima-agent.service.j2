@@ -1,0 +1,15 @@
+[Unit]
+Description=Proxima Agent (management API)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory={{ agent_dir }}
+ExecStart={{ agent_dir }}/venv/bin/python {{ agent_dir }}/agent.py
+Restart=always
+RestartSec=5
+Environment=PROXIMA_AGENT_DIR={{ agent_dir }}
+Environment=PROXIMA_AGENT_CONFIG={{ agent_dir }}/config.json
+
+[Install]
+WantedBy=multi-user.target

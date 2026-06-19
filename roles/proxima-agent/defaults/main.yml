@@ -1,0 +1,3 @@
+# proxima-agent role defaults
+agent_port: 5051
+agent_dir: /opt/proxima-agent

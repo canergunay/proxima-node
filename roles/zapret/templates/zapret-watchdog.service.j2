@@ -1,0 +1,6 @@
+[Unit]
+Description=Zapret watchdog check
+
+[Service]
+Type=oneshot
+ExecStart={{ zapret_dir }}/watchdog.sh

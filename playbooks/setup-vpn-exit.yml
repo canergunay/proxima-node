@@ -1,0 +1,68 @@
+---
+# Setup a VPN Exit Node
+# Roles: common → outline-ss → ssconf → speedtest → proxima-agent
+# Optional: adguard (when install_adguard=true)
+#
+# Usage:
+#   ansible-playbook playbooks/setup-vpn-exit.yml -l erg-pl
+#   ansible-playbook playbooks/setup-vpn-exit.yml -l erg-pl --ask-pass  # first connect
+#   ansible-playbook playbooks/setup-vpn-exit.yml -l erg-pl --check     # dry run
+
+- name: Setup VPN Exit Node
+  hosts: vpn_exit
+  gather_facts: true
+
+  pre_tasks:
+    - name: Verify host is in vpn_exit group
+      ansible.builtin.assert:
+        that:
+          - "'vpn_exit' in group_names"
+        fail_msg: "This playbook is only for vpn_exit hosts"
+
+    - name: Verify required variables
+      ansible.builtin.assert:
+        that:
+          - server_ip is defined and server_ip | length > 0
+          - ss_password is defined and ss_password | length > 0
+          - ssconf_token is defined and ssconf_token | length > 0
+          - speedtest_api_key is defined and speedtest_api_key | length > 0
+          - agent_api_key is defined and agent_api_key | length > 0
+        fail_msg: "Missing required host_vars. Copy host_vars/<host>.yml.example to host_vars/<host>.yml and fill in values."
+
+  roles:
+    - role: common
+      tags: [common]
+
+    - role: outline-ss
+      tags: [outline-ss]
+
+    - role: ssconf
+      tags: [ssconf]
+
+    - role: speedtest
+      tags: [speedtest]
+
+    - role: proxima-agent
+      tags: [agent]
+
+    - role: adguard
+      when: install_adguard | default(false) | bool
+      tags: [adguard]
+
+  post_tasks:
+    - name: Display setup summary
+      ansible.builtin.debug:
+        msg: |
+          ✓ VPN Exit Node setup complete: {{ inventory_hostname }}
+          ─────────────────────────────────────────
+          Server IP:    {{ server_ip }}
+          Location:     {{ server_location | default('unknown') }}
+          SS Port:      {{ ss_port }}
+          SS Cipher:    {{ ss_cipher }}
+          ssconf URL:   https://{{ server_ip }}:{{ ssconf_port }}/{{ ssconf_token }}
+          Agent URL:    https://{{ server_ip }}:{{ agent_port }}/api/info
+          Speedtest:    https://{{ server_ip }}:{{ speedtest_port }}
+          AdGuard:      {{ 'installed' if (install_adguard | default(false) | bool) else 'not installed' }}
+          ─────────────────────────────────────────
+          Next: Install AWG/Xray via AmneziaVPN app (optional)
+      tags: [always]

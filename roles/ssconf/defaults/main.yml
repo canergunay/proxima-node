@@ -1,0 +1,3 @@
+# ssconf role defaults
+ssconf_port: 8390
+outline_ss_dir: /opt/outline-ss

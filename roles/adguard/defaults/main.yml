@@ -1,0 +1,3 @@
+# adguard role defaults
+adguard_port_dns: 53
+adguard_port_web: 3000

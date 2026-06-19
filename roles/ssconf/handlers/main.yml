@@ -1,0 +1,9 @@
+---
+- name: daemon reload
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: restart ssconf
+  ansible.builtin.systemd:
+    name: proxima-ssconf
+    state: restarted

@@ -1,3 +1,30 @@
+# Secrets
 config.env
 *.pem
 *.key
+
+# Host-specific variables (contain secrets)
+inventory/host_vars/*.yml
+!inventory/host_vars/*.yml.example
+!inventory/host_vars/.gitignore
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+
+# Editor
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Ansible
+*.retry

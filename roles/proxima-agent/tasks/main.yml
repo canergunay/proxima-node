@@ -1,0 +1,70 @@
+---
+- name: Install Python dependencies
+  ansible.builtin.apt:
+    name:
+      - python3
+      - python3-pip
+      - python3-venv
+    state: present
+
+- name: Create agent directory
+  ansible.builtin.file:
+    path: "{{ agent_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy agent script
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../agent/agent.py"
+    dest: "{{ agent_dir }}/agent.py"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart proxima-agent
+
+- name: Deploy requirements.txt
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../agent/requirements.txt"
+    dest: "{{ agent_dir }}/requirements.txt"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Create Python venv
+  ansible.builtin.command:
+    cmd: python3 -m venv {{ agent_dir }}/venv
+    creates: "{{ agent_dir }}/venv/bin/python"
+
+- name: Install Flask in venv
+  ansible.builtin.pip:
+    requirements: "{{ agent_dir }}/requirements.txt"
+    virtualenv: "{{ agent_dir }}/venv"
+
+- name: Write agent config
+  ansible.builtin.template:
+    src: config.json.j2
+    dest: "{{ agent_dir }}/config.json"
+    owner: root
+    group: root
+    mode: "0600"
+  notify: restart proxima-agent
+
+- name: Deploy proxima-agent systemd service
+  ansible.builtin.template:
+    src: proxima-agent.service.j2
+    dest: /etc/systemd/system/proxima-agent.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - daemon reload
+    - restart proxima-agent
+
+- name: Enable and start proxima-agent
+  ansible.builtin.systemd:
+    name: proxima-agent
+    enabled: true
+    state: started
+    daemon_reload: true

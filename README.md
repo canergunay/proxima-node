@@ -1,132 +1,138 @@
 # proxima-node
 
-One-command VPN exit node setup for [Proxima](https://github.com/canergunay/proxima) — a proxy & VPN management platform.
+Infrastructure-as-Code for [Proxima](https://github.com/canergunay/proxima) server nodes — VPN exit servers and DPI bypass nodes.
 
-Sets up a complete VPN exit node with Outline Shadowsocks, speed test server, and AdGuard Home on a fresh Debian/Ubuntu VPS.
+Manages provisioning, configuration, credential rotation, and lifecycle of all Proxima server infrastructure via Ansible roles and playbooks.
 
-## What Gets Installed
+## Server Types
 
-| Component | Port | Purpose |
-|-----------|------|---------|
-| **Outline SS** | 8388/tcp+udp | Shadowsocks proxy server (chacha20-ietf-poly1305) |
-| **ssconf** | 8390/tcp | HTTPS server for SS config distribution |
-| **Speed Test** | 8999/tcp | HTTPS speed test server for Proxima |
-| **AdGuard Home** | 53, 3000 | DNS-level ad blocking |
-| **UFW Firewall** | — | Hardened firewall with only required ports |
+| Type | Servers | Key Components |
+|------|---------|---------------|
+| **VPN Exit** | ERG-TR, ERG-DE, ERG-FI, ERG-PL | outline-ss-server, ssconf, speedtest, proxima-agent |
+| **DPI Bypass** | ERG-RU (Pi5) | shadowsocks-libev, zapret-nfqws2, proxima-agent |
 
-**AmneziaWG + Xray** are installed separately via the [AmneziaVPN](https://amnezia.org) client app (ports 80/udp, 443/tcp).
+See [docs/server-types.md](docs/server-types.md) for detailed comparison.
 
 ## Quick Start
 
+### Option 1: Ansible (recommended)
+
 ```bash
-# SSH into your fresh Debian 12 VPS as root, then:
+# Clone the repo on the Ansible control machine
+git clone https://github.com/canergunay/proxima-node.git
+cd proxima-node
+
+# Setup host variables
+cp inventory/host_vars/erg-pl.yml.example inventory/host_vars/erg-pl.yml
+# Edit with real values...
+
+# Provision a VPN exit node (first connect, password auth):
+ansible-playbook playbooks/setup-vpn-exit.yml -l erg-pl --ask-pass
+
+# Provision a DPI bypass node:
+ansible-playbook playbooks/setup-dpi-bypass.yml -l erg-ru --ask-pass
+```
+
+### Option 2: Standalone script (no Ansible needed on target)
+
+```bash
+# SSH into a fresh Debian 12 VPS as root:
 curl -sSL https://raw.githubusercontent.com/canergunay/proxima-node/main/setup.sh | bash
 ```
 
-Or clone and run:
+## Repo Structure
 
-```bash
-git clone https://github.com/canergunay/proxima-node.git
-cd proxima-node
-bash setup.sh
 ```
+proxima-node/
+├── ansible.cfg              # Ansible configuration
+├── setup.sh                 # Standalone curl-installer (no Ansible needed)
+│
+├── inventory/
+│   ├── hosts.yml            # Server inventory (IPs, groups)
+│   ├── group_vars/          # Per-group defaults
+│   └── host_vars/           # Per-server secrets (gitignored)
+│
+├── roles/
+│   ├── common/              # System hardening, SSH, UFW, Docker
+│   ├── outline-ss/          # Outline SS server (VPN exit)
+│   ├── ss-server/           # shadowsocks-libev (DPI bypass)
+│   ├── ssconf/              # SS config distribution server
+│   ├── speedtest/           # Speed test server
+│   ├── zapret/              # Zapret DPI bypass (nfqws2)
+│   ├── proxima-agent/       # Universal management agent
+│   └── adguard/             # AdGuard Home (Docker)
+│
+├── playbooks/
+│   ├── site.yml             # Full site setup (all servers)
+│   ├── setup-vpn-exit.yml   # VPN exit node provisioning
+│   ├── setup-dpi-bypass.yml # DPI bypass node provisioning
+│   ├── update-agent.yml     # Update proxima-agent everywhere
+│   ├── health-check.yml     # Verify all servers healthy
+│   ├── rotate-credentials.yml  # Rotate SS passwords, API keys
+│   └── decommission.yml     # Safely remove a server
+│
+├── agent/                   # proxima-agent source code
+│   ├── agent.py             # Universal agent (HTTPS, auto-detect server type)
+│   └── requirements.txt
+│
+├── scripts/                 # Standalone bash scripts (used by setup.sh)
+└── docs/                    # Documentation
+```
+
+## Playbooks
+
+| Playbook | Purpose | Example |
+|----------|---------|---------|
+| `setup-vpn-exit.yml` | Provision VPN exit node | `ansible-playbook playbooks/setup-vpn-exit.yml -l erg-pl` |
+| `setup-dpi-bypass.yml` | Provision DPI bypass node | `ansible-playbook playbooks/setup-dpi-bypass.yml -l erg-ru` |
+| `site.yml` | All servers (dispatches by type) | `ansible-playbook playbooks/site.yml` |
+| `update-agent.yml` | Update proxima-agent | `ansible-playbook playbooks/update-agent.yml` |
+| `health-check.yml` | Check all servers | `ansible-playbook playbooks/health-check.yml` |
+| `rotate-credentials.yml` | Rotate secrets | `ansible-playbook playbooks/rotate-credentials.yml -l erg-pl` |
+| `decommission.yml` | Remove a server | `ansible-playbook playbooks/decommission.yml -l erg-old` |
+
+## proxima-agent
+
+Universal management agent deployed on every server. Provides HTTPS API (self-signed cert, API key auth) for remote management.
+
+**Key endpoints:**
+- `GET /health` — basic health check (no auth)
+- `GET /api/status` — disk, memory, uptime, services
+- `GET /api/info` — agent version, server type, cert fingerprint
+- `POST /api/restart` — restart services
+- `GET /api/ss-key` — current SS connection key
+
+Auto-detects server type (VPN exit vs DPI bypass) and exposes type-specific endpoints.
 
 ## Requirements
 
-- **OS:** Debian 12 or Ubuntu 22+ (fresh install recommended)
-- **RAM:** 1 GB minimum
-- **Disk:** 10 GB minimum
-- **Access:** Root SSH access
-
-## Setup Flow
-
-```
-1. Get a VPS (Debian 12)
-2. SSH in as root
-3. Run the setup script → Outline SS, ssconf, speedtest, AdGuard Home installed
-4. Use AmneziaVPN client to add AWG + Xray to the server
-5. Add credentials to your Proxima instance
-```
-
-## Components
-
-### Outline Shadowsocks (port 8388)
-
-Native [outline-ss-server](https://github.com/Jigsaw-Code/outline-ss-server) binary with:
-- `chacha20-ietf-poly1305` cipher
-- TLS ClientHello prefix for DPI resistance
-- TCP + UDP listeners
-
-### ssconf Server (port 8390)
-
-Lightweight Python HTTPS server that serves the SS configuration as JSON. Proxima clients fetch this URL to auto-configure their Shadowsocks connection. Protected by a random token.
-
-### Speed Test Server (port 8999)
-
-HTTPS server for measuring tunnel throughput from Proxima:
-- `HEAD /speedtest/ping` — latency measurement
-- `GET /speedtest/download?size=N` — download test (max 50 MB)
-- `POST /speedtest/upload` — upload test (max 100 MB)
-- `GET /speedtest/health` — health check (no auth)
-
-Protected by Bearer token authentication.
-
-### AdGuard Home (port 53, 3000)
-
-DNS-level ad and tracker blocking via Docker container. After installation, complete the setup wizard at `http://<server-ip>:3000`.
-
-### System Hardening
-
-- **sysctl:** IP forwarding, TCP BBR, network hardening
-- **SSH:** Key-only auth (if keys detected), root login via key only
-- **UFW:** Deny-all incoming, only required ports open
-
-## Configuration
-
-All generated secrets are saved to `/opt/proxima-node/config.env`:
-
-```
-SERVER_IP=<auto-detected>
-NODE_ID=proxima-node-<hostname>
-SS_PASSWORD=<random>
-SS_PREFIX=FgMBAgABAAH8AwM=
-SSCONF_TOKEN=<random>
-SPEEDTEST_API_KEY=<random>
-```
+- **Control machine:** Linux with Ansible 2.14+
+- **Target servers:** Debian 12+ or Ubuntu 22+ with root SSH access
+- **VPN exit:** KVM/QEMU VPS (required for WireGuard kernel module)
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────┐
-│                  VPS Server                  │
-│                                              │
-│  ┌──────────────┐  ┌──────────────────────┐ │
-│  │ AmneziaWG    │  │ Outline SS           │ │
-│  │ (Docker)     │  │ (native binary)      │ │
-│  │ :80/udp      │  │ :8388/tcp+udp        │ │
-│  └──────────────┘  └──────────────────────┘ │
-│  ┌──────────────┐  ┌──────────────────────┐ │
-│  │ Xray VLESS   │  │ ssconf server        │ │
-│  │ (Docker)     │  │ (Python/systemd)     │ │
-│  │ :443/tcp     │  │ :8390/tcp            │ │
-│  └──────────────┘  └──────────────────────┘ │
-│  ┌──────────────┐  ┌──────────────────────┐ │
-│  │ AdGuard Home │  │ Speed Test server    │ │
-│  │ (Docker)     │  │ (Python/systemd)     │ │
-│  │ :53, :3000   │  │ :8999/tcp            │ │
-│  └──────────────┘  └──────────────────────┘ │
-│                                              │
-│  UFW Firewall ─ deny all except above ports  │
-└─────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────┐
+│           Control Machine (ERG)                  │
+│    Ansible → SSH → target servers                │
+│    adm.prxa.net → HTTPS → proxima-agents         │
+└─────────────────────┬───────────────────────────┘
+                      │
+      ┌───────────────┼───────────────────┐
+      │               │                   │
+┌─────▼─────┐  ┌──────▼──────┐   ┌───────▼───────┐
+│ VPN Exit   │  │ VPN Exit    │   │ DPI Bypass    │
+│ ERG-PL     │  │ ERG-DE/FI/TR│   │ ERG-RU (Pi5)  │
+│            │  │             │   │               │
+│ outline-ss │  │ outline-ss  │   │ ss-server     │
+│ ssconf     │  │ ssconf      │   │ zapret-nfqws2 │
+│ speedtest  │  │ speedtest   │   │ proxima-agent │
+│ prx-agent  │  │ prx-agent   │   │ watchdog      │
+│ [AWG/Xray] │  │ [AWG/Xray]  │   └───────────────┘
+│ [AdGuard]  │  │             │
+└────────────┘  └─────────────┘
 ```
-
-## Tested Providers
-
-| Provider | Location | ERG Latency | Notes |
-|----------|----------|-------------|-------|
-| BlueVPS | Warsaw, PL | 31ms | NVMe-bKVM 1024, $6/mo |
-| Hetzner | Germany | 43ms | Good but IPs throttled in Russia |
-| Aeza | Finland | — | Cooperates with RKN, not recommended |
 
 ## License
 

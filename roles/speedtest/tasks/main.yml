@@ -1,0 +1,59 @@
+---
+- name: Create speedtest directory
+  ansible.builtin.file:
+    path: "{{ speedtest_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Generate self-signed TLS certificate for speedtest
+  ansible.builtin.command:
+    cmd: >
+      openssl req -x509 -nodes -newkey ec -pkeyopt ec_paramgen_curve:prime256v1
+      -keyout {{ speedtest_dir }}/key.pem -out {{ speedtest_dir }}/cert.pem
+      -days 3650 -subj "/CN=proxima-speedtest"
+      -addext "subjectAltName=IP:{{ server_ip | default(ansible_default_ipv4.address) }}"
+    creates: "{{ speedtest_dir }}/cert.pem"
+
+- name: Set cert permissions
+  ansible.builtin.file:
+    path: "{{ speedtest_dir }}/{{ item.name }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { name: cert.pem, mode: "0644" }
+    - { name: key.pem, mode: "0600" }
+
+- name: Deploy speedtest server script
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../templates/speedtest-server.py"
+    dest: "{{ speedtest_dir }}/speedtest-server.py"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart speedtest
+
+- name: Deploy speedtest systemd service
+  ansible.builtin.template:
+    src: proxima-speedtest.service.j2
+    dest: /etc/systemd/system/proxima-speedtest.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - daemon reload
+    - restart speedtest
+
+- name: Enable and start speedtest
+  ansible.builtin.systemd:
+    name: proxima-speedtest
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Allow speedtest port in UFW
+  community.general.ufw:
+    rule: allow
+    port: "{{ speedtest_port }}"
+    proto: tcp
+    comment: "Proxima speedtest"

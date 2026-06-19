@@ -1,0 +1,57 @@
+---
+# Health check — verify all servers are healthy
+# Connects to each proxima-agent and checks service status.
+#
+# Usage:
+#   ansible-playbook playbooks/health-check.yml              # all servers
+#   ansible-playbook playbooks/health-check.yml -l vpn_exit  # only VPN exits
+
+- name: Health Check All Servers
+  hosts: all
+  become: false
+  gather_facts: false
+
+  tasks:
+    - name: Check agent health endpoint
+      ansible.builtin.uri:
+        url: "https://{{ ansible_host }}:{{ agent_port | default(5051) }}/health"
+        validate_certs: false
+        status_code: 200
+        return_content: true
+      register: health_result
+      delegate_to: localhost
+      failed_when: false
+
+    - name: Check agent status endpoint
+      ansible.builtin.uri:
+        url: "https://{{ ansible_host }}:{{ agent_port | default(5051) }}/api/status"
+        validate_certs: false
+        headers:
+          X-API-Key: "{{ agent_api_key }}"
+        status_code: 200
+        return_content: true
+      register: status_result
+      delegate_to: localhost
+      failed_when: false
+      when: health_result.status is defined and health_result.status == 200
+
+    - name: Report healthy server
+      ansible.builtin.debug:
+        msg: |
+          ✓ {{ inventory_hostname }} ({{ server_location | default('?') }})
+            Agent:  healthy
+            Uptime: {{ (status_result.json.data.uptime | default('unknown')) }}s
+            Disk:   {{ (status_result.json.data.disk.used_pct | default('?')) }}%
+            Memory: {{ (status_result.json.data.memory.used_pct | default('?')) }}%
+      when:
+        - health_result.status is defined
+        - health_result.status == 200
+        - status_result.status is defined
+        - status_result.status == 200
+
+    - name: Report unhealthy server
+      ansible.builtin.debug:
+        msg: |
+          ✗ {{ inventory_hostname }} ({{ server_location | default('?') }})
+            Agent:  UNREACHABLE (HTTP {{ health_result.status | default('connection refused') }})
+      when: health_result.status is not defined or health_result.status != 200

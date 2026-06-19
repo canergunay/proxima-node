@@ -1,0 +1,6 @@
+# common role defaults
+ssh_port: 22
+install_docker: true
+ssh_public_key: ""
+proxima_ips: []
+agent_port: 5051

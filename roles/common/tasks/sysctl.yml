@@ -1,0 +1,13 @@
+---
+- name: Deploy sysctl configuration
+  ansible.builtin.template:
+    src: sysctl-proxima.conf.j2
+    dest: /etc/sysctl.d/99-proxima-node.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload sysctl
+
+- name: Apply sysctl settings
+  ansible.builtin.command: sysctl --system
+  changed_when: false

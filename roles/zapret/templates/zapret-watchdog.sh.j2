@@ -1,0 +1,31 @@
+#!/bin/bash
+# Zapret watchdog — checks iptables rules, service health, and YouTube reachability.
+# Managed by Ansible. Run by zapret-watchdog.timer every 5 minutes.
+
+# Check 1: UID exception rule for ss-server (must be present)
+if ! /sbin/iptables -t mangle -C OUTPUT -p tcp --dport 443 -m owner --uid-owner {{ ssserver_uid }} -j ACCEPT 2>/dev/null; then
+    echo "$(date): ss-server UID exception rule missing, restarting zapret-nfqws2"
+    systemctl restart zapret-nfqws2
+    exit 0
+fi
+
+# Check 2: NFQUEUE rule (must be present)
+if ! /sbin/iptables -t mangle -C OUTPUT -p tcp --dport 443 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:15 -j NFQUEUE --queue-num {{ nfqws2_queue_num }} --queue-bypass 2>/dev/null; then
+    echo "$(date): NFQUEUE rule missing, restarting zapret-nfqws2"
+    systemctl restart zapret-nfqws2
+    exit 0
+fi
+
+# Check 3: service is active
+if ! systemctl is-active --quiet zapret-nfqws2; then
+    echo "$(date): zapret-nfqws2 not active, restarting"
+    systemctl restart zapret-nfqws2
+    exit 0
+fi
+
+# Check 4: YouTube reachability (DPI bypass working)
+HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 https://www.youtube.com 2>/dev/null)
+if [ "$HTTP_CODE" = "000" ]; then
+    echo "$(date): YouTube unreachable (HTTP 000), restarting zapret-nfqws2"
+    systemctl restart zapret-nfqws2
+fi

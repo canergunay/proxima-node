@@ -1,0 +1,15 @@
+---
+# Full site setup — dispatches by group membership
+# Each imported playbook has its own host filter (vpn_exit / dpi_bypass),
+# so running this against all hosts will apply the correct setup per server type.
+#
+# Usage:
+#   ansible-playbook playbooks/site.yml                    # all servers
+#   ansible-playbook playbooks/site.yml -l erg-pl          # single server
+#   ansible-playbook playbooks/site.yml --check            # dry run
+
+- name: Setup VPN Exit Nodes
+  ansible.builtin.import_playbook: setup-vpn-exit.yml
+
+- name: Setup DPI Bypass Nodes
+  ansible.builtin.import_playbook: setup-dpi-bypass.yml

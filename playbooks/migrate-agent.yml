@@ -1,0 +1,112 @@
+---
+# Migrate from zapret-agent (port 5050) to proxima-agent (port 5051)
+#
+# This playbook:
+# 1. Deploys proxima-agent on port 5051
+# 2. Verifies it responds to health checks
+# 3. Stops and removes the old zapret-agent (port 5050)
+#
+# Usage:
+#   ansible-playbook playbooks/migrate-agent.yml -l erg-tr
+#   ansible-playbook playbooks/migrate-agent.yml              # all servers
+
+- name: Migrate zapret-agent to proxima-agent
+  hosts: all
+  gather_facts: true
+
+  vars:
+    old_agent_dir: /opt/zapret-agent
+    old_agent_service: zapret-agent
+
+  tasks:
+    # ── Phase 1: Deploy proxima-agent ──────────────────────────────────────
+
+    - name: Check if old zapret-agent exists
+      ansible.builtin.stat:
+        path: /etc/systemd/system/{{ old_agent_service }}.service
+      register: old_agent_exists
+
+    - name: Report migration status
+      ansible.builtin.debug:
+        msg: "{{ 'Old zapret-agent found — will migrate' if old_agent_exists.stat.exists else 'No zapret-agent found — deploying fresh proxima-agent' }}"
+
+    - name: Deploy proxima-agent via role
+      ansible.builtin.include_role:
+        name: proxima-agent
+
+    # ── Phase 2: Verify new agent ──────────────────────────────────────────
+
+    - name: Wait for proxima-agent health check
+      ansible.builtin.uri:
+        url: "https://{{ ansible_host }}:{{ agent_port | default(5051) }}/health"
+        validate_certs: false
+        status_code: 200
+      register: new_agent_health
+      retries: 5
+      delay: 3
+      until: new_agent_health.status == 200
+      delegate_to: localhost
+
+    - name: Verify proxima-agent version
+      ansible.builtin.uri:
+        url: "https://{{ ansible_host }}:{{ agent_port | default(5051) }}/health"
+        validate_certs: false
+        return_content: true
+      register: new_agent_info
+      delegate_to: localhost
+
+    - name: Show new agent info
+      ansible.builtin.debug:
+        msg: "proxima-agent healthy: {{ new_agent_info.json }}"
+
+    # ── Phase 3: Remove old zapret-agent ───────────────────────────────────
+
+    - name: Stop old zapret-agent service
+      ansible.builtin.systemd:
+        name: "{{ old_agent_service }}"
+        state: stopped
+      when: old_agent_exists.stat.exists
+      ignore_errors: true
+
+    - name: Disable old zapret-agent service
+      ansible.builtin.systemd:
+        name: "{{ old_agent_service }}"
+        enabled: false
+      when: old_agent_exists.stat.exists
+      ignore_errors: true
+
+    - name: Remove old zapret-agent systemd unit
+      ansible.builtin.file:
+        path: /etc/systemd/system/{{ old_agent_service }}.service
+        state: absent
+      when: old_agent_exists.stat.exists
+      notify: daemon reload
+
+    - name: Remove old zapret-agent directory
+      ansible.builtin.file:
+        path: "{{ old_agent_dir }}"
+        state: absent
+      when: old_agent_exists.stat.exists
+
+    - name: Close old agent port in UFW
+      ansible.builtin.command:
+        cmd: ufw delete allow 5050/tcp
+      when: old_agent_exists.stat.exists
+      ignore_errors: true
+
+    - name: Reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true
+      when: old_agent_exists.stat.exists
+
+    - name: Migration summary
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }}: migration complete.
+          proxima-agent v{{ new_agent_info.json.version }} running on port {{ agent_port | default(5051) }}.
+          {{ 'Old zapret-agent removed.' if old_agent_exists.stat.exists else 'No old agent to remove.' }}
+
+  handlers:
+    - name: daemon reload
+      ansible.builtin.systemd:
+        daemon_reload: true

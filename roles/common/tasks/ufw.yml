@@ -1,0 +1,50 @@
+---
+- name: Install UFW
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+
+- name: Set UFW default deny incoming
+  community.general.ufw:
+    direction: incoming
+    default: deny
+
+- name: Set UFW default allow outgoing
+  community.general.ufw:
+    direction: outgoing
+    default: allow
+
+- name: Allow SSH
+  community.general.ufw:
+    rule: allow
+    port: "{{ ssh_port | default(22) }}"
+    proto: tcp
+    comment: SSH
+
+- name: Allow SS port (TCP)
+  community.general.ufw:
+    rule: allow
+    port: "{{ ss_port | default(8388) }}"
+    proto: tcp
+    comment: Shadowsocks TCP
+
+- name: Allow SS port (UDP)
+  community.general.ufw:
+    rule: allow
+    port: "{{ ss_port | default(8388) }}"
+    proto: udp
+    comment: Shadowsocks UDP
+
+- name: Allow agent port from Proxima IPs only
+  community.general.ufw:
+    rule: allow
+    port: "{{ agent_port | default(5051) }}"
+    proto: tcp
+    from_ip: "{{ item }}"
+    comment: "Proxima agent from {{ item }}"
+  loop: "{{ proxima_ips | default([]) }}"
+  when: proxima_ips | default([]) | length > 0
+
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled

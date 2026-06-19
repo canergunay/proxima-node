@@ -1,0 +1,14 @@
+[Unit]
+Description=Outline SS Server
+After=network.target
+
+[Service]
+Type=simple
+ExecStart={{ outline_ss_dir }}/outline-ss-server -config {{ outline_ss_dir }}/config.yml
+Restart=always
+RestartSec=5
+User={{ outline_ss_user }}
+Group={{ outline_ss_group }}
+
+[Install]
+WantedBy=multi-user.target

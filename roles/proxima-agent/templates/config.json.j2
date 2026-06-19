@@ -1,0 +1,7 @@
+{
+    "api_key": "{{ agent_api_key | default('') }}",
+    "server_ip": "{{ server_ip | default(ansible_default_ipv4.address) }}",
+    "node_id": "{{ node_id | default('proxima-node-' + ansible_hostname) }}",
+    "agent_port": {{ agent_port }}{% if healthchecks_url is defined and healthchecks_url %},
+    "healthchecks_url": "{{ healthchecks_url }}"{% endif %}
+}

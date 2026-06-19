@@ -1,0 +1,30 @@
+---
+- name: Include sysctl hardening
+  ansible.builtin.include_tasks: sysctl.yml
+  tags: [common, sysctl]
+
+- name: Include SSH hardening
+  ansible.builtin.include_tasks: ssh.yml
+  tags: [common, ssh]
+
+- name: Include UFW firewall
+  ansible.builtin.include_tasks: ufw.yml
+  tags: [common, ufw]
+
+- name: Include Docker install
+  ansible.builtin.include_tasks: docker.yml
+  when: install_docker | default(true) | bool
+  tags: [common, docker]
+
+- name: Install base packages
+  ansible.builtin.apt:
+    name:
+      - curl
+      - jq
+      - python3
+      - python3-pip
+      - python3-venv
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  tags: [common, packages]

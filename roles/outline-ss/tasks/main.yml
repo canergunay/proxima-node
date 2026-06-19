@@ -1,0 +1,65 @@
+---
+- name: Create outline-ss directory
+  ansible.builtin.file:
+    path: "{{ outline_ss_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Determine architecture
+  ansible.builtin.set_fact:
+    outline_arch: "{{ 'arm64' if ansible_architecture == 'aarch64' else 'x86_64' }}"
+
+- name: Download outline-ss-server binary
+  ansible.builtin.get_url:
+    url: "https://github.com/Jigsaw-Code/outline-ss-server/releases/download/v{{ outline_ss_version }}/outline-ss-server_{{ outline_ss_version }}_linux_{{ outline_arch }}.tar.gz"
+    dest: /tmp/outline-ss-server.tar.gz
+    mode: "0644"
+  register: download_result
+
+- name: Extract outline-ss-server binary
+  ansible.builtin.unarchive:
+    src: /tmp/outline-ss-server.tar.gz
+    dest: "{{ outline_ss_dir }}"
+    remote_src: true
+  when: download_result.changed
+
+- name: Set binary permissions
+  ansible.builtin.file:
+    path: "{{ outline_ss_dir }}/outline-ss-server"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy outline-ss config
+  ansible.builtin.template:
+    src: config.yml.j2
+    dest: "{{ outline_ss_dir }}/config.yml"
+    owner: root
+    group: "{{ outline_ss_group }}"
+    mode: "0640"
+  notify: restart outline-ss
+
+- name: Deploy outline-ss systemd service
+  ansible.builtin.template:
+    src: outline-ss-server.service.j2
+    dest: /etc/systemd/system/outline-ss-server.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - daemon reload
+    - restart outline-ss
+
+- name: Enable and start outline-ss-server
+  ansible.builtin.systemd:
+    name: outline-ss-server
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Clean up downloaded archive
+  ansible.builtin.file:
+    path: /tmp/outline-ss-server.tar.gz
+    state: absent

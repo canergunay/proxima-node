@@ -1,0 +1,19 @@
+[Unit]
+Description=Zapret nfqws2 DPI bypass
+After=network.target
+
+[Service]
+Type=simple
+# Flush stale mangle rules before adding fresh ones
+ExecStartPre=/bin/sh -c '/sbin/iptables -t mangle -F OUTPUT 2>/dev/null; true'
+# Rule 1: ACCEPT ss-server traffic (UID {{ ssserver_uid }} = {{ ssserver_user }}) — skip DPI desync
+ExecStartPre=/sbin/iptables -t mangle -I OUTPUT -p tcp --dport 443 -m owner --uid-owner {{ ssserver_uid }} -j ACCEPT
+# Rule 2: NFQUEUE everything else for zapret DPI bypass
+ExecStartPre=/sbin/iptables -t mangle -A OUTPUT -p tcp --dport 443 -m connbytes --connbytes-dir=original --connbytes-mode=packets --connbytes 1:15 -j NFQUEUE --queue-num {{ nfqws2_queue_num }} --queue-bypass
+ExecStart={{ zapret_dir }}/bin/nfqws2 @{{ zapret_dir }}/nfqws2.conf
+ExecStopPost=/bin/sh -c '/sbin/iptables -t mangle -F OUTPUT 2>/dev/null; true'
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

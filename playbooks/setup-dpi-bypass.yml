@@ -1,0 +1,56 @@
+---
+# Setup a DPI Bypass Node
+# Roles: common → ss-server → zapret → proxima-agent
+#
+# Usage:
+#   ansible-playbook playbooks/setup-dpi-bypass.yml -l erg-ru
+#   ansible-playbook playbooks/setup-dpi-bypass.yml -l erg-ru --ask-pass  # first connect
+#   ansible-playbook playbooks/setup-dpi-bypass.yml -l erg-ru --check     # dry run
+
+- name: Setup DPI Bypass Node
+  hosts: dpi_bypass
+  gather_facts: true
+
+  pre_tasks:
+    - name: Verify host is in dpi_bypass group
+      ansible.builtin.assert:
+        that:
+          - "'dpi_bypass' in group_names"
+        fail_msg: "This playbook is only for dpi_bypass hosts"
+
+    - name: Verify required variables
+      ansible.builtin.assert:
+        that:
+          - server_ip is defined and server_ip | length > 0
+          - ss_password is defined and ss_password | length > 0
+          - agent_api_key is defined and agent_api_key | length > 0
+        fail_msg: "Missing required host_vars. Copy host_vars/<host>.yml.example to host_vars/<host>.yml and fill in values."
+
+  roles:
+    - role: common
+      tags: [common]
+
+    - role: ss-server
+      tags: [ss-server]
+
+    - role: zapret
+      tags: [zapret]
+
+    - role: proxima-agent
+      tags: [agent]
+
+  post_tasks:
+    - name: Display setup summary
+      ansible.builtin.debug:
+        msg: |
+          ✓ DPI Bypass Node setup complete: {{ inventory_hostname }}
+          ─────────────────────────────────────────
+          Server IP:       {{ server_ip }}
+          Location:        {{ server_location | default('unknown') }}
+          SS Port:         {{ ss_port }}
+          SS Cipher:       {{ ss_cipher }}
+          SS Server User:  {{ ssserver_user }} (UID {{ ssserver_uid }})
+          NFQUEUE Num:     {{ nfqws2_queue_num }}
+          Agent URL:       https://{{ server_ip }}:{{ agent_port }}/api/info
+          ─────────────────────────────────────────
+      tags: [always]

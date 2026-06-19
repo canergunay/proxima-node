@@ -1,0 +1,39 @@
+---
+- name: Create AdGuard Home directory
+  ansible.builtin.file:
+    path: /opt/adguardhome/{{ item }}
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - work
+    - conf
+
+- name: Stop systemd-resolved if running (frees port 53)
+  ansible.builtin.systemd:
+    name: systemd-resolved
+    state: stopped
+    enabled: false
+  failed_when: false
+
+- name: Run AdGuard Home Docker container
+  community.docker.docker_container:
+    name: adguardhome
+    image: adguard/adguardhome:latest
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "{{ adguard_port_dns }}:53/tcp"
+      - "{{ adguard_port_dns }}:53/udp"
+      - "{{ adguard_port_web }}:3000/tcp"
+    volumes:
+      - /opt/adguardhome/work:/opt/adguardhome/work
+      - /opt/adguardhome/conf:/opt/adguardhome/conf
+
+- name: Allow AdGuard web port in UFW
+  community.general.ufw:
+    rule: allow
+    port: "{{ adguard_port_web }}"
+    proto: tcp
+    comment: "AdGuard Home setup"

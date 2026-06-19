@@ -1,0 +1,149 @@
+---
+# Decommission a server — stop all services, clean up configs
+# Run this before destroying a VPS to ensure clean teardown.
+#
+# Usage:
+#   ansible-playbook playbooks/decommission.yml -l erg-old
+#
+# After running:
+#   1. Remove server from inventory/hosts.yml
+#   2. Remove host_vars/<host>.yml
+#   3. Remove from Proxima tunnel_config
+#   4. Destroy VPS at provider
+
+- name: Decommission Server
+  hosts: all
+  gather_facts: true
+
+  vars_prompt:
+    - name: confirm_decommission
+      prompt: "WARNING: This will STOP ALL Proxima services on {{ ansible_play_hosts | join(', ') }}. Type the hostname to confirm"
+      private: false
+
+  pre_tasks:
+    - name: Abort if not confirmed
+      ansible.builtin.assert:
+        that:
+          - confirm_decommission == inventory_hostname
+        fail_msg: "Decommission cancelled — hostname mismatch"
+
+  tasks:
+    # Stop and disable all Proxima services
+    - name: Stop proxima-agent
+      ansible.builtin.systemd:
+        name: proxima-agent
+        state: stopped
+        enabled: false
+      failed_when: false
+
+    - name: Stop proxima-ssconf
+      ansible.builtin.systemd:
+        name: proxima-ssconf
+        state: stopped
+        enabled: false
+      failed_when: false
+
+    - name: Stop proxima-speedtest
+      ansible.builtin.systemd:
+        name: proxima-speedtest
+        state: stopped
+        enabled: false
+      failed_when: false
+
+    - name: Stop outline-ss-server
+      ansible.builtin.systemd:
+        name: outline-ss-server
+        state: stopped
+        enabled: false
+      failed_when: false
+      when: "'vpn_exit' in group_names"
+
+    - name: Stop shadowsocks-libev
+      ansible.builtin.systemd:
+        name: "shadowsocks-libev-server@config"
+        state: stopped
+        enabled: false
+      failed_when: false
+      when: "'dpi_bypass' in group_names"
+
+    - name: Stop zapret-nfqws2
+      ansible.builtin.systemd:
+        name: zapret-nfqws2
+        state: stopped
+        enabled: false
+      failed_when: false
+      when: "'dpi_bypass' in group_names"
+
+    - name: Stop zapret-watchdog timer
+      ansible.builtin.systemd:
+        name: zapret-watchdog.timer
+        state: stopped
+        enabled: false
+      failed_when: false
+      when: "'dpi_bypass' in group_names"
+
+    - name: Stop AdGuard Home container
+      community.docker.docker_container:
+        name: adguardhome
+        state: absent
+      failed_when: false
+
+    # Remove systemd unit files
+    - name: Remove Proxima systemd units
+      ansible.builtin.file:
+        path: "/etc/systemd/system/{{ item }}"
+        state: absent
+      loop:
+        - proxima-agent.service
+        - proxima-ssconf.service
+        - proxima-speedtest.service
+        - outline-ss-server.service
+        - zapret-nfqws2.service
+        - zapret-watchdog.service
+        - zapret-watchdog.timer
+      notify: daemon reload
+
+    # Clean up data directories
+    - name: Remove proxima-agent directory
+      ansible.builtin.file:
+        path: "{{ agent_dir | default('/opt/proxima-agent') }}"
+        state: absent
+
+    - name: Remove outline-ss directory
+      ansible.builtin.file:
+        path: /opt/outline-ss
+        state: absent
+      when: "'vpn_exit' in group_names"
+
+    - name: Remove speedtest directory
+      ansible.builtin.file:
+        path: /opt/proxima-speedtest
+        state: absent
+
+    - name: Remove AdGuard Home data
+      ansible.builtin.file:
+        path: /opt/adguardhome
+        state: absent
+
+    - name: Reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Display decommission summary
+      ansible.builtin.debug:
+        msg: |
+          ✓ {{ inventory_hostname }} decommissioned
+          ─────────────────────────────────────────
+          All Proxima services stopped and removed.
+
+          Manual steps remaining:
+          1. Remove from inventory/hosts.yml
+          2. Delete host_vars/{{ inventory_hostname }}.yml
+          3. Remove from Proxima tunnel_config
+          4. Destroy VPS at provider ({{ server_provider | default('unknown') }})
+          ─────────────────────────────────────────
+
+  handlers:
+    - name: daemon reload
+      ansible.builtin.systemd:
+        daemon_reload: true

@@ -1,0 +1,11 @@
+# zapret role defaults
+zapret_dir: /opt/zapret
+nfqws2_queue_num: 200
+ssserver_user: ssserver
+ssserver_uid: 999
+
+# Default DPI bypass args (without --qnum)
+nfqws2_args: >-
+  --dpi-desync=fake,split2
+  --dpi-desync-ttl=3
+  --dpi-desync-fooling=md5sig,badseq

@@ -1,0 +1,3 @@
+# speedtest role defaults
+speedtest_port: 8999
+speedtest_dir: /opt/proxima-speedtest

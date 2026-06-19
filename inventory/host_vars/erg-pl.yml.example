@@ -1,0 +1,10 @@
+# ERG-PL — VPN Exit Node (Poland)
+# Copy to erg-pl.yml and fill in real values. NEVER commit the real file.
+
+server_ip: 193.200.16.140
+node_id: proxima-node-srv153554
+ss_password: "CHANGE_ME"
+ssconf_token: "CHANGE_ME"
+speedtest_api_key: "CHANGE_ME"
+agent_api_key: "CHANGE_ME"
+install_adguard: true

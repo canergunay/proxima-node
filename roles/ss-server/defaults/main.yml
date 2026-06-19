@@ -1,0 +1,5 @@
+# ss-server role defaults (shadowsocks-libev for DPI bypass nodes)
+ss_port: 8388
+ss_cipher: chacha20-ietf-poly1305
+ssserver_user: ssserver
+ssserver_uid: 999

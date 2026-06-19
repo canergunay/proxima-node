@@ -1,0 +1,49 @@
+---
+- name: Install shadowsocks-libev
+  ansible.builtin.apt:
+    name: shadowsocks-libev
+    state: present
+
+- name: Create ssserver system user with fixed UID
+  ansible.builtin.user:
+    name: "{{ ssserver_user }}"
+    uid: "{{ ssserver_uid }}"
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+  register: ssserver_user_result
+
+- name: Deploy ss-server config
+  ansible.builtin.template:
+    src: config.json.j2
+    dest: /etc/shadowsocks-libev/config.json
+    owner: root
+    group: root
+    mode: "0640"
+  notify: restart ss-server
+
+- name: Create systemd override directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/shadowsocks-libev-server@config.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy systemd override (fixed user, no DynamicUser)
+  ansible.builtin.template:
+    src: override.conf.j2
+    dest: /etc/systemd/system/shadowsocks-libev-server@config.service.d/override.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - daemon reload
+    - restart ss-server
+
+- name: Enable and start ss-server
+  ansible.builtin.systemd:
+    name: shadowsocks-libev-server@config
+    enabled: true
+    state: started
+    daemon_reload: true

@@ -1,0 +1,9 @@
+---
+- name: daemon reload
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: restart zapret-nfqws2
+  ansible.builtin.systemd:
+    name: zapret-nfqws2
+    state: restarted

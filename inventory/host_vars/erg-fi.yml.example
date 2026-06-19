@@ -1,0 +1,10 @@
+# ERG-FI — VPN Exit Node (Finland)
+# Copy to erg-fi.yml and fill in real values. NEVER commit the real file.
+
+server_ip: 109.120.187.205
+node_id: proxima-node-erg-fi
+ss_password: "CHANGE_ME"
+ssconf_token: "CHANGE_ME"
+speedtest_api_key: "CHANGE_ME"
+agent_api_key: "CHANGE_ME"
+install_adguard: false

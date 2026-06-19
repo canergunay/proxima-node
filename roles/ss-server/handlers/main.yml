@@ -1,0 +1,9 @@
+---
+- name: daemon reload
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: restart ss-server
+  ansible.builtin.systemd:
+    name: shadowsocks-libev-server@config
+    state: restarted

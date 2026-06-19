@@ -1,0 +1,12 @@
+# DPI Bypass Node defaults
+server_type: dpi_bypass
+
+# Components
+install_docker: false    # Pi5 doesn't need Docker
+
+# shadowsocks-libev runs as fixed UID user
+ssserver_user: ssserver
+ssserver_uid: 999
+
+# Zapret
+nfqws2_queue_num: 200

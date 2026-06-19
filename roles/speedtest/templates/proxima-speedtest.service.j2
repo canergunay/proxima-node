@@ -1,0 +1,19 @@
+[Unit]
+Description=Proxima Speed Test Server
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 {{ speedtest_dir }}/speedtest-server.py
+Environment=SPEEDTEST_API_KEY={{ speedtest_api_key }}
+Environment=SPEEDTEST_PORT={{ speedtest_port }}
+Environment=SPEEDTEST_CERT={{ speedtest_dir }}/cert.pem
+Environment=SPEEDTEST_KEY={{ speedtest_dir }}/key.pem
+Restart=always
+RestartSec=5
+User=nobody
+Group=nogroup
+WorkingDirectory={{ speedtest_dir }}
+
+[Install]
+WantedBy=multi-user.target

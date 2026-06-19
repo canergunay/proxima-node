@@ -1,0 +1,93 @@
+---
+- name: Create zapret directory
+  ansible.builtin.file:
+    path: "{{ zapret_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create zapret bin directory
+  ansible.builtin.file:
+    path: "{{ zapret_dir }}/bin"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Check if nfqws2 binary exists
+  ansible.builtin.stat:
+    path: "{{ zapret_dir }}/bin/nfqws2"
+  register: nfqws2_stat
+
+- name: Fail if nfqws2 not installed
+  ansible.builtin.fail:
+    msg: >
+      nfqws2 binary not found at {{ zapret_dir }}/bin/nfqws2.
+      Install zapret manually first or place the nfqws2 binary in {{ zapret_dir }}/bin/.
+  when: not nfqws2_stat.stat.exists
+
+- name: Install iptables if not present
+  ansible.builtin.apt:
+    name: iptables
+    state: present
+
+- name: Write nfqws2 config file
+  ansible.builtin.template:
+    src: nfqws2.conf.j2
+    dest: "{{ zapret_dir }}/nfqws2.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart zapret-nfqws2
+
+- name: Deploy zapret-nfqws2 systemd service
+  ansible.builtin.template:
+    src: zapret-nfqws2.service.j2
+    dest: /etc/systemd/system/zapret-nfqws2.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - daemon reload
+    - restart zapret-nfqws2
+
+- name: Deploy zapret watchdog script
+  ansible.builtin.template:
+    src: zapret-watchdog.sh.j2
+    dest: "{{ zapret_dir }}/watchdog.sh"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy zapret watchdog service
+  ansible.builtin.template:
+    src: zapret-watchdog.service.j2
+    dest: /etc/systemd/system/zapret-watchdog.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: daemon reload
+
+- name: Deploy zapret watchdog timer
+  ansible.builtin.template:
+    src: zapret-watchdog.timer.j2
+    dest: /etc/systemd/system/zapret-watchdog.timer
+    owner: root
+    group: root
+    mode: "0644"
+  notify: daemon reload
+
+- name: Enable and start zapret-nfqws2
+  ansible.builtin.systemd:
+    name: zapret-nfqws2
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Enable and start zapret watchdog timer
+  ansible.builtin.systemd:
+    name: zapret-watchdog.timer
+    enabled: true
+    state: started
+    daemon_reload: true
