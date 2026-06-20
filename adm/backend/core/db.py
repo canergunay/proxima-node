@@ -71,6 +71,16 @@ def init_db() -> None:
             password_hash TEXT NOT NULL,
             created_at    INTEGER NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS vpn_servers (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            name            TEXT NOT NULL UNIQUE,
+            display_name    TEXT NOT NULL,
+            url             TEXT NOT NULL,
+            api_token_enc   TEXT,
+            created_at      INTEGER NOT NULL,
+            updated_at      INTEGER NOT NULL
+        );
     """)
     conn.commit()
 
@@ -267,5 +277,62 @@ def update_admin_password(admin_id: int, password_hash: str) -> bool:
         "UPDATE admins SET password_hash = ? WHERE id = ?",
         (password_hash, admin_id),
     )
+    conn.commit()
+    return cur.rowcount > 0
+
+
+# ── VPN Server CRUD ─────────────────────────────────────────────────────
+
+def create_vpn_server(data: dict) -> int:
+    conn = get_conn()
+    ts = int(time.time())
+    cur = conn.execute(
+        "INSERT INTO vpn_servers (name, display_name, url, api_token_enc, "
+        "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            data["name"], data["display_name"], data["url"],
+            data.get("api_token_enc"),
+            ts, ts,
+        ),
+    )
+    conn.commit()
+    return cur.lastrowid
+
+
+def get_vpn_server(vpn_server_id: int) -> dict | None:
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT * FROM vpn_servers WHERE id = ?", (vpn_server_id,)
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def get_all_vpn_servers() -> list[dict]:
+    conn = get_conn()
+    rows = conn.execute("SELECT * FROM vpn_servers ORDER BY id").fetchall()
+    return [dict(r) for r in rows]
+
+
+def update_vpn_server(vpn_server_id: int, updates: dict) -> bool:
+    conn = get_conn()
+    allowed = {"name", "display_name", "url", "api_token_enc"}
+    sets, vals = [], []
+    for key, val in updates.items():
+        if key in allowed:
+            sets.append(f"{key} = ?")
+            vals.append(val)
+    if not sets:
+        return False
+    sets.append("updated_at = ?")
+    vals.append(int(time.time()))
+    vals.append(vpn_server_id)
+    conn.execute(f"UPDATE vpn_servers SET {', '.join(sets)} WHERE id = ?", vals)
+    conn.commit()
+    return True
+
+
+def delete_vpn_server(vpn_server_id: int) -> bool:
+    conn = get_conn()
+    cur = conn.execute("DELETE FROM vpn_servers WHERE id = ?", (vpn_server_id,))
     conn.commit()
     return cur.rowcount > 0

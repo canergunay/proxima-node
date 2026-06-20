@@ -44,10 +44,12 @@ def create_app() -> Flask:
     from api.servers import bp as servers_bp
     from api.provision import bp as provision_bp
     from api.operations import bp as operations_bp
+    from api.vpn_servers import bp as vpn_servers_bp
     app.register_blueprint(auth_bp)
     app.register_blueprint(servers_bp)
     app.register_blueprint(provision_bp)
     app.register_blueprint(operations_bp)
+    app.register_blueprint(vpn_servers_bp)
 
     # Auth middleware
     NO_AUTH_PATHS = {"/api/auth/login", "/api/auth/setup", "/api/auth/me"}

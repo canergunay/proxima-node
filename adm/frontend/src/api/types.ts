@@ -74,6 +74,86 @@ export interface VlessKeyData {
   fingerprint: string;
 }
 
+// ── VPN Servers (Proxima instances) ─────────────────────────────────────
+
+export interface VpnServer {
+  id: number;
+  name: string;
+  display_name: string;
+  url: string;
+  has_token: boolean;
+  online: boolean;
+  proxima_status: ProximaStatus | null;
+  error: string | null;
+}
+
+export interface ProximaStatus {
+  server_ip: string;
+  mode: string;
+  deployment: string;
+  dns_mode: { active: boolean; containers: Record<string, string> };
+  slots: Record<string, ProximaSlotSummary>;
+  bypass_active: boolean;
+  bypass_slots: string[];
+}
+
+export interface ProximaSlotSummary {
+  label: string;
+  type: string;
+  active: string | null;
+  pool: string[];
+  health: {
+    last_ip_ok: boolean | null;
+    last_ip: string | null;
+    failover_count: number;
+    bypass_active: boolean;
+  };
+}
+
+export interface ProximaSlot {
+  id: string;
+  label: string;
+  type: string;
+  enabled: boolean;
+  port: number;
+  socks_port: number;
+  direct: boolean;
+  active: string | null;
+  pool: string[];
+  dpi_args?: string | null;
+  via_slot?: string | null;
+  health: {
+    last_ip_check: string | null;
+    last_ip_ok: boolean | null;
+    last_ip: string | null;
+    last_domain_check: string | null;
+    last_domain_ok: boolean | null;
+    domain_ok_count: number | null;
+    domain_total_count: number | null;
+    failover_count: number;
+    key_stats: Record<string, unknown>;
+  };
+}
+
+export interface ProximaTunnel {
+  name: string;
+  type: "awg" | "outline" | "xray";
+  endpoint: string;
+  method?: string | null;
+  ssconf_url?: string;
+  location?: string;
+  tag?: string;
+  prefix?: string;
+  server?: string;
+  port?: number;
+  vless_uuid?: string;
+  public_key?: string;
+  short_id?: string;
+  server_name?: string;
+  flow?: string;
+  fingerprint?: string;
+}
+
 export interface PreflightConflict {
   type: "port" | "service" | "container";
   port?: number;
