@@ -66,6 +66,13 @@
     - daemon reload
     - restart proxima-agent
 
+- name: Allow agent port in UFW
+  ansible.builtin.command:
+    cmd: "ufw allow {{ agent_port | default(5051) }}/tcp comment 'proxima-agent'"
+  register: ufw_result
+  changed_when: "'Added' in ufw_result.stdout or 'Rule added' in ufw_result.stdout"
+  failed_when: false
+
 - name: Enable and start proxima-agent
   ansible.builtin.systemd:
     name: proxima-agent
