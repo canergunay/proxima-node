@@ -101,6 +101,30 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE servers ADD COLUMN vless_port INTEGER DEFAULT 8443")
         conn.commit()
 
+    if "public_ip" not in cols:
+        conn.execute("ALTER TABLE servers ADD COLUMN public_ip TEXT")
+        conn.commit()
+
+    # Auto-generate ssconf_token for servers that lack one
+    rows = conn.execute(
+        "SELECT id FROM servers WHERE ssconf_token_enc IS NULL"
+    ).fetchall()
+    if rows:
+        from core.auth import encrypt_value
+        from core.credential_gen import gen_ssconf_token
+        for row in rows:
+            token = gen_ssconf_token()
+            conn.execute(
+                "UPDATE servers SET ssconf_token_enc = ? WHERE id = ?",
+                (encrypt_value(token), row[0]),
+            )
+        conn.commit()
+        import logging
+        logging.getLogger("adm.db").info(
+            f"Generated ssconf_token for {len(rows)} server(s): "
+            + ", ".join(str(r[0]) for r in rows)
+        )
+
     # vpn_servers migrations
     vpn_cols = {row[1] for row in conn.execute("PRAGMA table_info(vpn_servers)").fetchall()}
     if "public_url" not in vpn_cols:
@@ -157,10 +181,11 @@ def get_all_servers() -> list[dict]:
 def update_server(server_id: int, updates: dict) -> bool:
     conn = get_conn()
     allowed = {
-        "name", "display_name", "ip", "server_type", "location", "provider",
-        "status", "root_password_enc", "ss_password_enc", "agent_api_key_enc",
-        "ssconf_token_enc", "speedtest_api_key_enc", "ss_port", "ss_cipher",
-        "agent_port", "ssh_port", "node_id", "install_adguard",
+        "name", "display_name", "ip", "public_ip", "server_type", "location",
+        "provider", "status", "root_password_enc", "ss_password_enc",
+        "agent_api_key_enc", "ssconf_token_enc", "speedtest_api_key_enc",
+        "ss_port", "ss_cipher", "agent_port", "ssh_port", "node_id",
+        "install_adguard",
         "vless_uuid", "vless_public_key", "vless_short_id", "vless_port",
     }
     sets, vals = [], []

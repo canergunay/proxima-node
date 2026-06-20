@@ -65,6 +65,7 @@ def _fetch_server_status(server: dict) -> dict:
         "name": server["name"],
         "display_name": server["display_name"],
         "ip": server["ip"],
+        "public_ip": server.get("public_ip") or "",
         "server_type": server["server_type"],
         "location": server["location"],
         "provider": server["provider"],
@@ -221,7 +222,7 @@ def update_server_endpoint(server_id: int):
     body = request.get_json(force=True, silent=True) or {}
     updates = {}
 
-    for field in ("name", "display_name", "ip", "location", "provider"):
+    for field in ("name", "display_name", "ip", "public_ip", "location", "provider"):
         if field in body:
             updates[field] = body[field].strip() if isinstance(body[field], str) else body[field]
 
@@ -420,6 +421,11 @@ def ssconf_proxy(server_id: int, token: str):
         "password": data["password"],
         "method": data.get("method", "chacha20-ietf-poly1305"),
     }
+
+    # Override server IP for NAT'd servers (e.g. ERG-RU on LAN)
+    if server.get("public_ip"):
+        config_response["server"] = server["public_ip"]
+
     return jsonify(config_response)
 
 

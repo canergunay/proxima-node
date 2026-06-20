@@ -91,6 +91,9 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
   const [preflight, setPreflight] = useState<PreflightData | null>(null);
   const [preflightLoading, setPreflightLoading] = useState(false);
   const [preflightError, setPreflightError] = useState("");
+  const [publicIp, setPublicIp] = useState("");
+  const [publicIpSaving, setPublicIpSaving] = useState(false);
+  const [publicIpSaved, setPublicIpSaved] = useState(false);
 
   const fetchDetail = useCallback(async () => {
     try {
@@ -107,9 +110,15 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
       setSsKeyError(false);
       setVlessKey(null);
       setVlessKeyError(false);
+      setPublicIpSaved(false);
       fetchDetail();
     }
   }, [open, fetchDetail]);
+
+  // Sync publicIp state when server data loads
+  useEffect(() => {
+    if (server) setPublicIp(server.public_ip || "");
+  }, [server?.id, server?.public_ip]);
 
   // Fetch SS key when server is active
   useEffect(() => {
@@ -242,6 +251,18 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const savePublicIp = async () => {
+    setPublicIpSaving(true);
+    setPublicIpSaved(false);
+    try {
+      await api.put(`/servers/${serverId}`, { public_ip: publicIp.trim() });
+      setPublicIpSaved(true);
+      fetchDetail();
+      setTimeout(() => setPublicIpSaved(false), 2000);
+    } catch { /* ignore */ }
+    setPublicIpSaving(false);
   };
 
   const handleClose = () => {
@@ -485,6 +506,28 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
               Node ID: {server.node_id}
             </Typography>
           )}
+
+          {/* Public IP override for NAT'd servers */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1.5 }}>
+            <TextField
+              label={t("detail.publicIp")}
+              value={publicIp}
+              onChange={(e) => { setPublicIp(e.target.value); setPublicIpSaved(false); }}
+              size="small"
+              sx={{ flex: 1 }}
+              helperText={t("detail.publicIpHelp")}
+              placeholder="46.138.254.119"
+            />
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={savePublicIp}
+              disabled={publicIpSaving || publicIp === (server.public_ip || "")}
+              sx={{ minWidth: 80, alignSelf: "flex-start", mt: 0.5 }}
+            >
+              {publicIpSaved ? t("detail.publicIpSaved") : t("common.save")}
+            </Button>
+          </Box>
         </Box>
 
         {/* Operations history */}

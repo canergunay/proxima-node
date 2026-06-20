@@ -3,6 +3,7 @@ export interface Server {
   name: string;
   display_name: string;
   ip: string;
+  public_ip: string;
   server_type: "vpn_exit" | "dpi_bypass";
   location: string;
   provider: string;
