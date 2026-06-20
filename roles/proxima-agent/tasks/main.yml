@@ -5,6 +5,7 @@
       - python3
       - python3-pip
       - python3-venv
+      - python3-setuptools
     state: present
 
 - name: Create agent directory
@@ -37,10 +38,11 @@
     cmd: python3 -m venv {{ agent_dir }}/venv
     creates: "{{ agent_dir }}/venv/bin/python"
 
-- name: Install Flask in venv
-  ansible.builtin.pip:
-    requirements: "{{ agent_dir }}/requirements.txt"
-    virtualenv: "{{ agent_dir }}/venv"
+- name: Install requirements in venv
+  ansible.builtin.command:
+    cmd: "{{ agent_dir }}/venv/bin/pip install -r {{ agent_dir }}/requirements.txt"
+  register: pip_result
+  changed_when: "'Successfully installed' in pip_result.stdout"
 
 - name: Write agent config
   ansible.builtin.template:
