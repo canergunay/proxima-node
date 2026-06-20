@@ -370,11 +370,12 @@ def ssconf_proxy(server_id: int, token: str):
 
     Auth architecture:
       1. ADM validates <token> against its own DB (access control)
-      2. ADM calls agent /api/ss-key via API key (gets agent's ssconf URL)
-      3. ADM fetches config from agent's ssconf endpoint (agent's own token)
-      4. Returns config to client
+      2. ADM calls agent /api/ss-key via API key (server-to-server auth)
+      3. Transforms response to ssconf format and returns to client
 
-    ADM's token and agent's token are independent — no sync required.
+    ADM's token and agent's ssconf_token are independent — no sync needed.
+    The /api/ss-key endpoint returns all required fields (server, port,
+    password, method) which ADM maps to ssconf format (server_port).
     """
     server = get_server(server_id)
     if not server:
@@ -389,7 +390,10 @@ def ssconf_proxy(server_id: int, token: str):
     if not expected or token != expected:
         return jsonify({"error": "Invalid token"}), 401
 
-    # Step 2: Fetch agent's actual ssconf URL via API key auth
+    # Step 2: Fetch SS config data from agent via API key auth
+    # Uses /api/ss-key (API key auth) rather than /ssconf/<token> (URL token auth)
+    # because agent and dedicated ssconf service may have different tokens.
+    # API key auth is the proper server-to-server mechanism.
     try:
         ss_data = _proxy_request(server, "GET", "/api/ss-key")
     except http_requests.exceptions.ConnectionError:
@@ -403,31 +407,20 @@ def ssconf_proxy(server_id: int, token: str):
     if not ss_data.get("ok"):
         return jsonify({"error": ss_data.get("error", "Agent error")}), 502
 
-    agent_ssconf_url = (ss_data.get("data") or {}).get("ssconf_url", "")
-    if not agent_ssconf_url:
-        return jsonify({"error": "No ssconf URL available from agent"}), 502
+    data = ss_data.get("data") or {}
+    if not data.get("server") or not data.get("password"):
+        return jsonify({"error": "Incomplete SS config from agent"}), 502
 
-    # Step 3: Convert ssconf:// to https:// and fetch config from agent
-    if agent_ssconf_url.startswith("ssconf://"):
-        fetch_url = "https://" + agent_ssconf_url[len("ssconf://"):]
-    else:
-        fetch_url = agent_ssconf_url
-
-    # Strip fragment (e.g. #ERG-DE) — not sent to server
-    fetch_url = fetch_url.split("#")[0]
-
-    try:
-        resp = http_requests.get(fetch_url, timeout=15, verify=False)
-        resp.raise_for_status()
-        # Return raw JSON — Proxima expects {server, server_port, password, method}
-        return resp.json(), resp.status_code
-    except http_requests.exceptions.ConnectionError:
-        return jsonify({"error": "Cannot reach ssconf endpoint"}), 502
-    except http_requests.exceptions.Timeout:
-        return jsonify({"error": "Timeout"}), 502
-    except Exception as e:
-        log.error(f"ssconf proxy error for server {server_id}: {e}")
-        return jsonify({"error": "Proxy error"}), 502
+    # Step 3: Return ssconf-format response (SIP008)
+    # Proxima expects: {server, server_port, password, method}
+    # Agent /api/ss-key returns "port"; ssconf format uses "server_port"
+    config_response = {
+        "server": data["server"],
+        "server_port": data.get("port", 8388),
+        "password": data["password"],
+        "method": data.get("method", "chacha20-ietf-poly1305"),
+    }
+    return jsonify(config_response)
 
 
 @bp.put("/api/servers/<int:server_id>/dpi-args")
