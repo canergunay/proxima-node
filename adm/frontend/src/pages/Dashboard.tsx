@@ -172,7 +172,18 @@ export default function Dashboard() {
             <Grid container spacing={2}>
               {vpnServers.map((server) => (
                 <Grid key={server.id} size={{ xs: 12, sm: 6, md: 4 }}>
-                  <VpnServerCard server={server} onClick={() => setSelectedVpn(server)} />
+                  <VpnServerCard
+                    server={server}
+                    onClick={() => setSelectedVpn(server)}
+                    onEdit={() => setSelectedVpn(server)}
+                    onDelete={async () => {
+                      if (!confirm(t("vpnDetail.confirmDelete", { name: server.display_name }))) return;
+                      try {
+                        await api.delete(`/vpn-servers/${server.id}`);
+                        fetchVpnServers();
+                      } catch { /* handled by interceptor */ }
+                    }}
+                  />
                 </Grid>
               ))}
             </Grid>

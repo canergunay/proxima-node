@@ -360,6 +360,43 @@ def preflight_check(server_id: int):
     return jsonify(result)
 
 
+@bp.get("/api/servers/<int:server_id>/ssconf/<token>")
+def ssconf_proxy(server_id: int, token: str):
+    """Proxy ssconf requests to exit server agent.
+
+    This endpoint is exempt from JWT auth (auth is via URL token).
+    Proxima instances fetch SS configs through ADM instead of directly
+    from exit server agents, avoiding firewall issues.
+    """
+    server = get_server(server_id)
+    if not server:
+        return jsonify({"error": "Not found"}), 404
+
+    # Validate token against stored ssconf_token
+    enc = server.get("ssconf_token_enc")
+    if not enc:
+        return jsonify({"error": "No ssconf token configured"}), 404
+
+    expected = decrypt_value(enc)
+    if not expected or token != expected:
+        return jsonify({"error": "Invalid token"}), 401
+
+    # Proxy to agent's /ssconf/<token> endpoint
+    url = _agent_url(server) + f"/ssconf/{token}"
+    try:
+        resp = http_requests.get(url, timeout=15, verify=False)
+        resp.raise_for_status()
+        # Return raw JSON (not wrapped) — Proxima expects {server, server_port, password, method}
+        return resp.json(), resp.status_code
+    except http_requests.exceptions.ConnectionError:
+        return jsonify({"error": "Cannot reach server"}), 502
+    except http_requests.exceptions.Timeout:
+        return jsonify({"error": "Timeout"}), 502
+    except Exception as e:
+        log.error(f"ssconf proxy error for server {server_id}: {e}")
+        return jsonify({"error": "Proxy error"}), 502
+
+
 @bp.put("/api/servers/<int:server_id>/dpi-args")
 def update_dpi_args(server_id: int):
     """Update DPI args via agent (dpi_bypass only)."""

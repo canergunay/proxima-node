@@ -3,7 +3,9 @@ import {
   IconButton,
 } from "@mui/material";
 import CircleIcon from "@mui/icons-material/Circle";
-import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import LaunchIcon from "@mui/icons-material/Launch";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { useTranslation } from "react-i18next";
 import type { VpnServer, ProximaSlotSummary, DomainCheckSummary } from "../api/types";
@@ -89,6 +91,8 @@ function serviceStatus(
 interface Props {
   server: VpnServer;
   onClick: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
 }
 
 /** Sort slot entries by numeric slot ID */
@@ -107,7 +111,7 @@ function slotDotColor(ipOk: boolean | null | undefined): string {
   return "#616161";
 }
 
-export default function VpnServerCard({ server, onClick }: Props) {
+export default function VpnServerCard({ server, onClick, onEdit, onDelete }: Props) {
   const { t } = useTranslation();
   const status = server.proxima_status;
   const isOnline = server.online;
@@ -131,10 +135,10 @@ export default function VpnServerCard({ server, onClick }: Props) {
       <CardActionArea onClick={onClick}>
         <CardContent>
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-              <Typography variant="subtitle1" fontWeight={700}>
-                {server.display_name}
-              </Typography>
+            <Typography variant="subtitle1" fontWeight={700}>
+              {server.display_name}
+            </Typography>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.25 }}>
               {linkUrl && (
                 <Tooltip title={linkUrl} placement="top">
                   <IconButton
@@ -145,18 +149,37 @@ export default function VpnServerCard({ server, onClick }: Props) {
                     }}
                     sx={{ p: 0.25 }}
                   >
-                    <OpenInNewIcon sx={{ fontSize: 14, color: "text.secondary" }} />
+                    <LaunchIcon sx={{ fontSize: 16 }} />
                   </IconButton>
                 </Tooltip>
               )}
+              <Tooltip title={t("vpnServer.edit")} placement="top">
+                <IconButton
+                  size="small"
+                  onClick={(e) => { e.stopPropagation(); onEdit(); }}
+                  sx={{ p: 0.25 }}
+                >
+                  <EditIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title={t("vpnServer.delete")} placement="top">
+                <IconButton
+                  size="small"
+                  onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                  sx={{ p: 0.25 }}
+                >
+                  <DeleteOutlineIcon sx={{ fontSize: 16, color: "error.main" }} />
+                </IconButton>
+              </Tooltip>
+              <Chip
+                icon={<CircleIcon sx={{ fontSize: 10, color: isOnline ? "#4caf50" : undefined }} />}
+                label={isOnline ? t("vpnServer.online") : t("vpnServer.offline")}
+                size="small"
+                variant="outlined"
+                color={isOnline ? "success" : "default"}
+                sx={{ ml: 0.5 }}
+              />
             </Box>
-            <Chip
-              icon={<CircleIcon sx={{ fontSize: 10, color: isOnline ? "#4caf50" : undefined }} />}
-              label={isOnline ? t("vpnServer.online") : t("vpnServer.offline")}
-              size="small"
-              variant="outlined"
-              color={isOnline ? "success" : "default"}
-            />
           </Box>
 
           {/* Service health icons (WhatsApp, Telegram, ChatGPT, Claude, Gemini, YouTube) */}

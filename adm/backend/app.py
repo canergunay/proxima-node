@@ -61,6 +61,10 @@ def create_app() -> Flask:
         if not path.startswith("/api/"):
             return None
 
+        # ssconf proxy — authenticated via URL token, not JWT
+        if "/ssconf/" in path and path.startswith("/api/servers/"):
+            return None
+
         requires_auth = path not in NO_AUTH_PATHS
 
         auth_header = request.headers.get("Authorization", "")

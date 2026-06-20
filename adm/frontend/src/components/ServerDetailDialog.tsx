@@ -411,8 +411,14 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
             {ssKey && (
               <Box sx={{ bgcolor: "action.hover", borderRadius: 1, p: 1.5, mb: 1 }}>
                 <CopyField label={t("detail.ssUri")} value={ssKey.uri} />
+                {server.ssconf_token && (
+                  <CopyField
+                    label={t("detail.ssconfProxyUrl")}
+                    value={`ssconf://${window.location.host}/api/servers/${serverId}/ssconf/${server.ssconf_token}`}
+                  />
+                )}
                 {ssKey.ssconf_url && (
-                  <CopyField label={t("detail.ssconfUrl")} value={ssKey.ssconf_url} />
+                  <CopyField label={t("detail.ssconfDirectUrl")} value={ssKey.ssconf_url} />
                 )}
               </Box>
             )}
