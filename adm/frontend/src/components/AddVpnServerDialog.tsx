@@ -17,6 +17,7 @@ export default function AddVpnServerDialog({ open, onClose, onCreated }: Props) 
   const [name, setName] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [url, setUrl] = useState("");
+  const [publicUrl, setPublicUrl] = useState("");
   const [apiToken, setApiToken] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -36,6 +37,9 @@ export default function AddVpnServerDialog({ open, onClose, onCreated }: Props) 
         display_name: displayName.trim() || name.trim().toUpperCase(),
         url: url.trim(),
       };
+      if (publicUrl.trim()) {
+        body.public_url = publicUrl.trim();
+      }
       if (apiToken.trim()) {
         body.api_token = apiToken.trim();
       }
@@ -46,6 +50,7 @@ export default function AddVpnServerDialog({ open, onClose, onCreated }: Props) 
         setName("");
         setDisplayName("");
         setUrl("");
+        setPublicUrl("");
         setApiToken("");
         onCreated();
       } else {
@@ -89,6 +94,15 @@ export default function AddVpnServerDialog({ open, onClose, onCreated }: Props) 
             size="small"
             fullWidth
             required
+          />
+          <TextField
+            label={t("addVpn.publicUrl")}
+            placeholder={t("addVpn.publicUrlPlaceholder")}
+            value={publicUrl}
+            onChange={(e) => setPublicUrl(e.target.value)}
+            size="small"
+            fullWidth
+            helperText={t("addVpn.publicUrlHelp")}
           />
           <TextField
             label={t("addVpn.apiToken")}

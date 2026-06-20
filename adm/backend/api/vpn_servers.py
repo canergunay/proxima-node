@@ -61,9 +61,11 @@ def _fetch_vpn_server_status(server: dict) -> dict:
         "name": server["name"],
         "display_name": server["display_name"],
         "url": server["url"],
+        "public_url": server.get("public_url", ""),
         "has_token": bool(server.get("api_token_enc")),
         "online": False,
         "proxima_status": None,
+        "domain_checks": None,
         "error": None,
     }
 
@@ -86,6 +88,27 @@ def _fetch_vpn_server_status(server: dict) -> dict:
         result["error"] = "Timeout"
     except Exception as e:
         result["error"] = str(e)
+
+    # Also fetch domain check results (non-blocking on failure)
+    if result["online"]:
+        try:
+            dresp = _proxima_request(server, "GET",
+                                     "/api/groups/domain-status", timeout=5)
+            if dresp.status_code == 200:
+                ddata = dresp.json()
+                if ddata.get("ok") and ddata.get("data"):
+                    # Summarize: keep only latest check per domain
+                    summary = {}
+                    for domain, checks in ddata["data"].items():
+                        if checks:
+                            latest = checks[-1]
+                            summary[domain] = {
+                                "ok": latest.get("ok", False),
+                                "http_status": latest.get("http_status"),
+                            }
+                    result["domain_checks"] = summary
+        except Exception:
+            pass  # Domain checks are optional, don't fail status
 
     return result
 
@@ -110,8 +133,10 @@ def list_vpn_servers():
                 results.append({
                     "id": s["id"], "name": s["name"],
                     "display_name": s["display_name"], "url": s["url"],
+                    "public_url": s.get("public_url", ""),
                     "has_token": bool(s.get("api_token_enc")),
-                    "online": False, "proxima_status": None, "error": str(e),
+                    "online": False, "proxima_status": None,
+                    "domain_checks": None, "error": str(e),
                 })
 
     # Sort by original DB order
@@ -136,10 +161,13 @@ def add_vpn_server():
     if not display_name:
         display_name = name.upper()
 
+    public_url = (body.get("public_url") or "").strip().rstrip("/")
+
     data = {
         "name": name,
         "display_name": display_name,
         "url": url,
+        "public_url": public_url,
     }
 
     api_token = (body.get("api_token") or "").strip()
@@ -168,6 +196,7 @@ def get_vpn_server_detail(vpn_server_id: int):
         "name": server["name"],
         "display_name": server["display_name"],
         "url": server["url"],
+        "public_url": server.get("public_url", ""),
         "has_token": bool(server.get("api_token_enc")),
         "created_at": server["created_at"],
         "updated_at": server["updated_at"],
@@ -186,13 +215,15 @@ def update_vpn_server_endpoint(vpn_server_id: int):
     body = request.get_json(force=True, silent=True) or {}
     updates = {}
 
-    for field in ("name", "display_name", "url"):
+    for field in ("name", "display_name", "url", "public_url"):
         if field in body:
             val = body[field]
             updates[field] = val.strip() if isinstance(val, str) else val
 
     if "url" in updates:
         updates["url"] = updates["url"].rstrip("/")
+    if "public_url" in updates:
+        updates["public_url"] = updates["public_url"].rstrip("/")
 
     api_token = (body.get("api_token") or "").strip()
     if api_token:

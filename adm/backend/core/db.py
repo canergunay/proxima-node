@@ -101,6 +101,12 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE servers ADD COLUMN vless_port INTEGER DEFAULT 8443")
         conn.commit()
 
+    # vpn_servers migrations
+    vpn_cols = {row[1] for row in conn.execute("PRAGMA table_info(vpn_servers)").fetchall()}
+    if "public_url" not in vpn_cols:
+        conn.execute("ALTER TABLE vpn_servers ADD COLUMN public_url TEXT DEFAULT ''")
+        conn.commit()
+
 
 # ── Server CRUD ──────────────────────────────────────────────────────────
 
@@ -287,11 +293,11 @@ def create_vpn_server(data: dict) -> int:
     conn = get_conn()
     ts = int(time.time())
     cur = conn.execute(
-        "INSERT INTO vpn_servers (name, display_name, url, api_token_enc, "
-        "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO vpn_servers (name, display_name, url, public_url, api_token_enc, "
+        "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
         (
             data["name"], data["display_name"], data["url"],
-            data.get("api_token_enc"),
+            data.get("public_url", ""), data.get("api_token_enc"),
             ts, ts,
         ),
     )
@@ -315,7 +321,7 @@ def get_all_vpn_servers() -> list[dict]:
 
 def update_vpn_server(vpn_server_id: int, updates: dict) -> bool:
     conn = get_conn()
-    allowed = {"name", "display_name", "url", "api_token_enc"}
+    allowed = {"name", "display_name", "url", "public_url", "api_token_enc"}
     sets, vals = [], []
     for key, val in updates.items():
         if key in allowed:

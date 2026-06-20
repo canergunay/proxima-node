@@ -81,10 +81,17 @@ export interface VpnServer {
   name: string;
   display_name: string;
   url: string;
+  public_url: string;
   has_token: boolean;
   online: boolean;
   proxima_status: ProximaStatus | null;
+  domain_checks: Record<string, DomainCheckSummary> | null;
   error: string | null;
+}
+
+export interface DomainCheckSummary {
+  ok: boolean;
+  http_status: number | null;
 }
 
 export interface ProximaStatus {
