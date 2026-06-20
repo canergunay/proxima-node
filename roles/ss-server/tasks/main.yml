@@ -18,7 +18,7 @@
     src: config.json.j2
     dest: /etc/shadowsocks-libev/config.json
     owner: root
-    group: root
+    group: "{{ ssserver_user }}"
     mode: "0640"
   notify: restart ss-server
 
