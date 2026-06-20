@@ -3,6 +3,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, Typography, Box, Chip, Divider, IconButton,
   Tooltip, Alert, CircularProgress, List, ListItem, ListItemText,
+  TextField,
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -59,6 +60,7 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
   const [actionLoading, setActionLoading] = useState(false);
   const [operationId, setOperationId] = useState<number | null>(null);
   const [operation, setOperation] = useState<Operation | null>(null);
+  const [rootPassword, setRootPassword] = useState("");
 
   const fetchDetail = useCallback(async () => {
     try {
@@ -121,7 +123,9 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
         return;
       }
 
-      const body = action === "provision" ? { server_id: serverId } : {};
+      const body = action === "provision"
+        ? { server_id: serverId, ...(rootPassword ? { root_password: rootPassword } : {}) }
+        : {};
       const { data } = await api.post(endpoint, body);
       if (data.ok) {
         setOperationId(data.data.operation_id);
@@ -182,6 +186,21 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
           </Box>
         )}
 
+        {/* Root password for new/error servers */}
+        {(server.status === "new" || server.status === "error") && (
+          <Box sx={{ mb: 3 }}>
+            <TextField
+              label={t("provision.rootPassword")}
+              type="password"
+              value={rootPassword}
+              onChange={(e) => setRootPassword(e.target.value)}
+              fullWidth
+              size="small"
+              helperText={t("provision.rootPasswordHelp")}
+            />
+          </Box>
+        )}
+
         {/* Credentials */}
         {server.status !== "new" && (
           <Box sx={{ mb: 3 }}>
@@ -232,20 +251,11 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
         )}
       </DialogContent>
       <DialogActions>
-        {server.status === "new" && (
+        {(server.status === "new" || server.status === "error") && (
           <Button
             variant="contained"
             onClick={() => handleAction("provision")}
-            disabled={actionLoading}
-          >
-            {t("detail.provision")}
-          </Button>
-        )}
-        {server.status === "error" && (
-          <Button
-            variant="contained"
-            onClick={() => handleAction("provision")}
-            disabled={actionLoading}
+            disabled={actionLoading || !rootPassword}
           >
             {t("detail.provision")}
           </Button>

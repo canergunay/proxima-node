@@ -55,6 +55,12 @@ def provision():
     if server["status"] not in ("new", "error"):
         return jsonify({"ok": False, "error": f"Cannot provision server in '{server['status']}' status"}), 400
 
+    # Accept root_password from request body if not already stored
+    root_password = (body.get("root_password") or "").strip()
+    if root_password:
+        update_server(server_id, {"root_password_enc": encrypt_value(root_password)})
+        server = get_server(server_id)
+
     if not server.get("root_password_enc"):
         return jsonify({"ok": False, "error": "Root password required for provisioning"}), 400
 

@@ -219,6 +219,11 @@ def update_server_endpoint(server_id: int):
     if "install_adguard" in body:
         updates["install_adguard"] = 1 if body["install_adguard"] else 0
 
+    # Encrypt root password if provided
+    root_password = (body.get("root_password") or "").strip()
+    if root_password:
+        updates["root_password_enc"] = encrypt_value(root_password)
+
     if not updates:
         return jsonify({"ok": False, "error": "No valid fields to update"}), 400
 
