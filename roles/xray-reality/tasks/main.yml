@@ -1,4 +1,11 @@
 ---
+- name: Ensure unzip is installed
+  ansible.builtin.apt:
+    name: unzip
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
 - name: Determine architecture
   ansible.builtin.set_fact:
     xray_arch: "{{ '64' if ansible_architecture == 'x86_64' else 'arm64-v8a' }}"
