@@ -310,6 +310,29 @@ def get_dpi_args(server_id: int):
         return jsonify({"ok": False, "error": str(e)}), 502
 
 
+@bp.post("/api/servers/<int:server_id>/preflight")
+def preflight_check(server_id: int):
+    """Run pre-flight checks on target server before provisioning."""
+    server = get_server(server_id)
+    if not server:
+        return jsonify({"ok": False, "error": "Server not found"}), 404
+
+    if server["status"] not in ("new", "error"):
+        return jsonify({"ok": False, "error": "Preflight only for new/error servers"}), 400
+
+    # Accept root_password from request body
+    body = request.get_json(force=True, silent=True) or {}
+    root_password = (body.get("root_password") or "").strip()
+
+    # Or use stored password
+    if not root_password and server.get("root_password_enc"):
+        root_password = decrypt_value(server["root_password_enc"])
+
+    from core.preflight import run_preflight
+    result = run_preflight(server["ip"], root_password)
+    return jsonify(result)
+
+
 @bp.put("/api/servers/<int:server_id>/dpi-args")
 def update_dpi_args(server_id: int):
     """Update DPI args via agent (dpi_bypass only)."""

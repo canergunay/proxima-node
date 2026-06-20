@@ -389,10 +389,18 @@ def get_ss_key():
     user_info = base64.urlsafe_b64encode(f"{method}:{password}".encode()).decode().rstrip("=")
     ss_uri = f"ss://{user_info}@{server_ip}:{port}#{node_id}"
 
-    # Build ssconf URL — points to ssconf service (port 8390), not agent
+    # Build ssconf URL
     ssconf_url = ""
-    if _detect_server_type() == "vpn_exit":
-        ssconf_url = f"ssconf://{server_ip}:8390/{api_key}"
+    ssconf_token = config.get("ssconf_token") or api_key
+    server_type = _detect_server_type()
+    if ssconf_token:
+        if server_type == "vpn_exit" and _service_active(SVC_SSCONF):
+            # VPN exit: dedicated ssconf service on port 8390
+            ssconf_url = f"ssconf://{server_ip}:8390/{ssconf_token}"
+        else:
+            # All types: agent serves ssconf on its own port
+            agent_port = config.get("agent_port", 5051)
+            ssconf_url = f"ssconf://{server_ip}:{agent_port}/{ssconf_token}"
 
     return jsonify({
         "ok": True,
@@ -410,7 +418,8 @@ def get_ss_key():
 @app.get("/ssconf/<token>")
 def ssconf_config(token: str):
     """Serve SS config in ssconf/SIP008 format."""
-    expected = _get_api_key()
+    config = _load_config()
+    expected = config.get("ssconf_token") or _get_api_key()
     if not expected or token != expected:
         return jsonify({"error": "Invalid token"}), 401
 

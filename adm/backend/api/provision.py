@@ -67,20 +67,20 @@ def provision():
     # Generate credentials
     ss_password = gen_ss_password()
     agent_api_key = gen_agent_api_key()
+    ssconf_token = gen_ssconf_token()
     node_id = gen_node_id(server["name"])
 
     updates = {
         "status": "provisioning",
         "ss_password_enc": encrypt_value(ss_password),
         "agent_api_key_enc": encrypt_value(agent_api_key),
+        "ssconf_token_enc": encrypt_value(ssconf_token),
         "node_id": node_id,
     }
 
     # VPN exit gets additional credentials
     if server["server_type"] == "vpn_exit":
-        ssconf_token = gen_ssconf_token()
         speedtest_api_key = gen_speedtest_api_key()
-        updates["ssconf_token_enc"] = encrypt_value(ssconf_token)
         updates["speedtest_api_key_enc"] = encrypt_value(speedtest_api_key)
 
     update_server(server_id, updates)

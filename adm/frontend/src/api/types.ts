@@ -61,3 +61,24 @@ export interface AuthMe {
   auth_configured: boolean;
   username?: string;
 }
+
+export interface PreflightConflict {
+  type: "port" | "service" | "container";
+  port?: number;
+  name?: string;
+  detail: string;
+  severity: "warning" | "info";
+}
+
+export interface PreflightData {
+  os: string;
+  arch: string;
+  python: string;
+  disk_free_gb: number;
+  memory_mb: number;
+  occupied_ports: { port: number; process: string }[];
+  active_services: { name: string; state: string }[];
+  docker_containers: { name: string; image: string; status: string }[];
+  conflicts: PreflightConflict[];
+  ssh_ok: boolean;
+}
