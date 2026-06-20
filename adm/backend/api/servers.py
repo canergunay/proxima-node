@@ -196,6 +196,18 @@ def get_server_detail(server_id: int):
     # Include recent operations
     result["operations"] = get_operations_by_server(server_id, limit=10)
 
+    # Include live online status
+    result["online"] = False
+    result["agent_status"] = None
+    if result.get("status") in ("active", "provisioning", "error"):
+        try:
+            status_data = _proxy_request(server, "GET", "/api/status", timeout=5)
+            if status_data.get("ok"):
+                result["online"] = True
+                result["agent_status"] = status_data.get("data")
+        except Exception:
+            pass
+
     return jsonify({"ok": True, "data": result})
 
 

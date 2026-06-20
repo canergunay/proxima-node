@@ -18,11 +18,11 @@ export interface AgentStatus {
   uptime: number;
   server_type: string;
   public_ip: string;
-  disk_usage_percent: number;
-  memory_usage_percent: number;
+  disk: { free_gb: number; total_gb: number; used_gb: number; used_pct: number };
+  memory: { available_mb: number; total_mb: number; used_pct: number };
   services: Record<string, boolean>;
   docker_containers?: ContainerInfo[];
-  version: string;
+  version?: string;
 }
 
 export interface ContainerInfo {

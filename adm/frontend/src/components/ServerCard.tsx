@@ -86,23 +86,23 @@ export default function ServerCard({ server, onClick }: Props) {
               <Box sx={{ mt: 1, display: "flex", gap: 2 }}>
                 <Box sx={{ flex: 1 }}>
                   <Typography variant="caption" color="text.secondary">
-                    {t("server.disk")} {status.disk_usage_percent}%
+                    {t("server.disk")} {status.disk?.used_pct?.toFixed(0) ?? "—"}%
                   </Typography>
                   <LinearProgress
                     variant="determinate"
-                    value={status.disk_usage_percent}
-                    color={status.disk_usage_percent > 90 ? "error" : "primary"}
+                    value={status.disk?.used_pct ?? 0}
+                    color={(status.disk?.used_pct ?? 0) > 90 ? "error" : "primary"}
                     sx={{ height: 4, borderRadius: 2 }}
                   />
                 </Box>
                 <Box sx={{ flex: 1 }}>
                   <Typography variant="caption" color="text.secondary">
-                    {t("server.memory")} {status.memory_usage_percent}%
+                    {t("server.memory")} {status.memory?.used_pct?.toFixed(0) ?? "—"}%
                   </Typography>
                   <LinearProgress
                     variant="determinate"
-                    value={status.memory_usage_percent}
-                    color={status.memory_usage_percent > 90 ? "error" : "primary"}
+                    value={status.memory?.used_pct ?? 0}
+                    color={(status.memory?.used_pct ?? 0) > 90 ? "error" : "primary"}
                     sx={{ height: 4, borderRadius: 2 }}
                   />
                 </Box>

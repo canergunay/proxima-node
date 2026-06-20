@@ -336,7 +336,12 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {slots.map((slot) => (
+                  {[...slots].sort((a, b) => {
+                    const aNum = parseInt(a.id.replace(/\D/g, ""), 10);
+                    const bNum = parseInt(b.id.replace(/\D/g, ""), 10);
+                    if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
+                    return a.id.localeCompare(b.id);
+                  }).map((slot) => (
                     <SlotRow
                       key={slot.id}
                       slot={slot}
@@ -613,7 +618,11 @@ function SlotRow({ slot, onAction, actionLoading }: SlotRowProps) {
         <Typography variant="body2" fontWeight={600}>{slot.label || slot.id}</Typography>
       </TableCell>
       <TableCell>
-        <Chip label={slot.type} size="small" variant="outlined" />
+        {slot.type ? (
+          <Chip label={slot.type} size="small" variant="outlined" />
+        ) : (
+          <Chip label="direct" size="small" variant="outlined" color="default" />
+        )}
       </TableCell>
       <TableCell>
         <Typography variant="body2" sx={{ fontFamily: "monospace", fontSize: "0.75rem" }}>

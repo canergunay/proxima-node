@@ -16,13 +16,15 @@ export default function VpnServerCard({ server, onClick }: Props) {
   const status = server.proxima_status;
   const isOnline = server.online;
 
-  // Count healthy slots
+  // Count healthy slots — only slots that have been health-checked
   let healthyCount = 0;
   let totalSlots = 0;
   if (status?.slots) {
     for (const slot of Object.values(status.slots)) {
+      // Skip unchecked slots (Direct, disabled, no active key)
+      if (slot.health?.last_ip_ok === null || slot.health?.last_ip_ok === undefined) continue;
       totalSlots++;
-      if (slot.health?.last_ip_ok === true) healthyCount++;
+      if (slot.health.last_ip_ok === true) healthyCount++;
     }
   }
 
