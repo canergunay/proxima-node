@@ -1,6 +1,6 @@
 ---
 # Setup a VPN Exit Node
-# Roles: common → outline-ss → ssconf → speedtest → proxima-agent
+# Roles: common → outline-ss → ssconf → speedtest → proxima-agent → xray-reality
 # Optional: adguard (when install_adguard=true)
 #
 # Usage:
@@ -44,6 +44,9 @@
 
     - role: proxima-agent
       tags: [agent]
+
+    - role: xray-reality
+      tags: [xray-reality]
 
     - role: adguard
       when: install_adguard | default(false) | bool

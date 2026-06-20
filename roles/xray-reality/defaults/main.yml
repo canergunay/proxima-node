@@ -1,0 +1,6 @@
+---
+vless_port: 8443
+vless_reality_dest: "www.google.com:443"
+vless_reality_sni: "www.google.com"
+xray_version: "25.4.30"
+xray_dir: "/opt/xray-reality"

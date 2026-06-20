@@ -1,0 +1,39 @@
+{
+  "log": {"loglevel": "warning"},
+  "inbounds": [
+    {
+      "port": {{ vless_port }},
+      "protocol": "vless",
+      "settings": {
+        "clients": [
+          {
+            "id": "{{ vless_uuid }}",
+            "flow": "xtls-rprx-vision"
+          }
+        ],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "security": "reality",
+        "realitySettings": {
+          "dest": "{{ vless_reality_dest }}",
+          "serverNames": ["{{ vless_reality_sni }}"],
+          "privateKey": "{{ vless_private_key }}",
+          "shortIds": ["{{ vless_short_id }}"]
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls", "quic"],
+        "routeOnly": true
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "protocol": "freedom",
+      "tag": "direct"
+    }
+  ]
+}

@@ -15,7 +15,7 @@ import ErrorIcon from "@mui/icons-material/Error";
 import InfoIcon from "@mui/icons-material/Info";
 import { useTranslation } from "react-i18next";
 import api from "../api/client";
-import type { ServerDetail, Operation, PreflightData } from "../api/types";
+import type { ServerDetail, Operation, PreflightData, VlessKeyData } from "../api/types";
 import OutputViewer from "./OutputViewer";
 
 interface Props {
@@ -85,6 +85,9 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
   const [ssKey, setSsKey] = useState<SsKeyData | null>(null);
   const [ssKeyLoading, setSsKeyLoading] = useState(false);
   const [ssKeyError, setSsKeyError] = useState(false);
+  const [vlessKey, setVlessKey] = useState<VlessKeyData | null>(null);
+  const [vlessKeyLoading, setVlessKeyLoading] = useState(false);
+  const [vlessKeyError, setVlessKeyError] = useState(false);
   const [preflight, setPreflight] = useState<PreflightData | null>(null);
   const [preflightLoading, setPreflightLoading] = useState(false);
   const [preflightError, setPreflightError] = useState("");
@@ -102,6 +105,8 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
       setLoading(true);
       setSsKey(null);
       setSsKeyError(false);
+      setVlessKey(null);
+      setVlessKeyError(false);
       fetchDetail();
     }
   }, [open, fetchDetail]);
@@ -118,6 +123,19 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
       .catch(() => setSsKeyError(true))
       .finally(() => setSsKeyLoading(false));
   }, [server?.status, serverId]);
+
+  // Fetch VLESS key when server is active + vpn_exit
+  useEffect(() => {
+    if (!server || server.status !== "active" || server.server_type !== "vpn_exit") return;
+    setVlessKeyLoading(true);
+    api.get(`/servers/${serverId}/vless-key`)
+      .then(({ data }) => {
+        if (data.ok) setVlessKey(data.data);
+        else setVlessKeyError(true);
+      })
+      .catch(() => setVlessKeyError(true))
+      .finally(() => setVlessKeyLoading(false));
+  }, [server?.status, server?.server_type, serverId]);
 
   // Poll operation
   useEffect(() => {
@@ -203,6 +221,7 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
       else if (action === "rotate") endpoint = `/provision/${serverId}/rotate`;
       else if (action === "update-agent") endpoint = `/provision/${serverId}/update-agent`;
       else if (action === "install-agent") endpoint = `/provision/${serverId}/install-agent`;
+      else if (action === "install-xray-reality") endpoint = `/provision/${serverId}/install-xray-reality`;
       else if (action === "restart") {
         await api.post(`/servers/${serverId}/restart`, {});
         fetchDetail();
@@ -398,6 +417,28 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
               </Box>
             )}
 
+            {/* VLESS keys — vpn_exit only */}
+            {server.server_type === "vpn_exit" && vlessKeyLoading && (
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 1 }}>
+                <CircularProgress size={16} />
+                <Typography variant="body2" color="text.secondary">
+                  {t("detail.fetchingVlessKeys")}
+                </Typography>
+              </Box>
+            )}
+
+            {server.server_type === "vpn_exit" && vlessKeyError && !vlessKey && (
+              <Alert severity="info" variant="outlined" sx={{ mb: 1 }}>
+                {t("detail.vlessNotInstalled")}
+              </Alert>
+            )}
+
+            {vlessKey && (
+              <Box sx={{ bgcolor: "action.hover", borderRadius: 1, p: 1.5, mb: 1 }}>
+                <CopyField label={t("detail.vlessUri")} value={vlessKey.uri} />
+              </Box>
+            )}
+
             {/* Raw credentials in collapsible section */}
             <Accordion disableGutters elevation={0} sx={{ bgcolor: "transparent", "&:before": { display: "none" } }}>
               <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ px: 0, minHeight: 36 }}>
@@ -491,6 +532,11 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
         {server.status === "active" && !server.online && (
           <Button variant="contained" onClick={() => handleAction("install-agent")} disabled={actionLoading}>
             {t("detail.installAgent")}
+          </Button>
+        )}
+        {server.status === "active" && server.server_type === "vpn_exit" && !vlessKey && !vlessKeyLoading && (
+          <Button variant="outlined" onClick={() => handleAction("install-xray-reality")} disabled={actionLoading}>
+            {t("detail.installXrayReality")}
           </Button>
         )}
         {server.status === "active" && (

@@ -62,6 +62,18 @@ export interface AuthMe {
   username?: string;
 }
 
+export interface VlessKeyData {
+  uri: string;
+  server: string;
+  port: number;
+  vless_uuid: string;
+  public_key: string;
+  short_id: string;
+  server_name: string;
+  flow: string;
+  fingerprint: string;
+}
+
 export interface PreflightConflict {
   type: "port" | "service" | "container";
   port?: number;

@@ -1,0 +1,13 @@
+[Unit]
+Description=Xray VLESS Reality
+After=network.target
+
+[Service]
+Type=simple
+ExecStart={{ xray_dir }}/xray run -config {{ xray_dir }}/config.json
+Restart=always
+RestartSec=3
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

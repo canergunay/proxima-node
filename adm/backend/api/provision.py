@@ -1,11 +1,15 @@
-"""Provisioning API — provision, decommission, rotate, update-agent."""
+"""Provisioning API — provision, decommission, rotate, update-agent, install-xray-reality."""
 
 import logging
 
+import requests as http_requests
+import urllib3
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from flask import Blueprint, jsonify, request
 
 from core.ansible_runner import current_operation_id, is_running, run_playbook
-from core.auth import encrypt_value
+from core.auth import decrypt_value, encrypt_value
 from core.credential_gen import (
     gen_agent_api_key,
     gen_node_id,
@@ -249,6 +253,74 @@ def install_agent(server_id: int):
             log.info(f"[PROVISION] Agent installed on {server['name']}")
         else:
             log.error(f"[PROVISION] Agent install failed on {server['name']}")
+
+    run_playbook(op_id, playbook, limit=server["name"], on_complete=on_complete)
+
+    return jsonify({"ok": True, "data": {"operation_id": op_id}})
+
+
+def _fetch_vless_keys(server: dict) -> dict | None:
+    """Fetch VLESS Reality keys from agent and return parsed data."""
+    url = f"https://{server['ip']}:{server.get('agent_port', 5051)}/api/vless-key"
+    headers = {}
+    enc_key = server.get("agent_api_key_enc")
+    if enc_key:
+        api_key = decrypt_value(enc_key)
+        if api_key:
+            headers["X-API-Key"] = api_key
+    try:
+        resp = http_requests.get(url, headers=headers, timeout=15, verify=False)
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("ok") and data.get("data"):
+            return data["data"]
+    except Exception as e:
+        log.warning(f"Failed to fetch VLESS keys: {e}")
+    return None
+
+
+@bp.post("/api/provision/<int:server_id>/install-xray-reality")
+def install_xray_reality(server_id: int):
+    """Install Xray VLESS Reality on a VPN exit server."""
+    busy = _check_not_running()
+    if busy:
+        return busy
+
+    server = get_server(server_id)
+    if not server:
+        return jsonify({"ok": False, "error": "Server not found"}), 404
+
+    if server["status"] != "active":
+        return jsonify({"ok": False, "error": "Server must be active"}), 400
+
+    if server["server_type"] != "vpn_exit":
+        return jsonify({"ok": False, "error": "VLESS Reality is only for vpn_exit servers"}), 400
+
+    # Regenerate inventory so host_vars are current
+    regenerate_for_server(server)
+
+    playbook = "install-xray-reality.yml"
+    op_id = create_operation(server_id, "install-xray-reality", playbook)
+
+    def on_complete(success: bool, op_id: int):
+        if success:
+            # Fetch VLESS keys from agent and store in DB
+            srv = get_server(server_id)
+            if srv:
+                vless_data = _fetch_vless_keys(srv)
+                if vless_data:
+                    update_server(server_id, {
+                        "vless_uuid": vless_data.get("vless_uuid"),
+                        "vless_public_key": vless_data.get("public_key"),
+                        "vless_short_id": vless_data.get("short_id"),
+                        "vless_port": vless_data.get("port", 8443),
+                    })
+                    log.info(f"[PROVISION] VLESS keys saved for {srv['name']}")
+                else:
+                    log.warning(f"[PROVISION] VLESS installed but could not fetch keys from {srv['name']}")
+            log.info(f"[PROVISION] Xray Reality installed on {server['name']}")
+        else:
+            log.error(f"[PROVISION] Xray Reality install failed on {server['name']}")
 
     run_playbook(op_id, playbook, limit=server["name"], on_complete=on_complete)
 

@@ -278,6 +278,21 @@ def get_ss_key(server_id: int):
         return jsonify({"ok": False, "error": str(e)}), 502
 
 
+@bp.get("/api/servers/<int:server_id>/vless-key")
+def get_vless_key(server_id: int):
+    """Get VLESS Reality key from agent."""
+    server = get_server(server_id)
+    if not server:
+        return jsonify({"ok": False, "error": "Server not found"}), 404
+    try:
+        result = _proxy_request(server, "GET", "/api/vless-key")
+        return jsonify(result)
+    except http_requests.exceptions.ConnectionError:
+        return jsonify({"ok": False, "error": "Cannot reach server"}), 502
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 502
+
+
 @bp.post("/api/servers/<int:server_id>/restart")
 def restart_services(server_id: int):
     """Restart services via agent."""

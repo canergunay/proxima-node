@@ -1,0 +1,9 @@
+---
+- name: daemon reload
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: restart xray-reality
+  ansible.builtin.systemd:
+    name: xray-reality
+    state: restarted

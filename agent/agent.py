@@ -33,12 +33,14 @@ AGENT_DIR = os.environ.get("PROXIMA_AGENT_DIR", "/opt/proxima-agent")
 CONFIG_PATH = os.environ.get("PROXIMA_AGENT_CONFIG", f"{AGENT_DIR}/config.json")
 CERT_FILE = f"{AGENT_DIR}/cert.pem"
 KEY_FILE = f"{AGENT_DIR}/key.pem"
-VERSION = "2.1.0"
+VERSION = "2.2.0"
 
 # Service paths by server type
 OUTLINE_SS_CONFIG = "/opt/outline-ss/config.yml"
 SS_LIBEV_CONFIG = "/etc/shadowsocks-libev/config.json"
 NFQWS2_CONF = "/opt/zapret/nfqws2.conf"
+XRAY_REALITY_DIR = "/opt/xray-reality"
+XRAY_REALITY_KEYS = f"{XRAY_REALITY_DIR}/keys.json"
 
 # Service names
 SVC_OUTLINE_SS = "outline-ss-server"
@@ -46,6 +48,7 @@ SVC_SS_LIBEV = "shadowsocks-libev-server@config"
 SVC_NFQWS2 = "zapret-nfqws2"
 SVC_SSCONF = "proxima-ssconf"
 SVC_SPEEDTEST = "proxima-speedtest"
+SVC_XRAY_REALITY = "xray-reality"
 
 
 def _load_config() -> dict:
@@ -241,6 +244,24 @@ def _read_ss_config() -> dict | None:
     return _read_ss_libev_config()
 
 
+# ── VLESS Reality config reader ────────────────────────────────────────
+
+def _read_vless_config() -> dict | None:
+    """Read VLESS Reality keys from /opt/xray-reality/keys.json."""
+    try:
+        with open(XRAY_REALITY_KEYS) as f:
+            keys = json.load(f)
+        return {
+            "vless_uuid": keys.get("uuid", ""),
+            "public_key": keys.get("public_key", ""),
+            "short_id": keys.get("short_id", ""),
+            "port": keys.get("port", 8443),
+            "server_name": keys.get("sni", "www.google.com"),
+        }
+    except Exception:
+        return None
+
+
 # ── DPI-specific helpers ───────────────────────────────────────────────────
 
 def _read_dpi_args() -> str:
@@ -301,11 +322,15 @@ def get_status():
             "outline_ss": _service_active(SVC_OUTLINE_SS),
             "ssconf": _service_active(SVC_SSCONF),
             "speedtest": _service_active(SVC_SPEEDTEST),
+            "xray_reality": _service_active(SVC_XRAY_REALITY),
         }
         data["ss_config"] = {
             "port": ss_cfg.get("port", 8388) if ss_cfg else 8388,
             "method": ss_cfg.get("method", "chacha20-ietf-poly1305") if ss_cfg else "",
         }
+        vless_cfg = _read_vless_config()
+        if vless_cfg:
+            data["vless_config"] = {"port": vless_cfg["port"]}
 
     elif server_type == "dpi_bypass":
         ss_cfg = _read_ss_libev_config()
@@ -331,6 +356,8 @@ def deep_health():
     if server_type == "vpn_exit":
         checks["outline_ss"] = _service_active(SVC_OUTLINE_SS)
         checks["ssconf"] = _service_active(SVC_SSCONF)
+        if _service_exists(SVC_XRAY_REALITY):
+            checks["xray_reality"] = _service_active(SVC_XRAY_REALITY)
     elif server_type == "dpi_bypass":
         checks["nfqws2"] = _service_active(SVC_NFQWS2)
         checks["ss_server"] = _service_active(SVC_SS_LIBEV)
@@ -353,6 +380,7 @@ def restart_services():
         "nfqws2": SVC_NFQWS2,
         "ssconf": SVC_SSCONF,
         "speedtest": SVC_SPEEDTEST,
+        "xray-reality": SVC_XRAY_REALITY,
         # Legacy names (backward compat)
         "ss": SVC_SS_LIBEV,
     }
@@ -479,6 +507,48 @@ def update_ss_config():
         return jsonify({"ok": False, "error": f"Config updated but restart failed: {e}"}), 500
 
     return jsonify({"ok": True})
+
+
+# ── VLESS Reality endpoints ──────────────────────────────────────────────
+
+@app.get("/api/vless-key")
+def get_vless_key():
+    """Return VLESS Reality connection details and vless:// URI."""
+    vless_cfg = _read_vless_config()
+    if not vless_cfg:
+        return jsonify({"ok": False, "error": "VLESS Reality not configured"}), 404
+
+    config = _load_config()
+    server_ip = config.get("server_ip") or _get_public_ip() or socket.gethostname()
+    node_id = config.get("node_id", socket.gethostname())
+
+    uuid = vless_cfg["vless_uuid"]
+    port = vless_cfg["port"]
+    pbk = vless_cfg["public_key"]
+    sid = vless_cfg["short_id"]
+    sni = vless_cfg["server_name"]
+
+    # Build vless:// URI
+    params = (
+        f"encryption=none&flow=xtls-rprx-vision&type=tcp"
+        f"&security=reality&sni={sni}&fp=chrome&pbk={pbk}&sid={sid}"
+    )
+    vless_uri = f"vless://{uuid}@{server_ip}:{port}?{params}#{node_id}"
+
+    return jsonify({
+        "ok": True,
+        "data": {
+            "uri": vless_uri,
+            "server": server_ip,
+            "port": port,
+            "vless_uuid": uuid,
+            "public_key": pbk,
+            "short_id": sid,
+            "server_name": sni,
+            "flow": "xtls-rprx-vision",
+            "fingerprint": "chrome",
+        },
+    })
 
 
 # ── DPI Bypass endpoints ───────────────────────────────────────────────────

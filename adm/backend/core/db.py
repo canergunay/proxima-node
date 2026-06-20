@@ -84,6 +84,12 @@ def _migrate(conn: sqlite3.Connection) -> None:
     if "ssh_port" not in cols:
         conn.execute("ALTER TABLE servers ADD COLUMN ssh_port INTEGER NOT NULL DEFAULT 22")
         conn.commit()
+    if "vless_uuid" not in cols:
+        conn.execute("ALTER TABLE servers ADD COLUMN vless_uuid TEXT")
+        conn.execute("ALTER TABLE servers ADD COLUMN vless_public_key TEXT")
+        conn.execute("ALTER TABLE servers ADD COLUMN vless_short_id TEXT")
+        conn.execute("ALTER TABLE servers ADD COLUMN vless_port INTEGER DEFAULT 8443")
+        conn.commit()
 
 
 # ── Server CRUD ──────────────────────────────────────────────────────────
@@ -139,6 +145,7 @@ def update_server(server_id: int, updates: dict) -> bool:
         "status", "root_password_enc", "ss_password_enc", "agent_api_key_enc",
         "ssconf_token_enc", "speedtest_api_key_enc", "ss_port", "ss_cipher",
         "agent_port", "ssh_port", "node_id", "install_adguard",
+        "vless_uuid", "vless_public_key", "vless_short_id", "vless_port",
     }
     sets, vals = [], []
     for key, val in updates.items():

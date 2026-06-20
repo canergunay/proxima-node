@@ -1,0 +1,141 @@
+---
+- name: Determine architecture
+  ansible.builtin.set_fact:
+    xray_arch: "{{ '64' if ansible_architecture == 'x86_64' else 'arm64-v8a' }}"
+
+- name: Create xray-reality directory
+  ansible.builtin.file:
+    path: "{{ xray_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Check if xray binary exists
+  ansible.builtin.stat:
+    path: "{{ xray_dir }}/xray"
+  register: xray_binary
+
+- name: Download xray-core
+  ansible.builtin.get_url:
+    url: "https://github.com/XTLS/Xray-core/releases/download/v{{ xray_version }}/Xray-linux-{{ xray_arch }}.zip"
+    dest: /tmp/xray-core.zip
+    mode: "0644"
+  when: not xray_binary.stat.exists
+
+- name: Extract xray binary
+  ansible.builtin.command:
+    cmd: "unzip -o /tmp/xray-core.zip xray -d {{ xray_dir }}"
+  when: not xray_binary.stat.exists
+
+- name: Set xray binary permissions
+  ansible.builtin.file:
+    path: "{{ xray_dir }}/xray"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Clean up download
+  ansible.builtin.file:
+    path: /tmp/xray-core.zip
+    state: absent
+
+# ── Key Generation ──────────────────────────────────────────────────────
+
+- name: Check if keys.json exists
+  ansible.builtin.stat:
+    path: "{{ xray_dir }}/keys.json"
+  register: keys_file
+
+- name: Generate VLESS UUID
+  ansible.builtin.command:
+    cmd: "{{ xray_dir }}/xray uuid"
+  register: uuid_result
+  when: not keys_file.stat.exists
+
+- name: Generate x25519 keypair
+  ansible.builtin.command:
+    cmd: "{{ xray_dir }}/xray x25519"
+  register: x25519_result
+  when: not keys_file.stat.exists
+
+- name: Generate random short ID
+  ansible.builtin.command:
+    cmd: "openssl rand -hex 8"
+  register: shortid_result
+  when: not keys_file.stat.exists
+
+- name: Parse x25519 output
+  ansible.builtin.set_fact:
+    vless_uuid: "{{ uuid_result.stdout | trim }}"
+    vless_private_key: "{{ x25519_result.stdout_lines | select('match', '^Private key:') | first | regex_replace('^Private key: ', '') }}"
+    vless_public_key: "{{ x25519_result.stdout_lines | select('match', '^Public key:') | first | regex_replace('^Public key: ', '') }}"
+    vless_short_id: "{{ shortid_result.stdout | trim }}"
+  when: not keys_file.stat.exists
+
+- name: Write keys.json
+  ansible.builtin.copy:
+    content: |
+      {
+        "uuid": "{{ vless_uuid }}",
+        "private_key": "{{ vless_private_key }}",
+        "public_key": "{{ vless_public_key }}",
+        "short_id": "{{ vless_short_id }}",
+        "port": {{ vless_port }},
+        "sni": "{{ vless_reality_sni }}"
+      }
+    dest: "{{ xray_dir }}/keys.json"
+    owner: root
+    group: root
+    mode: "0600"
+  when: not keys_file.stat.exists
+
+- name: Read existing keys.json
+  ansible.builtin.slurp:
+    src: "{{ xray_dir }}/keys.json"
+  register: keys_content
+  when: keys_file.stat.exists
+
+- name: Load existing keys
+  ansible.builtin.set_fact:
+    vless_uuid: "{{ (keys_content.content | b64decode | from_json).uuid }}"
+    vless_private_key: "{{ (keys_content.content | b64decode | from_json).private_key }}"
+    vless_public_key: "{{ (keys_content.content | b64decode | from_json).public_key }}"
+    vless_short_id: "{{ (keys_content.content | b64decode | from_json).short_id }}"
+  when: keys_file.stat.exists
+
+# ── Configuration & Service ─────────────────────────────────────────────
+
+- name: Deploy xray-reality config
+  ansible.builtin.template:
+    src: config.json.j2
+    dest: "{{ xray_dir }}/config.json"
+    owner: root
+    group: root
+    mode: "0600"
+  notify: restart xray-reality
+
+- name: Deploy xray-reality systemd service
+  ansible.builtin.template:
+    src: xray-reality.service.j2
+    dest: /etc/systemd/system/xray-reality.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - daemon reload
+    - restart xray-reality
+
+- name: Allow VLESS port in UFW
+  ansible.builtin.command:
+    cmd: "ufw allow {{ vless_port }}/tcp comment 'xray-reality'"
+  register: ufw_result
+  changed_when: "'Added' in ufw_result.stdout or 'Rule added' in ufw_result.stdout"
+  failed_when: false
+
+- name: Enable and start xray-reality
+  ansible.builtin.systemd:
+    name: xray-reality
+    enabled: true
+    state: started
+    daemon_reload: true
