@@ -55,6 +55,7 @@
   "detail.rotate": "Rotate Credentials",
   "detail.updateAgent": "Update Agent",
   "detail.restart": "Restart Services",
+  "detail.installAgent": "Install Agent",
   "detail.confirmDecommission": "Are you sure you want to decommission this server?",
   "detail.confirmRotate": "This will rotate all credentials. Continue?",
   "detail.connectionKeys": "Connection Keys",

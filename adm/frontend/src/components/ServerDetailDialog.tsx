@@ -202,6 +202,7 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
       if (action === "decommission") endpoint = `/provision/${serverId}/decommission`;
       else if (action === "rotate") endpoint = `/provision/${serverId}/rotate`;
       else if (action === "update-agent") endpoint = `/provision/${serverId}/update-agent`;
+      else if (action === "install-agent") endpoint = `/provision/${serverId}/install-agent`;
       else if (action === "restart") {
         await api.post(`/servers/${serverId}/restart`, {});
         fetchDetail();
@@ -486,6 +487,11 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
               {t("preflight.retry")}
             </Button>
           </>
+        )}
+        {server.status === "active" && !server.online && (
+          <Button variant="contained" onClick={() => handleAction("install-agent")} disabled={actionLoading}>
+            {t("detail.installAgent")}
+          </Button>
         )}
         {server.status === "active" && (
           <>

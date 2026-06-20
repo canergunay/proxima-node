@@ -74,6 +74,17 @@ def init_db() -> None:
     """)
     conn.commit()
 
+    # Schema migrations
+    _migrate(conn)
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Run schema migrations for columns added after initial release."""
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(servers)").fetchall()}
+    if "ssh_port" not in cols:
+        conn.execute("ALTER TABLE servers ADD COLUMN ssh_port INTEGER NOT NULL DEFAULT 22")
+        conn.commit()
+
 
 # ── Server CRUD ──────────────────────────────────────────────────────────
 
@@ -127,7 +138,7 @@ def update_server(server_id: int, updates: dict) -> bool:
         "name", "display_name", "ip", "server_type", "location", "provider",
         "status", "root_password_enc", "ss_password_enc", "agent_api_key_enc",
         "ssconf_token_enc", "speedtest_api_key_enc", "ss_port", "ss_cipher",
-        "agent_port", "node_id", "install_adguard",
+        "agent_port", "ssh_port", "node_id", "install_adguard",
     }
     sets, vals = [], []
     for key, val in updates.items():

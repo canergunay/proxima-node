@@ -55,6 +55,7 @@
   "detail.rotate": "Сменить учётные данные",
   "detail.updateAgent": "Обновить агент",
   "detail.restart": "Перезапустить сервисы",
+  "detail.installAgent": "Установить агент",
   "detail.confirmDecommission": "Вы уверены, что хотите вывести этот сервер из эксплуатации?",
   "detail.confirmRotate": "Все учётные данные будут сменены. Продолжить?",
   "detail.connectionKeys": "Ключи подключения",

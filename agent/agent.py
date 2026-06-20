@@ -398,9 +398,9 @@ def get_ss_key():
             # VPN exit: dedicated ssconf service on port 8390
             ssconf_url = f"ssconf://{server_ip}:8390/{ssconf_token}"
         else:
-            # All types: agent serves ssconf on its own port
+            # All types: agent serves ssconf on its own port at /ssconf/<token>
             agent_port = config.get("agent_port", 5051)
-            ssconf_url = f"ssconf://{server_ip}:{agent_port}/{ssconf_token}"
+            ssconf_url = f"ssconf://{server_ip}:{agent_port}/ssconf/{ssconf_token}"
 
     return jsonify({
         "ok": True,

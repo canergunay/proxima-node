@@ -55,6 +55,7 @@
   "detail.rotate": "Kimlik Bilgilerini Yenile",
   "detail.updateAgent": "Agent Güncelle",
   "detail.restart": "Servisleri Yeniden Başlat",
+  "detail.installAgent": "Agent Kur",
   "detail.confirmDecommission": "Bu sunucuyu kaldırmak istediğinizden emin misiniz?",
   "detail.confirmRotate": "Tüm kimlik bilgileri yenilenecek. Devam edilsin mi?",
   "detail.connectionKeys": "Bağlantı Anahtarları",

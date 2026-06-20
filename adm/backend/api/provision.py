@@ -222,3 +222,34 @@ def update_agent(server_id: int):
     run_playbook(op_id, playbook, limit=server["name"], on_complete=on_complete)
 
     return jsonify({"ok": True, "data": {"operation_id": op_id}})
+
+
+@bp.post("/api/provision/<int:server_id>/install-agent")
+def install_agent(server_id: int):
+    """Deploy proxima-agent to a server that doesn't have it yet."""
+    busy = _check_not_running()
+    if busy:
+        return busy
+
+    server = get_server(server_id)
+    if not server:
+        return jsonify({"ok": False, "error": "Server not found"}), 404
+
+    if server["status"] != "active":
+        return jsonify({"ok": False, "error": "Server must be active to install agent"}), 400
+
+    # Regenerate inventory so host_vars have the correct credentials
+    regenerate_for_server(server)
+
+    playbook = "migrate-agent.yml"
+    op_id = create_operation(server_id, "install-agent", playbook)
+
+    def on_complete(success: bool, op_id: int):
+        if success:
+            log.info(f"[PROVISION] Agent installed on {server['name']}")
+        else:
+            log.error(f"[PROVISION] Agent install failed on {server['name']}")
+
+    run_playbook(op_id, playbook, limit=server["name"], on_complete=on_complete)
+
+    return jsonify({"ok": True, "data": {"operation_id": op_id}})

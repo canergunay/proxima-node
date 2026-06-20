@@ -40,6 +40,9 @@ def write_hosts_yml(servers: list[dict]) -> None:
         if s["status"] == "decommissioned":
             continue
         host_entry = {"ansible_host": s["ip"]}
+        ssh_port = s.get("ssh_port", 22)
+        if ssh_port and ssh_port != 22:
+            host_entry["ansible_port"] = ssh_port
         if s.get("location"):
             host_entry["server_location"] = s["location"]
         if s.get("provider"):
