@@ -1,11 +1,11 @@
 # zapret role defaults
 zapret_dir: /opt/zapret
 nfqws2_queue_num: 200
-ssserver_user: ssserver
-ssserver_uid: 999
 
-# Default DPI bypass args (without --qnum)
-nfqws2_args: >-
-  --dpi-desync=fake,split2
-  --dpi-desync-ttl=3
-  --dpi-desync-fooling=md5sig,badseq
+# Default DPI bypass args (nfqws2 v2 Lua syntax, without --qnum)
+nfqws2_args: |-
+  --lua-init=@{{ zapret_dir }}/lua/zapret-lib.lua
+  --lua-init=@{{ zapret_dir }}/lua/zapret-antidpi.lua
+  --lua-desync=wssize:wsize=1:scale=6
+  --payload=tls_client_hello
+  --lua-desync=multidisorder:pos=1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1
