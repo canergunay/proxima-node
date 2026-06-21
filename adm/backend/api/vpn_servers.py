@@ -79,7 +79,12 @@ def _fetch_vpn_server_status(server: dict) -> dict:
         data = resp.json()
         if data.get("ok"):
             result["online"] = True
-            result["proxima_status"] = data.get("data")
+            status_data = data.get("data") or {}
+            result["proxima_status"] = status_data
+            # Prefer public_url from live Proxima status over DB value
+            live_url = status_data.get("public_url", "")
+            if live_url:
+                result["public_url"] = live_url
         else:
             result["error"] = data.get("error", "Unknown error")
     except http_requests.exceptions.ConnectionError:
