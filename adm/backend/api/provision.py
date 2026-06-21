@@ -13,7 +13,6 @@ from core.auth import decrypt_value, encrypt_value
 from core.credential_gen import (
     gen_agent_api_key,
     gen_node_id,
-    gen_speedtest_api_key,
     gen_ss_password,
     gen_ssconf_token,
 )
@@ -81,11 +80,6 @@ def provision():
         "ssconf_token_enc": encrypt_value(ssconf_token),
         "node_id": node_id,
     }
-
-    # VPN exit gets additional credentials
-    if server["server_type"] == "vpn_exit":
-        speedtest_api_key = gen_speedtest_api_key()
-        updates["speedtest_api_key_enc"] = encrypt_value(speedtest_api_key)
 
     update_server(server_id, updates)
 

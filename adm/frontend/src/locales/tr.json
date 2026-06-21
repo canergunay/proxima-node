@@ -46,7 +46,6 @@
   "detail.ssPassword": "SS Şifresi",
   "detail.agentApiKey": "Agent API Anahtarı",
   "detail.ssconfToken": "ssconf Token",
-  "detail.speedtestKey": "Speedtest API Anahtarı",
   "detail.ssconfUrl": "ssconf URL",
   "detail.ssconfProxyUrl": "ssconf (ADM üzerinden)",
   "detail.ssconfDirectUrl": "ssconf (doğrudan)",

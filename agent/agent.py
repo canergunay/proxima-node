@@ -47,7 +47,6 @@ SVC_OUTLINE_SS = "outline-ss-server"
 SVC_SS_LIBEV = "shadowsocks-libev-server@config"
 SVC_NFQWS2 = "zapret-nfqws2"
 SVC_SSCONF = "proxima-ssconf"
-SVC_SPEEDTEST = "proxima-speedtest"
 SVC_XRAY_REALITY = "xray-reality"
 
 
@@ -321,7 +320,6 @@ def get_status():
         data["services"] = {
             "outline_ss": _service_active(SVC_OUTLINE_SS),
             "ssconf": _service_active(SVC_SSCONF),
-            "speedtest": _service_active(SVC_SPEEDTEST),
             "xray_reality": _service_active(SVC_XRAY_REALITY),
         }
         data["ss_config"] = {
@@ -379,7 +377,6 @@ def restart_services():
         "ss-server": SVC_SS_LIBEV,
         "nfqws2": SVC_NFQWS2,
         "ssconf": SVC_SSCONF,
-        "speedtest": SVC_SPEEDTEST,
         "xray-reality": SVC_XRAY_REALITY,
         # Legacy names (backward compat)
         "ss": SVC_SS_LIBEV,

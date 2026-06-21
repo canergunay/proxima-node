@@ -46,7 +46,6 @@
   "detail.ssPassword": "SS Password",
   "detail.agentApiKey": "Agent API Key",
   "detail.ssconfToken": "ssconf Token",
-  "detail.speedtestKey": "Speedtest API Key",
   "detail.ssconfUrl": "ssconf URL",
   "detail.ssconfProxyUrl": "ssconf (via ADM)",
   "detail.ssconfDirectUrl": "ssconf (direct)",

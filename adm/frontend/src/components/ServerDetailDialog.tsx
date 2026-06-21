@@ -477,7 +477,6 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
                 <CopyField label={t("detail.ssPassword")} value={server.ss_password} />
                 <CopyField label={t("detail.agentApiKey")} value={server.agent_api_key} />
                 <CopyField label={t("detail.ssconfToken")} value={server.ssconf_token} />
-                <CopyField label={t("detail.speedtestKey")} value={server.speedtest_api_key} />
               </AccordionDetails>
             </Accordion>
           </Box>
@@ -490,7 +489,6 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
             <CopyField label={t("detail.ssPassword")} value={server.ss_password} />
             <CopyField label={t("detail.agentApiKey")} value={server.agent_api_key} />
             <CopyField label={t("detail.ssconfToken")} value={server.ssconf_token} />
-            <CopyField label={t("detail.speedtestKey")} value={server.speedtest_api_key} />
           </Box>
         )}
 

@@ -36,7 +36,6 @@ export interface ServerDetail extends Server {
   ss_password: string | null;
   agent_api_key: string | null;
   ssconf_token: string | null;
-  speedtest_api_key: string | null;
   ss_port: number;
   ss_cipher: string;
   node_id: string | null;

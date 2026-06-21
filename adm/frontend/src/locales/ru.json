@@ -46,7 +46,6 @@
   "detail.ssPassword": "Пароль SS",
   "detail.agentApiKey": "API-ключ агента",
   "detail.ssconfToken": "Токен ssconf",
-  "detail.speedtestKey": "API-ключ Speedtest",
   "detail.ssconfUrl": "URL ssconf",
   "detail.ssconfProxyUrl": "ssconf (через ADM)",
   "detail.ssconfDirectUrl": "ssconf (напрямую)",

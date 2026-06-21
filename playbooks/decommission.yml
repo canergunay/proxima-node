@@ -43,13 +43,6 @@
         enabled: false
       failed_when: false
 
-    - name: Stop proxima-speedtest
-      ansible.builtin.systemd:
-        name: proxima-speedtest
-        state: stopped
-        enabled: false
-      failed_when: false
-
     - name: Stop outline-ss-server
       ansible.builtin.systemd:
         name: outline-ss-server
@@ -96,7 +89,6 @@
       loop:
         - proxima-agent.service
         - proxima-ssconf.service
-        - proxima-speedtest.service
         - outline-ss-server.service
         - zapret-nfqws2.service
         - zapret-watchdog.service
@@ -114,11 +106,6 @@
         path: /opt/outline-ss
         state: absent
       when: "'vpn_exit' in group_names"
-
-    - name: Remove speedtest directory
-      ansible.builtin.file:
-        path: /opt/proxima-speedtest
-        state: absent
 
     - name: Remove AdGuard Home data
       ansible.builtin.file:

@@ -4,7 +4,6 @@ server_type: vpn_exit
 # Components to install
 install_outline_ss: true
 install_ssconf: true
-install_speedtest: true
 install_adguard: false
 
 # Outline SS server runs as nobody

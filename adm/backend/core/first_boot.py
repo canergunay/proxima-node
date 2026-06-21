@@ -76,7 +76,6 @@ def import_existing_servers() -> int:
                 ("ss_password", "ss_password_enc"),
                 ("agent_api_key", "agent_api_key_enc"),
                 ("ssconf_token", "ssconf_token_enc"),
-                ("speedtest_api_key", "speedtest_api_key_enc"),
             ]:
                 val = host_vars.get(var_name)
                 if val:

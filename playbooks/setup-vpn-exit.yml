@@ -1,6 +1,6 @@
 ---
 # Setup a VPN Exit Node
-# Roles: common → outline-ss → ssconf → speedtest → proxima-agent → xray-reality
+# Roles: common → outline-ss → ssconf → proxima-agent → xray-reality
 # Optional: adguard (when install_adguard=true)
 #
 # Usage:
@@ -25,7 +25,6 @@
           - server_ip is defined and server_ip | length > 0
           - ss_password is defined and ss_password | length > 0
           - ssconf_token is defined and ssconf_token | length > 0
-          - speedtest_api_key is defined and speedtest_api_key | length > 0
           - agent_api_key is defined and agent_api_key | length > 0
         fail_msg: "Missing required host_vars. Copy host_vars/<host>.yml.example to host_vars/<host>.yml and fill in values."
 
@@ -38,9 +37,6 @@
 
     - role: ssconf
       tags: [ssconf]
-
-    - role: speedtest
-      tags: [speedtest]
 
     - role: proxima-agent
       tags: [agent]
@@ -64,7 +60,6 @@
           SS Cipher:    {{ ss_cipher }}
           ssconf URL:   https://{{ server_ip }}:{{ ssconf_port }}/{{ ssconf_token }}
           Agent URL:    https://{{ server_ip }}:{{ agent_port }}/api/info
-          Speedtest:    https://{{ server_ip }}:{{ speedtest_port }}
           AdGuard:      {{ 'installed' if (install_adguard | default(false) | bool) else 'not installed' }}
           ─────────────────────────────────────────
           Next: Install AWG/Xray via AmneziaVPN app (optional)

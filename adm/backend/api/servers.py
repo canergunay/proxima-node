@@ -183,7 +183,6 @@ def get_server_detail(server_id: int):
         ("ss_password_enc", "ss_password"),
         ("agent_api_key_enc", "agent_api_key"),
         ("ssconf_token_enc", "ssconf_token"),
-        ("speedtest_api_key_enc", "speedtest_api_key"),
     ]:
         enc_val = result.pop(enc_field, None)
         if enc_val:
