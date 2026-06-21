@@ -1,6 +1,6 @@
 ---
 # Setup a DPI Bypass Node
-# Roles: common → ss-server → zapret → proxima-agent
+# Roles: common → outline-ss → zapret → proxima-agent
 #
 # Usage:
 #   ansible-playbook playbooks/setup-dpi-bypass.yml -l erg-ru
@@ -26,12 +26,26 @@
           - agent_api_key is defined and agent_api_key | length > 0
         fail_msg: "Missing required host_vars. Copy host_vars/<host>.yml.example to host_vars/<host>.yml and fill in values."
 
+    # Migration: remove legacy shadowsocks-libev if present
+    - name: Stop legacy shadowsocks-libev service
+      ansible.builtin.systemd:
+        name: shadowsocks-libev-server@config
+        state: stopped
+        enabled: false
+      failed_when: false
+
+    - name: Remove shadowsocks-libev package
+      ansible.builtin.apt:
+        name: shadowsocks-libev
+        state: absent
+        purge: true
+
   roles:
     - role: common
       tags: [common]
 
-    - role: ss-server
-      tags: [ss-server]
+    - role: outline-ss
+      tags: [outline-ss]
 
     - role: zapret
       tags: [zapret]
@@ -43,13 +57,14 @@
     - name: Display setup summary
       ansible.builtin.debug:
         msg: |
-          ✓ DPI Bypass Node setup complete: {{ inventory_hostname }}
+          DPI Bypass Node setup complete: {{ inventory_hostname }}
           ─────────────────────────────────────────
           Server IP:       {{ server_ip }}
           Location:        {{ server_location | default('unknown') }}
+          SS Server:       outline-ss-server v{{ outline_ss_version }}
           SS Port:         {{ ss_port }}
           SS Cipher:       {{ ss_cipher }}
-          SS Server User:  {{ ssserver_user }} (UID {{ ssserver_uid }})
+          SS Prefix:       {{ ss_prefix }}
           NFQUEUE Num:     {{ nfqws2_queue_num }}
           Agent URL:       https://{{ server_ip }}:{{ agent_port }}/api/info
           ─────────────────────────────────────────
