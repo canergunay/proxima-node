@@ -81,20 +81,25 @@ def _poll_server(server: dict) -> dict:
             status_data = data.get("data", {})
             result["online"] = True
             result["uptime"] = status_data.get("uptime")
-            result["disk_pct"] = status_data.get("disk_percent")
-            result["memory_pct"] = status_data.get("memory_percent")
+            # Agent returns nested objects: disk.used_pct, memory.used_pct
+            disk = status_data.get("disk", {})
+            if isinstance(disk, dict):
+                result["disk_pct"] = disk.get("used_pct")
+            memory = status_data.get("memory", {})
+            if isinstance(memory, dict):
+                result["memory_pct"] = memory.get("used_pct")
             # Count services
             services = status_data.get("services", {})
             if services:
                 result["services_ok"] = sum(
                     1 for v in services.values() if v is True or v == "active"
                 )
-            # Check docker
-            docker = status_data.get("docker", {})
-            if docker:
+            # Count running docker containers
+            containers = status_data.get("docker_containers", [])
+            if isinstance(containers, list):
                 result["docker_ok"] = sum(
-                    1 for v in docker.values()
-                    if isinstance(v, str) and "running" in v.lower()
+                    1 for c in containers
+                    if isinstance(c, dict) and "up" in c.get("status", "").lower()
                 )
     except http_requests.exceptions.RequestException:
         pass
@@ -123,7 +128,7 @@ def _collect_metrics() -> None:
         metric = results.get(server["id"], {"online": False})
         insert_metric(server["id"], metric)
 
-    log.debug(
+    log.info(
         f"Collected metrics for {len(servers)} server(s): "
         + ", ".join(
             f"{s['name']}={'up' if results.get(s['id'], {}).get('online') else 'down'}"

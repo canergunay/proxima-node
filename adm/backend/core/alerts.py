@@ -1,10 +1,16 @@
 """Telegram alert sender."""
 
 import logging
+import os
 
 import requests
 
 log = logging.getLogger("adm.alerts")
+
+# Telegram API may be unreachable directly (e.g. from Russia).
+# Set TELEGRAM_PROXY env var to route through a SOCKS proxy.
+# Example: TELEGRAM_PROXY=socks5h://127.0.0.1:1081
+_TELEGRAM_PROXY = os.environ.get("TELEGRAM_PROXY", "")
 
 
 def send_telegram(bot_token: str, chat_id: str, message: str) -> tuple[bool, str | None]:
@@ -16,6 +22,7 @@ def send_telegram(bot_token: str, chat_id: str, message: str) -> tuple[bool, str
         return False, "Bot token or chat ID not configured"
 
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    proxies = {"https": _TELEGRAM_PROXY, "http": _TELEGRAM_PROXY} if _TELEGRAM_PROXY else None
     try:
         resp = requests.post(
             url,
@@ -24,7 +31,8 @@ def send_telegram(bot_token: str, chat_id: str, message: str) -> tuple[bool, str
                 "text": message,
                 "parse_mode": "Markdown",
             },
-            timeout=10,
+            timeout=15,
+            proxies=proxies,
         )
         data = resp.json()
         if data.get("ok"):
