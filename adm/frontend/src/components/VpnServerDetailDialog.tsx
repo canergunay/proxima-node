@@ -615,7 +615,7 @@ function SlotRow({ slot, onAction, actionLoading }: SlotRowProps) {
   return (
     <TableRow>
       <TableCell>
-        <Typography variant="body2" fontWeight={600}>{slot.label || slot.id}</Typography>
+        <Typography variant="body2" fontWeight={600}>{slot.active || slot.label || slot.id}</Typography>
       </TableCell>
       <TableCell>
         {slot.type ? (
