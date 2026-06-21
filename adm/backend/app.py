@@ -45,11 +45,13 @@ def create_app() -> Flask:
     from api.provision import bp as provision_bp
     from api.operations import bp as operations_bp
     from api.vpn_servers import bp as vpn_servers_bp
+    from api.monitoring import bp as monitoring_bp
     app.register_blueprint(auth_bp)
     app.register_blueprint(servers_bp)
     app.register_blueprint(provision_bp)
     app.register_blueprint(operations_bp)
     app.register_blueprint(vpn_servers_bp)
+    app.register_blueprint(monitoring_bp)
 
     # Auth middleware
     NO_AUTH_PATHS = {"/api/auth/login", "/api/auth/setup", "/api/auth/me"}
@@ -91,6 +93,11 @@ def create_app() -> Flask:
         elif not path.startswith("/api/"):
             response.headers["Cache-Control"] = "no-store"
         return response
+
+    # Start background scheduler
+    from core.scheduler import start_scheduler
+    start_scheduler()
+    log.info("Monitoring scheduler started")
 
     # Serve React SPA
     @app.get("/")

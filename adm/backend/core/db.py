@@ -81,6 +81,40 @@ def init_db() -> None:
             created_at      INTEGER NOT NULL,
             updated_at      INTEGER NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS server_metrics (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            server_id  INTEGER NOT NULL,
+            timestamp  INTEGER NOT NULL,
+            online     INTEGER NOT NULL DEFAULT 1,
+            uptime     INTEGER,
+            disk_pct   REAL,
+            memory_pct REAL,
+            services_ok INTEGER,
+            docker_ok   INTEGER,
+            FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_metrics_ts ON server_metrics(server_id, timestamp);
+
+        CREATE TABLE IF NOT EXISTS alert_config (
+            id                 INTEGER PRIMARY KEY CHECK (id = 1),
+            enabled            INTEGER NOT NULL DEFAULT 0,
+            telegram_bot_token TEXT DEFAULT '',
+            telegram_chat_id   TEXT DEFAULT '',
+            disk_threshold     REAL DEFAULT 90.0,
+            memory_threshold   REAL DEFAULT 90.0,
+            offline_minutes    INTEGER DEFAULT 5
+        );
+        INSERT OR IGNORE INTO alert_config (id) VALUES (1);
+
+        CREATE TABLE IF NOT EXISTS alert_history (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            server_id  INTEGER,
+            alert_type TEXT NOT NULL,
+            message    TEXT NOT NULL,
+            sent_at    INTEGER NOT NULL,
+            FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE SET NULL
+        );
     """)
     conn.commit()
 
@@ -367,3 +401,101 @@ def delete_vpn_server(vpn_server_id: int) -> bool:
     cur = conn.execute("DELETE FROM vpn_servers WHERE id = ?", (vpn_server_id,))
     conn.commit()
     return cur.rowcount > 0
+
+
+# ── Monitoring CRUD ────────────────────────────────────────────────────
+
+def insert_metric(server_id: int, data: dict) -> None:
+    conn = get_conn()
+    conn.execute(
+        "INSERT INTO server_metrics "
+        "(server_id, timestamp, online, uptime, disk_pct, memory_pct, services_ok, docker_ok) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            server_id, int(time.time()),
+            1 if data.get("online") else 0,
+            data.get("uptime"),
+            data.get("disk_pct"),
+            data.get("memory_pct"),
+            data.get("services_ok"),
+            data.get("docker_ok"),
+        ),
+    )
+    conn.commit()
+
+
+def get_metrics(server_id: int | None = None, hours: int = 24) -> list[dict]:
+    conn = get_conn()
+    since = int(time.time()) - hours * 3600
+    if server_id:
+        rows = conn.execute(
+            "SELECT server_id, timestamp, online, uptime, disk_pct, memory_pct "
+            "FROM server_metrics WHERE server_id = ? AND timestamp >= ? "
+            "ORDER BY timestamp",
+            (server_id, since),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT server_id, timestamp, online, uptime, disk_pct, memory_pct "
+            "FROM server_metrics WHERE timestamp >= ? ORDER BY timestamp",
+            (since,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def cleanup_old_metrics(days: int = 30) -> int:
+    conn = get_conn()
+    cutoff = int(time.time()) - days * 86400
+    cur = conn.execute("DELETE FROM server_metrics WHERE timestamp < ?", (cutoff,))
+    conn.commit()
+    return cur.rowcount
+
+
+def get_alert_config() -> dict:
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM alert_config WHERE id = 1").fetchone()
+    return dict(row) if row else {
+        "enabled": 0, "telegram_bot_token": "", "telegram_chat_id": "",
+        "disk_threshold": 90.0, "memory_threshold": 90.0, "offline_minutes": 5,
+    }
+
+
+def update_alert_config(updates: dict) -> bool:
+    conn = get_conn()
+    allowed = {
+        "enabled", "telegram_bot_token", "telegram_chat_id",
+        "disk_threshold", "memory_threshold", "offline_minutes",
+    }
+    sets, vals = [], []
+    for key, val in updates.items():
+        if key in allowed:
+            sets.append(f"{key} = ?")
+            vals.append(val)
+    if not sets:
+        return False
+    conn.execute(f"UPDATE alert_config SET {', '.join(sets)} WHERE id = 1", vals)
+    conn.commit()
+    return True
+
+
+def insert_alert(server_id: int | None, alert_type: str, message: str) -> int:
+    conn = get_conn()
+    cur = conn.execute(
+        "INSERT INTO alert_history (server_id, alert_type, message, sent_at) "
+        "VALUES (?, ?, ?, ?)",
+        (server_id, alert_type, message, int(time.time())),
+    )
+    conn.commit()
+    return cur.lastrowid
+
+
+def get_recent_alerts(limit: int = 100) -> list[dict]:
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT ah.id, ah.server_id, ah.alert_type, ah.message, ah.sent_at, "
+        "s.display_name as server_name "
+        "FROM alert_history ah LEFT JOIN servers s ON ah.server_id = s.id "
+        "ORDER BY ah.id DESC LIMIT ?",
+        (limit,),
+    ).fetchall()
+    return [dict(r) for r in rows]

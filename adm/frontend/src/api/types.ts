@@ -164,6 +164,35 @@ export interface ProximaTunnel {
   fingerprint?: string;
 }
 
+// ── Monitoring ────────────────────────────────────────────────────────
+
+export interface MetricPoint {
+  server_id: number;
+  timestamp: number;
+  online: number;
+  disk_pct: number | null;
+  memory_pct: number | null;
+  uptime: number | null;
+}
+
+export interface AlertConfig {
+  enabled: number;
+  telegram_bot_token: string;
+  telegram_chat_id: string;
+  disk_threshold: number;
+  memory_threshold: number;
+  offline_minutes: number;
+}
+
+export interface AlertEntry {
+  id: number;
+  server_id: number | null;
+  alert_type: string;
+  message: string;
+  sent_at: number;
+  server_name: string | null;
+}
+
 export interface PreflightConflict {
   type: "port" | "service" | "container";
   port?: number;

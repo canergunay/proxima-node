@@ -13,6 +13,7 @@ import ServerDetailDialog from "../components/ServerDetailDialog";
 import VpnServerCard from "../components/VpnServerCard";
 import AddVpnServerDialog from "../components/AddVpnServerDialog";
 import VpnServerDetailDialog from "../components/VpnServerDetailDialog";
+import MonitoringTab from "../components/MonitoringTab";
 
 export default function Dashboard() {
   const { t } = useTranslation();
@@ -77,18 +78,20 @@ export default function Dashboard() {
           {t("dashboard.title")}
         </Typography>
         <Box sx={{ display: "flex", gap: 1 }}>
-          <Button
-            startIcon={<RefreshIcon />}
-            onClick={() => {
-              if (tab === 0) { setServersLoading(true); fetchServers(); }
-              else { setVpnLoading(true); fetchVpnServers(); }
-            }}
-            variant="outlined"
-            size="small"
-          >
-            {t("dashboard.refresh")}
-          </Button>
-          {tab === 0 ? (
+          {tab !== 2 && (
+            <Button
+              startIcon={<RefreshIcon />}
+              onClick={() => {
+                if (tab === 0) { setServersLoading(true); fetchServers(); }
+                else { setVpnLoading(true); fetchVpnServers(); }
+              }}
+              variant="outlined"
+              size="small"
+            >
+              {t("dashboard.refresh")}
+            </Button>
+          )}
+          {tab === 0 && (
             <Button
               startIcon={<AddIcon />}
               onClick={() => setProvisionOpen(true)}
@@ -97,7 +100,8 @@ export default function Dashboard() {
             >
               {t("dashboard.addServer")}
             </Button>
-          ) : (
+          )}
+          {tab === 1 && (
             <Button
               startIcon={<AddIcon />}
               onClick={() => setAddVpnOpen(true)}
@@ -117,6 +121,7 @@ export default function Dashboard() {
       >
         <Tab label={t("dashboard.tabExitServers")} />
         <Tab label={t("dashboard.tabVpnServers")} />
+        <Tab label={t("dashboard.tabMonitoring")} />
       </Tabs>
 
       {/* ── Tab 0: Exit Servers ──────────────────── */}
@@ -206,6 +211,9 @@ export default function Dashboard() {
           )}
         </>
       )}
+
+      {/* ── Tab 2: Monitoring ──────────────────────── */}
+      {tab === 2 && <MonitoringTab />}
     </Box>
   );
 }
