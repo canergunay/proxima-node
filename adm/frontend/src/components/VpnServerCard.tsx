@@ -225,10 +225,12 @@ export default function VpnServerCard({ server, onClick, onEdit, onDelete }: Pro
                   variant="outlined"
                 />
               )}
-              {/* Slot dots (compact) */}
+              {/* Slot dots (compact) — only show checked slots */}
               {status.slots && Object.keys(status.slots).length > 0 && (
                 <Box sx={{ display: "flex", gap: 0.3, alignItems: "center" }}>
-                  {sortedSlots(status.slots).map(([id, slot]) => (
+                  {sortedSlots(status.slots)
+                    .filter(([, slot]) => slot.health?.last_ip_ok !== null && slot.health?.last_ip_ok !== undefined)
+                    .map(([id, slot]) => (
                     <Tooltip key={id} title={`${slot.label}${slot.health?.last_ip ? ` — ${slot.health.last_ip}` : ""}`} placement="top">
                       <Box
                         sx={{
