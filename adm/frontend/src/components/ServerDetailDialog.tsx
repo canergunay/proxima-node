@@ -64,7 +64,7 @@ function CopyField({ label, value, mono }: { label: string; value: string | null
       >
         {value}
       </Typography>
-      <Tooltip title={copied ? t("detail.copied") : "Copy"}>
+      <Tooltip title={copied ? t("detail.copied") : t("common.copy")}>
         <IconButton size="small" onClick={handleCopy}>
           <ContentCopyIcon fontSize="small" />
         </IconButton>
@@ -497,11 +497,11 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
         {/* Server info */}
         <Box sx={{ mb: 2 }}>
           <Typography variant="body2" color="text.secondary">
-            IP: {server.ip} | Type: {server.server_type} | Location: {server.location || "-"} | Provider: {server.provider || "-"}
+            {t("detail.ip")}: {server.ip} | {t("detail.type")}: {server.server_type} | {t("detail.location")}: {server.location || "-"} | {t("detail.provider")}: {server.provider || "-"}
           </Typography>
           {server.node_id && (
             <Typography variant="body2" color="text.secondary">
-              Node ID: {server.node_id}
+              {t("detail.nodeId")}: {server.node_id}
             </Typography>
           )}
 

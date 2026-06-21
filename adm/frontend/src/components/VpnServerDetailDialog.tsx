@@ -28,7 +28,7 @@ function CopyButton({ text }: { text: string }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   return (
-    <Tooltip title={copied ? t("detail.copied") : "Copy"}>
+    <Tooltip title={copied ? t("detail.copied") : t("common.copy")}>
       <IconButton
         size="small"
         onClick={(e) => {
@@ -141,7 +141,7 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
       const body: Record<string, unknown> = { type: tunnelType };
       if (tunnelType === "outline") {
         if (!tunnelForm.ssconf_url) {
-          setTunnelError("ssconf URL is required");
+          setTunnelError(t("vpnDetail.ssconfRequired"));
           setActionLoading(false);
           return;
         }
@@ -152,7 +152,7 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
         const required = ["server", "port", "vless_uuid", "public_key", "short_id", "server_name"];
         for (const f of required) {
           if (!tunnelForm[f]) {
-            setTunnelError(`${f} is required`);
+            setTunnelError(t("vpnDetail.fieldRequired", { field: f }));
             setActionLoading(false);
             return;
           }
@@ -174,10 +174,10 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
         setTunnelForm({});
         fetchTunnels();
       } else {
-        setTunnelError(data.error || "Failed to add tunnel");
+        setTunnelError(data.error || t("vpnDetail.addTunnelFailed"));
       }
     } catch (err: unknown) {
-      setTunnelError(err instanceof Error ? err.message : "Failed");
+      setTunnelError(err instanceof Error ? err.message : t("common.error"));
     }
     setActionLoading(false);
   };
@@ -321,18 +321,18 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
               </Box>
             ) : slots.length === 0 ? (
               <Typography color="text.secondary" sx={{ py: 2, textAlign: "center" }}>
-                No slots
+                {t("vpnDetail.noSlots")}
               </Typography>
             ) : (
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>Slot</TableCell>
+                    <TableCell>{t("vpnDetail.slot")}</TableCell>
                     <TableCell>{t("vpnDetail.slotType")}</TableCell>
                     <TableCell>{t("vpnDetail.slotActive")}</TableCell>
                     <TableCell>{t("vpnDetail.slotIp")}</TableCell>
                     <TableCell>{t("vpnDetail.slotHealth")}</TableCell>
-                    <TableCell align="right">Actions</TableCell>
+                    <TableCell align="right">{t("common.actions")}</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -375,7 +375,7 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>Name</TableCell>
+                    <TableCell>{t("common.name")}</TableCell>
                     <TableCell>{t("vpnDetail.tunnelType")}</TableCell>
                     <TableCell>{t("vpnDetail.tunnelEndpoint")}</TableCell>
                     <TableCell>{t("vpnDetail.tunnelTag")}</TableCell>
@@ -438,8 +438,8 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
                       setTunnelForm({});
                     }}
                   >
-                    <MenuItem value="outline">Outline (SS)</MenuItem>
-                    <MenuItem value="xray">Xray (VLESS)</MenuItem>
+                    <MenuItem value="outline">{t("vpnDetail.addOutline")}</MenuItem>
+                    <MenuItem value="xray">{t("vpnDetail.addXray")}</MenuItem>
                   </Select>
                 </FormControl>
 
@@ -476,7 +476,7 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
                     <>
                       <Box sx={{ display: "flex", gap: 1 }}>
                         <TextField
-                          label="Server"
+                          label={t("common.server")}
                           size="small"
                           fullWidth
                           required
@@ -484,7 +484,7 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
                           onChange={(e) => setTunnelForm({ ...tunnelForm, server: e.target.value })}
                         />
                         <TextField
-                          label="Port"
+                          label={t("common.port")}
                           size="small"
                           sx={{ width: 100 }}
                           required
@@ -494,7 +494,7 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
                         />
                       </Box>
                       <TextField
-                        label="UUID"
+                        label={t("vpnDetail.uuid")}
                         size="small"
                         fullWidth
                         required
@@ -503,7 +503,7 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
                       />
                       <Box sx={{ display: "flex", gap: 1 }}>
                         <TextField
-                          label="Public Key"
+                          label={t("vpnDetail.publicKey")}
                           size="small"
                           fullWidth
                           required
@@ -511,7 +511,7 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
                           onChange={(e) => setTunnelForm({ ...tunnelForm, public_key: e.target.value })}
                         />
                         <TextField
-                          label="Short ID"
+                          label={t("vpnDetail.shortId")}
                           size="small"
                           sx={{ width: 150 }}
                           required
@@ -521,7 +521,7 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
                       </Box>
                       <Box sx={{ display: "flex", gap: 1 }}>
                         <TextField
-                          label="SNI (Server Name)"
+                          label={t("vpnDetail.sni")}
                           size="small"
                           fullWidth
                           required
@@ -648,7 +648,7 @@ function SlotRow({ slot, onAction, actionLoading }: SlotRowProps) {
                 displayEmpty
                 sx={{ fontSize: "0.75rem", minWidth: 100, height: 30 }}
               >
-                <MenuItem value="" disabled>Key...</MenuItem>
+                <MenuItem value="" disabled>{t("vpnDetail.keyPlaceholder")}</MenuItem>
                 {slot.pool.filter(k => k !== slot.active).map(k => (
                   <MenuItem key={k} value={k} sx={{ fontSize: "0.75rem" }}>{k}</MenuItem>
                 ))}

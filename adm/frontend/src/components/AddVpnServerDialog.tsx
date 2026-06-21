@@ -24,7 +24,7 @@ export default function AddVpnServerDialog({ open, onClose, onCreated }: Props) 
 
   const handleSubmit = async () => {
     if (!name.trim() || !url.trim()) {
-      setError("Name and URL are required");
+      setError(t("addVpn.requiredFields"));
       return;
     }
 
@@ -54,10 +54,10 @@ export default function AddVpnServerDialog({ open, onClose, onCreated }: Props) 
         setApiToken("");
         onCreated();
       } else {
-        setError(data.error || "Failed to create VPN server");
+        setError(data.error || t("addVpn.createFailed"));
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to create VPN server";
+      const msg = err instanceof Error ? err.message : t("addVpn.createFailed");
       setError(msg);
     } finally {
       setLoading(false);

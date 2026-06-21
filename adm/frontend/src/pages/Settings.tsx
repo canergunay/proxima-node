@@ -26,7 +26,7 @@ export default function Settings({ onBack }: Props) {
     setMessage("");
 
     if (newPassword !== confirmPassword) {
-      setError("Passwords do not match");
+      setError(t("settings.passwordMismatch"));
       return;
     }
 
@@ -75,10 +75,10 @@ export default function Settings({ onBack }: Props) {
             {t("settings.language")}
           </Typography>
           <FormControl fullWidth size="small">
-            <InputLabel>Language</InputLabel>
+            <InputLabel>{t("settings.language")}</InputLabel>
             <Select
               value={i18n.language}
-              label="Language"
+              label={t("settings.language")}
               onChange={(e) => handleLanguageChange(e.target.value)}
             >
               <MenuItem value="en">English</MenuItem>
