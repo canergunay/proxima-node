@@ -6,7 +6,7 @@ agent_port: 5051
 ssconf_port: 8390
 
 # outline-ss-server version (VPN exit nodes)
-outline_ss_version: "1.5.0"
+outline_ss_version: "1.9.2"
 
 # SSH key for ongoing management (injected during provisioning)
 # Replace with your actual public key

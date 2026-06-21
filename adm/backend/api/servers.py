@@ -412,7 +412,7 @@ def ssconf_proxy(server_id: int, token: str):
         return jsonify({"error": "Incomplete SS config from agent"}), 502
 
     # Step 3: Return ssconf-format response (SIP008)
-    # Proxima expects: {server, server_port, password, method}
+    # Proxima expects: {server, server_port, password, method, prefix}
     # Agent /api/ss-key returns "port"; ssconf format uses "server_port"
     config_response = {
         "server": data["server"],
@@ -420,6 +420,8 @@ def ssconf_proxy(server_id: int, token: str):
         "password": data["password"],
         "method": data.get("method", "chacha20-ietf-poly1305"),
     }
+    if data.get("prefix"):
+        config_response["prefix"] = data["prefix"]
 
     # Override server IP for NAT'd servers (e.g. ERG-RU on LAN)
     if server.get("public_ip"):

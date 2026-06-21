@@ -11,11 +11,20 @@
   ansible.builtin.set_fact:
     outline_arch: "{{ 'arm64' if ansible_architecture == 'aarch64' else 'x86_64' }}"
 
+- name: Check installed outline-ss-server version
+  ansible.builtin.command:
+    cmd: "{{ outline_ss_dir }}/outline-ss-server -version"
+  register: installed_version
+  changed_when: false
+  failed_when: false
+
 - name: Download outline-ss-server binary
   ansible.builtin.get_url:
     url: "https://github.com/Jigsaw-Code/outline-ss-server/releases/download/v{{ outline_ss_version }}/outline-ss-server_{{ outline_ss_version }}_linux_{{ outline_arch }}.tar.gz"
     dest: /tmp/outline-ss-server.tar.gz
     mode: "0644"
+    force: true
+  when: installed_version.stdout | default('') != outline_ss_version
   register: download_result
 
 - name: Extract outline-ss-server binary
@@ -23,7 +32,8 @@
     src: /tmp/outline-ss-server.tar.gz
     dest: "{{ outline_ss_dir }}"
     remote_src: true
-  when: download_result.changed
+  when: download_result is changed
+  notify: restart outline-ss
 
 - name: Set binary permissions
   ansible.builtin.file:

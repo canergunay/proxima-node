@@ -427,17 +427,19 @@ def get_ss_key():
             agent_port = config.get("agent_port", 5051)
             ssconf_url = f"ssconf://{server_ip}:{agent_port}/ssconf/{ssconf_token}"
 
-    return jsonify({
-        "ok": True,
-        "data": {
-            "uri": ss_uri,
-            "ssconf_url": ssconf_url,
-            "server": server_ip,
-            "port": port,
-            "method": method,
-            "password": password,
-        },
-    })
+    data = {
+        "uri": ss_uri,
+        "ssconf_url": ssconf_url,
+        "server": server_ip,
+        "port": port,
+        "method": method,
+        "password": password,
+    }
+    prefix = ss_cfg.get("prefix", "")
+    if prefix:
+        data["prefix"] = prefix
+
+    return jsonify({"ok": True, "data": data})
 
 
 @app.get("/ssconf/<token>")
