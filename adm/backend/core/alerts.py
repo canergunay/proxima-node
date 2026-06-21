@@ -8,8 +8,8 @@ import requests
 log = logging.getLogger("adm.alerts")
 
 # Telegram API may be unreachable directly (e.g. from Russia).
-# Set TELEGRAM_PROXY env var to route through a SOCKS proxy.
-# Example: TELEGRAM_PROXY=socks5h://127.0.0.1:1081
+# Set TELEGRAM_PROXY env var to route through a proxy.
+# Example: TELEGRAM_PROXY=http://127.0.0.1:8180  (Proxima Gateway)
 _TELEGRAM_PROXY = os.environ.get("TELEGRAM_PROXY", "")
 
 
