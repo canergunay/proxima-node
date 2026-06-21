@@ -8,7 +8,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { useTranslation } from "react-i18next";
-import type { VpnServer, ProximaSlotSummary, DomainCheckSummary } from "../api/types";
+import type { VpnServer, ProximaSlotSummary, ServiceStatus } from "../api/types";
 
 // ── Brand SVG Icons (from ProximaVPN ServiceDots) ────────────────
 
@@ -48,43 +48,23 @@ const IconYouTube = () => (
   </svg>
 );
 
-// ── Service → Domain matching ────────────────────────────────────
+// ── Service definitions ──────────────────────────────────────────
 
 interface ServiceDef {
   id: string;
   label: string;
   icon: React.FC;
   brandColor: string;
-  patterns: string[];
 }
 
 const SERVICES: ServiceDef[] = [
-  { id: "whatsapp", label: "WhatsApp", icon: IconWhatsApp, brandColor: "#25D366", patterns: ["whatsapp"] },
-  { id: "telegram", label: "Telegram", icon: IconTelegram, brandColor: "#26A5E4", patterns: ["telegram"] },
-  { id: "chatgpt", label: "ChatGPT", icon: IconChatGPT, brandColor: "#10A37F", patterns: ["openai", "chatgpt"] },
-  { id: "claude", label: "Claude", icon: IconClaude, brandColor: "#D97757", patterns: ["claude", "anthropic"] },
-  { id: "gemini", label: "Gemini", icon: IconGemini, brandColor: "#8E75B2", patterns: ["gemini"] },
-  { id: "youtube", label: "YouTube", icon: IconYouTube, brandColor: "#FF0000", patterns: ["youtube", "youtu.be"] },
+  { id: "whatsapp", label: "WhatsApp", icon: IconWhatsApp, brandColor: "#25D366" },
+  { id: "telegram", label: "Telegram", icon: IconTelegram, brandColor: "#26A5E4" },
+  { id: "chatgpt", label: "ChatGPT", icon: IconChatGPT, brandColor: "#10A37F" },
+  { id: "claude", label: "Claude", icon: IconClaude, brandColor: "#D97757" },
+  { id: "gemini", label: "Gemini", icon: IconGemini, brandColor: "#8E75B2" },
+  { id: "youtube", label: "YouTube", icon: IconYouTube, brandColor: "#FF0000" },
 ];
-
-/** Aggregate domain checks for a service: worst status wins */
-function serviceStatus(
-  patterns: string[],
-  checks: Record<string, DomainCheckSummary>,
-): { found: boolean; ok: boolean; hasHttpError: boolean } {
-  let found = false;
-  let allOk = true;
-  let hasHttpError = false;
-  for (const [domain, check] of Object.entries(checks)) {
-    if (!patterns.some((p) => domain.includes(p))) continue;
-    found = true;
-    if (!check.ok) {
-      allOk = false;
-      if (check.http_status) hasHttpError = true;
-    }
-  }
-  return { found, ok: allOk, hasHttpError };
-}
 
 // ── Card helpers ─────────────────────────────────────────────────
 
@@ -128,7 +108,15 @@ export default function VpnServerCard({ server, onClick, onEdit, onDelete }: Pro
   }
 
   const linkUrl = server.public_url || server.url;
-  const domainChecks = server.domain_checks;
+  const connectivity = server.connectivity;
+
+  // Build a lookup map from connectivity array for O(1) access
+  const connectivityMap = new Map<string, ServiceStatus>();
+  if (connectivity) {
+    for (const svc of connectivity) {
+      connectivityMap.set(svc.id, svc);
+    }
+  }
 
   return (
     <Card variant="outlined">
@@ -182,17 +170,20 @@ export default function VpnServerCard({ server, onClick, onEdit, onDelete }: Pro
             </Box>
           </Box>
 
-          {/* Service health icons (WhatsApp, Telegram, ChatGPT, Claude, Gemini, YouTube) */}
-          {domainChecks && Object.keys(domainChecks).length > 0 && (
+          {/* Service connectivity icons (WhatsApp, Telegram, ChatGPT, Claude, Gemini, YouTube) */}
+          {connectivityMap.size > 0 && (
             <Box sx={{ display: "flex", gap: 0.75, mb: 1 }}>
               {SERVICES.map((svc) => {
-                const st = serviceStatus(svc.patterns, domainChecks);
-                if (!st.found) return null;
+                const st = connectivityMap.get(svc.id);
+                if (!st) return null;
                 const Icon = svc.icon;
-                const borderColor = st.ok ? "#4caf50" : st.hasHttpError ? "#ff9800" : "#f44336";
-                const isBlocked = !st.ok && !st.hasHttpError;
+                const isAccessible = st.accessible;
+                const borderColor = isAccessible ? "#4caf50" : "#f44336";
+                const tooltipText = isAccessible
+                  ? `${svc.label}: OK${st.latency_ms ? ` (${st.latency_ms}ms)` : ""}`
+                  : `${svc.label}: ${st.error || "Blocked"}`;
                 return (
-                  <Tooltip key={svc.id} title={`${svc.label}: ${st.ok ? "OK" : st.hasHttpError ? "HTTP Error" : "Blocked"}`} placement="top" arrow>
+                  <Tooltip key={svc.id} title={tooltipText} placement="top" arrow>
                     <Box
                       sx={{
                         width: 26,
@@ -202,8 +193,8 @@ export default function VpnServerCard({ server, onClick, onEdit, onDelete }: Pro
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        bgcolor: isBlocked ? "#f44336" : "transparent",
-                        color: isBlocked ? "#fff" : svc.brandColor,
+                        bgcolor: !isAccessible ? "#f44336" : "transparent",
+                        color: !isAccessible ? "#fff" : svc.brandColor,
                       }}
                     >
                       <Icon />

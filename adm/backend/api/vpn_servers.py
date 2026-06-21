@@ -65,7 +65,7 @@ def _fetch_vpn_server_status(server: dict) -> dict:
         "has_token": bool(server.get("api_token_enc")),
         "online": False,
         "proxima_status": None,
-        "domain_checks": None,
+        "connectivity": None,
         "error": None,
     }
 
@@ -94,26 +94,17 @@ def _fetch_vpn_server_status(server: dict) -> dict:
     except Exception as e:
         result["error"] = str(e)
 
-    # Also fetch domain check results (non-blocking on failure)
+    # Fetch connectivity check results (same source as ProximaVPN client dots)
     if result["online"]:
         try:
-            dresp = _proxima_request(server, "GET",
-                                     "/api/groups/domain-status", timeout=5)
-            if dresp.status_code == 200:
-                ddata = dresp.json()
-                if ddata.get("ok") and ddata.get("data"):
-                    # Summarize: keep only latest check per domain
-                    summary = {}
-                    for domain, checks in ddata["data"].items():
-                        if checks:
-                            latest = checks[-1]
-                            summary[domain] = {
-                                "ok": latest.get("ok", False),
-                                "http_status": latest.get("http_status"),
-                            }
-                    result["domain_checks"] = summary
+            cresp = _proxima_request(server, "GET",
+                                     "/api/vpn/self/connectivity", timeout=5)
+            if cresp.status_code == 200:
+                cdata = cresp.json()
+                if cdata.get("ok") and cdata.get("data"):
+                    result["connectivity"] = cdata["data"]
         except Exception:
-            pass  # Domain checks are optional, don't fail status
+            pass  # Connectivity data is optional, don't fail status
 
     return result
 
@@ -141,7 +132,7 @@ def list_vpn_servers():
                     "public_url": s.get("public_url", ""),
                     "has_token": bool(s.get("api_token_enc")),
                     "online": False, "proxima_status": None,
-                    "domain_checks": None, "error": str(e),
+                    "connectivity": None, "error": str(e),
                 })
 
     # Sort by original DB order

@@ -86,13 +86,16 @@ export interface VpnServer {
   has_token: boolean;
   online: boolean;
   proxima_status: ProximaStatus | null;
-  domain_checks: Record<string, DomainCheckSummary> | null;
+  connectivity: ServiceStatus[] | null;
   error: string | null;
 }
 
-export interface DomainCheckSummary {
-  ok: boolean;
-  http_status: number | null;
+export interface ServiceStatus {
+  id: string;
+  accessible: boolean;
+  checked_at: string | null;
+  error: string | null;
+  latency_ms: number | null;
 }
 
 export interface ProximaStatus {
