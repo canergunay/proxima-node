@@ -75,6 +75,12 @@ interface Props {
   onDelete: () => void;
 }
 
+function latencyColor(ms: number): string {
+  if (ms < 500) return "#4caf50";
+  if (ms <= 2000) return "#ff9800";
+  return "#f44336";
+}
+
 /** Sort slot entries by numeric slot ID */
 function sortedSlots(slots: Record<string, ProximaSlotSummary>): [string, ProximaSlotSummary][] {
   return Object.entries(slots).sort(([a], [b]) => {
@@ -170,7 +176,7 @@ export default function VpnServerCard({ server, onClick, onEdit, onDelete }: Pro
             </Box>
           </Box>
 
-          {/* Service connectivity icons (WhatsApp, Telegram, ChatGPT, Claude, Gemini, YouTube) */}
+          {/* Service connectivity icons with latency */}
           {connectivityMap.size > 0 && (
             <Box sx={{ display: "flex", gap: 0.75, mb: 1 }}>
               {SERVICES.map((svc) => {
@@ -184,20 +190,36 @@ export default function VpnServerCard({ server, onClick, onEdit, onDelete }: Pro
                   : `${svc.label}: ${st.error || "Blocked"}`;
                 return (
                   <Tooltip key={svc.id} title={tooltipText} placement="top" arrow>
-                    <Box
-                      sx={{
-                        width: 26,
-                        height: 26,
-                        borderRadius: "50%",
-                        border: `2px solid ${borderColor}`,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        bgcolor: !isAccessible ? "#f44336" : "transparent",
-                        color: !isAccessible ? "#fff" : svc.brandColor,
-                      }}
-                    >
-                      <Icon />
+                    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.25 }}>
+                      <Box
+                        sx={{
+                          width: 26,
+                          height: 26,
+                          borderRadius: "50%",
+                          border: `2px solid ${borderColor}`,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          bgcolor: !isAccessible ? "#f44336" : "transparent",
+                          color: !isAccessible ? "#fff" : svc.brandColor,
+                        }}
+                      >
+                        <Icon />
+                      </Box>
+                      {st.latency_ms != null && (
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontFamily: "monospace",
+                            fontSize: "0.55rem",
+                            fontWeight: 600,
+                            color: latencyColor(st.latency_ms),
+                            lineHeight: 1,
+                          }}
+                        >
+                          {st.latency_ms}ms
+                        </Typography>
+                      )}
                     </Box>
                   </Tooltip>
                 );
@@ -222,7 +244,7 @@ export default function VpnServerCard({ server, onClick, onEdit, onDelete }: Pro
                   {sortedSlots(status.slots)
                     .filter(([, slot]) => slot.health?.last_ip_ok !== null && slot.health?.last_ip_ok !== undefined)
                     .map(([id, slot]) => (
-                    <Tooltip key={id} title={`${slot.label}${slot.health?.last_ip ? ` — ${slot.health.last_ip}` : ""}`} placement="top">
+                    <Tooltip key={id} title={`${slot.active || slot.label}${slot.health?.last_ip ? ` — ${slot.health.last_ip}` : ""}`} placement="top">
                       <Box
                         sx={{
                           width: 8,
