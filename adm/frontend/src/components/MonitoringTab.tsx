@@ -75,7 +75,7 @@ export default function MonitoringTab() {
   // Build chart data: group metrics by timestamp, one entry per timestamp
   const serverIds = Object.keys(servers);
 
-  const buildChartData = (field: "disk_pct" | "memory_pct") => {
+  const buildChartData = (field: "disk_pct" | "memory_pct" | "cpu_pct") => {
     const grouped: Record<number, Record<string, number | null>> = {};
     for (const m of metrics) {
       const ts = m.timestamp;
@@ -92,6 +92,7 @@ export default function MonitoringTab() {
 
   const diskData = buildChartData("disk_pct");
   const memoryData = buildChartData("memory_pct");
+  const cpuData = buildChartData("cpu_pct");
 
   const formatTime = (ts: unknown) => {
     if (typeof ts !== "number") return String(ts);
@@ -114,6 +115,7 @@ export default function MonitoringTab() {
       if (configForm.telegram_chat_id !== undefined) body.telegram_chat_id = configForm.telegram_chat_id;
       if (configForm.disk_threshold !== undefined) body.disk_threshold = configForm.disk_threshold;
       if (configForm.memory_threshold !== undefined) body.memory_threshold = configForm.memory_threshold;
+      if (configForm.cpu_threshold !== undefined) body.cpu_threshold = configForm.cpu_threshold;
       if (configForm.offline_minutes !== undefined) body.offline_minutes = configForm.offline_minutes;
 
       const { data } = await api.put("/monitoring/config", body);
@@ -216,6 +218,34 @@ export default function MonitoringTab() {
               </LineChart>
             </ResponsiveContainer>
           </Box>
+
+          {/* CPU chart */}
+          <Box sx={{ flex: 1, minWidth: 350, minHeight: 250 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>{t("monitoring.cpuUsage")}</Typography>
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={cpuData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+                <XAxis dataKey="time" tickFormatter={formatTime} fontSize={11} stroke="#888" />
+                <YAxis domain={[0, 100]} unit="%" fontSize={11} stroke="#888" />
+                <Tooltip
+                  labelFormatter={formatTime}
+                  contentStyle={{ backgroundColor: "#1e1e1e", border: "1px solid #555" }}
+                />
+                <Legend />
+                {serverIds.map((sid, i) => (
+                  <Line
+                    key={sid}
+                    dataKey={sid}
+                    name={servers[sid]?.display_name || sid}
+                    stroke={COLORS[i % COLORS.length]}
+                    dot={false}
+                    strokeWidth={2}
+                    connectNulls
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </Box>
         </Box>
       )}
 
@@ -265,6 +295,15 @@ export default function MonitoringTab() {
                   type="number"
                   value={configForm.memory_threshold ?? 90}
                   onChange={(e) => setConfigForm({ ...configForm, memory_threshold: parseFloat(e.target.value) })}
+                  slotProps={{ htmlInput: { min: 1, max: 100 } }}
+                  sx={{ width: 130 }}
+                />
+                <TextField
+                  label={t("monitoring.cpuThreshold")}
+                  size="small"
+                  type="number"
+                  value={configForm.cpu_threshold ?? 80}
+                  onChange={(e) => setConfigForm({ ...configForm, cpu_threshold: parseFloat(e.target.value) })}
                   slotProps={{ htmlInput: { min: 1, max: 100 } }}
                   sx={{ width: 130 }}
                 />

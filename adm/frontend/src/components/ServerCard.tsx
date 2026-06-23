@@ -106,6 +106,17 @@ export default function ServerCard({ server, onClick }: Props) {
                     sx={{ height: 4, borderRadius: 2 }}
                   />
                 </Box>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    {t("server.cpu")} {status.cpu?.used_pct?.toFixed(0) ?? "—"}%
+                  </Typography>
+                  <LinearProgress
+                    variant="determinate"
+                    value={status.cpu?.used_pct ?? 0}
+                    color={(status.cpu?.used_pct ?? 0) > 80 ? "error" : "primary"}
+                    sx={{ height: 4, borderRadius: 2 }}
+                  />
+                </Box>
               </Box>
             </Box>
           )}

@@ -21,6 +21,7 @@ export interface AgentStatus {
   public_ip: string;
   disk: { free_gb: number; total_gb: number; used_gb: number; used_pct: number };
   memory: { available_mb: number; total_mb: number; used_pct: number };
+  cpu?: { used_pct: number };
   services: Record<string, boolean>;
   docker_containers?: ContainerInfo[];
   version?: string;
@@ -172,6 +173,7 @@ export interface MetricPoint {
   online: number;
   disk_pct: number | null;
   memory_pct: number | null;
+  cpu_pct: number | null;
   uptime: number | null;
 }
 
@@ -181,6 +183,7 @@ export interface AlertConfig {
   telegram_chat_id: string;
   disk_threshold: number;
   memory_threshold: number;
+  cpu_threshold: number;
   offline_minutes: number;
 }
 

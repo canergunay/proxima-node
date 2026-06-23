@@ -90,6 +90,7 @@ def init_db() -> None:
             uptime     INTEGER,
             disk_pct   REAL,
             memory_pct REAL,
+            cpu_pct    REAL,
             services_ok INTEGER,
             docker_ok   INTEGER,
             FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
@@ -103,6 +104,7 @@ def init_db() -> None:
             telegram_chat_id   TEXT DEFAULT '',
             disk_threshold     REAL DEFAULT 90.0,
             memory_threshold   REAL DEFAULT 90.0,
+            cpu_threshold      REAL DEFAULT 80.0,
             offline_minutes    INTEGER DEFAULT 5
         );
         INSERT OR IGNORE INTO alert_config (id) VALUES (1);
@@ -158,6 +160,18 @@ def _migrate(conn: sqlite3.Connection) -> None:
             f"Generated ssconf_token for {len(rows)} server(s): "
             + ", ".join(str(r[0]) for r in rows)
         )
+
+    # server_metrics migrations
+    metric_cols = {row[1] for row in conn.execute("PRAGMA table_info(server_metrics)").fetchall()}
+    if "cpu_pct" not in metric_cols:
+        conn.execute("ALTER TABLE server_metrics ADD COLUMN cpu_pct REAL")
+        conn.commit()
+
+    # alert_config migrations
+    alert_cols = {row[1] for row in conn.execute("PRAGMA table_info(alert_config)").fetchall()}
+    if "cpu_threshold" not in alert_cols:
+        conn.execute("ALTER TABLE alert_config ADD COLUMN cpu_threshold REAL DEFAULT 80.0")
+        conn.commit()
 
     # vpn_servers migrations
     vpn_cols = {row[1] for row in conn.execute("PRAGMA table_info(vpn_servers)").fetchall()}
@@ -409,14 +423,15 @@ def insert_metric(server_id: int, data: dict) -> None:
     conn = get_conn()
     conn.execute(
         "INSERT INTO server_metrics "
-        "(server_id, timestamp, online, uptime, disk_pct, memory_pct, services_ok, docker_ok) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "(server_id, timestamp, online, uptime, disk_pct, memory_pct, cpu_pct, services_ok, docker_ok) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             server_id, int(time.time()),
             1 if data.get("online") else 0,
             data.get("uptime"),
             data.get("disk_pct"),
             data.get("memory_pct"),
+            data.get("cpu_pct"),
             data.get("services_ok"),
             data.get("docker_ok"),
         ),
@@ -429,14 +444,14 @@ def get_metrics(server_id: int | None = None, hours: int = 24) -> list[dict]:
     since = int(time.time()) - hours * 3600
     if server_id:
         rows = conn.execute(
-            "SELECT server_id, timestamp, online, uptime, disk_pct, memory_pct "
+            "SELECT server_id, timestamp, online, uptime, disk_pct, memory_pct, cpu_pct "
             "FROM server_metrics WHERE server_id = ? AND timestamp >= ? "
             "ORDER BY timestamp",
             (server_id, since),
         ).fetchall()
     else:
         rows = conn.execute(
-            "SELECT server_id, timestamp, online, uptime, disk_pct, memory_pct "
+            "SELECT server_id, timestamp, online, uptime, disk_pct, memory_pct, cpu_pct "
             "FROM server_metrics WHERE timestamp >= ? ORDER BY timestamp",
             (since,),
         ).fetchall()
@@ -464,7 +479,7 @@ def update_alert_config(updates: dict) -> bool:
     conn = get_conn()
     allowed = {
         "enabled", "telegram_bot_token", "telegram_chat_id",
-        "disk_threshold", "memory_threshold", "offline_minutes",
+        "disk_threshold", "memory_threshold", "cpu_threshold", "offline_minutes",
     }
     sets, vals = [], []
     for key, val in updates.items():

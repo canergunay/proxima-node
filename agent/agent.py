@@ -176,6 +176,27 @@ def _get_memory() -> dict:
         return {}
 
 
+def _get_cpu_usage() -> dict:
+    """Read /proc/stat twice with 200ms interval to compute CPU usage."""
+    try:
+        def read_stat():
+            with open("/proc/stat") as f:
+                line = f.readline()  # cpu  user nice system idle iowait irq softirq
+            return [int(x) for x in line.split()[1:]]
+
+        s1 = read_stat()
+        time.sleep(0.2)
+        s2 = read_stat()
+
+        delta = [b - a for a, b in zip(s1, s2)]
+        total = sum(delta)
+        idle = delta[3]  # 4th field = idle
+        used_pct = round((total - idle) / total * 100, 1) if total > 0 else 0
+        return {"used_pct": used_pct}
+    except Exception:
+        return {}
+
+
 def _get_docker_containers() -> list:
     """List running Docker containers."""
     try:
@@ -310,6 +331,7 @@ def get_status():
         "server_type": server_type,
         "public_ip": _get_public_ip(),
         "uptime": _get_uptime(),
+        "cpu": _get_cpu_usage(),
         "disk": _get_disk_usage(),
         "memory": _get_memory(),
         "docker_containers": _get_docker_containers(),

@@ -78,6 +78,8 @@ def put_config():
         updates["disk_threshold"] = float(body["disk_threshold"])
     if "memory_threshold" in body:
         updates["memory_threshold"] = float(body["memory_threshold"])
+    if "cpu_threshold" in body:
+        updates["cpu_threshold"] = float(body["cpu_threshold"])
     if "offline_minutes" in body:
         updates["offline_minutes"] = int(body["offline_minutes"])
 

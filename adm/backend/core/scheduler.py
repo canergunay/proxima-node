@@ -88,6 +88,9 @@ def _poll_server(server: dict) -> dict:
             memory = status_data.get("memory", {})
             if isinstance(memory, dict):
                 result["memory_pct"] = memory.get("used_pct")
+            cpu = status_data.get("cpu", {})
+            if isinstance(cpu, dict):
+                result["cpu_pct"] = cpu.get("used_pct")
             # Count services
             services = status_data.get("services", {})
             if services:
@@ -150,6 +153,7 @@ def _check_alerts() -> None:
 
     disk_threshold = config.get("disk_threshold", 90.0)
     memory_threshold = config.get("memory_threshold", 90.0)
+    cpu_threshold = config.get("cpu_threshold", 80.0)
     offline_minutes = config.get("offline_minutes", 5)
 
     servers = [s for s in get_all_servers() if s["status"] == "active"]
@@ -203,6 +207,16 @@ def _check_alerts() -> None:
                 sid, "memory", bot_token, chat_id,
                 f"*Memory Warning*\nServer: {name}\n"
                 f"Memory Usage: {memory:.1f}%",
+                now,
+            )
+
+        # Check CPU
+        cpu = latest.get("cpu_pct")
+        if cpu is not None and cpu >= cpu_threshold:
+            _maybe_send_alert(
+                sid, "cpu", bot_token, chat_id,
+                f"*CPU Warning*\nServer: {name}\n"
+                f"CPU Usage: {cpu:.1f}%",
                 now,
             )
 
