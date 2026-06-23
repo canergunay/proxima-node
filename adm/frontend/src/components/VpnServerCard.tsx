@@ -1,6 +1,6 @@
 import {
   Card, CardActionArea, CardContent, Typography, Box, Chip, Tooltip,
-  IconButton,
+  IconButton, LinearProgress,
 } from "@mui/material";
 import CircleIcon from "@mui/icons-material/Circle";
 import LaunchIcon from "@mui/icons-material/Launch";
@@ -286,6 +286,45 @@ export default function VpnServerCard({ server, onClick, onEdit, onDelete }: Pro
                   {t("vpnServer.deployment")}: {status.deployment}
                 </Typography>
               )}
+            </Box>
+          )}
+
+          {/* System metrics bars */}
+          {status?.system && (
+            <Box sx={{ display: "flex", gap: 2, mt: 1 }}>
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="caption" color="text.secondary">
+                  {t("server.disk")} {status.system.disk?.used_pct?.toFixed(0) ?? "—"}%
+                </Typography>
+                <LinearProgress
+                  variant="determinate"
+                  value={status.system.disk?.used_pct ?? 0}
+                  color={(status.system.disk?.used_pct ?? 0) > 90 ? "error" : "primary"}
+                  sx={{ height: 4, borderRadius: 2 }}
+                />
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="caption" color="text.secondary">
+                  {t("server.memory")} {status.system.memory?.used_pct?.toFixed(0) ?? "—"}%
+                </Typography>
+                <LinearProgress
+                  variant="determinate"
+                  value={status.system.memory?.used_pct ?? 0}
+                  color={(status.system.memory?.used_pct ?? 0) > 90 ? "error" : "primary"}
+                  sx={{ height: 4, borderRadius: 2 }}
+                />
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="caption" color="text.secondary">
+                  {t("server.cpu")} {status.system.cpu?.used_pct?.toFixed(0) ?? "—"}%
+                </Typography>
+                <LinearProgress
+                  variant="determinate"
+                  value={status.system.cpu?.used_pct ?? 0}
+                  color={(status.system.cpu?.used_pct ?? 0) > 80 ? "error" : "primary"}
+                  sx={{ height: 4, borderRadius: 2 }}
+                />
+              </Box>
             </Box>
           )}
 

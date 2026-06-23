@@ -98,6 +98,12 @@ export interface ServiceStatus {
   latency_ms: number | null;
 }
 
+export interface ProximaSystemMetrics {
+  cpu?: { used_pct: number };
+  memory?: { total_mb: number; available_mb: number; used_pct: number };
+  disk?: { total_gb: number; used_gb: number; used_pct: number };
+}
+
 export interface ProximaStatus {
   server_ip: string;
   mode: string;
@@ -106,6 +112,7 @@ export interface ProximaStatus {
   slots: Record<string, ProximaSlotSummary>;
   bypass_active: boolean;
   bypass_slots: string[];
+  system?: ProximaSystemMetrics;
 }
 
 export interface ProximaSlotSummary {
