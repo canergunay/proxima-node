@@ -184,6 +184,15 @@ export interface MetricPoint {
   uptime: number | null;
 }
 
+export interface VpnMetricPoint {
+  vpn_server_id: number;
+  timestamp: number;
+  online: number;
+  disk_pct: number | null;
+  memory_pct: number | null;
+  cpu_pct: number | null;
+}
+
 export interface AlertConfig {
   enabled: number;
   telegram_bot_token: string;

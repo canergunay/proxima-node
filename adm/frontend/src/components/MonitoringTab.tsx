@@ -12,7 +12,7 @@ import {
   ResponsiveContainer, CartesianGrid,
 } from "recharts";
 import api from "../api/client";
-import type { MetricPoint, AlertConfig, AlertEntry } from "../api/types";
+import type { MetricPoint, VpnMetricPoint, AlertConfig, AlertEntry } from "../api/types";
 
 const COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff7300", "#00C49F", "#FF8042"];
 
@@ -25,6 +25,10 @@ export default function MonitoringTab() {
   const [metrics, setMetrics] = useState<MetricPoint[]>([]);
   const [servers, setServers] = useState<Record<string, { name: string; display_name: string }>>({});
   const [metricsLoading, setMetricsLoading] = useState(true);
+
+  const [vpnMetrics, setVpnMetrics] = useState<VpnMetricPoint[]>([]);
+  const [vpnServers, setVpnServers] = useState<Record<string, { name: string; display_name: string }>>({});
+  const [vpnMetricsLoading, setVpnMetricsLoading] = useState(true);
 
   const [alertConfig, setAlertConfig] = useState<AlertConfig | null>(null);
   const [configForm, setConfigForm] = useState<Partial<AlertConfig>>({});
@@ -45,6 +49,18 @@ export default function MonitoringTab() {
       }
     } catch { /* */ }
     setMetricsLoading(false);
+  }, [range]);
+
+  const fetchVpnMetrics = useCallback(async () => {
+    setVpnMetricsLoading(true);
+    try {
+      const { data } = await api.get(`/monitoring/vpn-metrics?hours=${RANGE_HOURS[range]}`);
+      if (data.ok) {
+        setVpnMetrics(data.data.metrics || []);
+        setVpnServers(data.data.servers || {});
+      }
+    } catch { /* */ }
+    setVpnMetricsLoading(false);
   }, [range]);
 
   const fetchConfig = useCallback(async () => {
@@ -68,9 +84,10 @@ export default function MonitoringTab() {
 
   useEffect(() => {
     fetchMetrics();
+    fetchVpnMetrics();
     fetchConfig();
     fetchAlerts();
-  }, [fetchMetrics, fetchConfig, fetchAlerts]);
+  }, [fetchMetrics, fetchVpnMetrics, fetchConfig, fetchAlerts]);
 
   // Build chart data: group metrics by timestamp, one entry per timestamp
   const serverIds = Object.keys(servers);
@@ -93,6 +110,28 @@ export default function MonitoringTab() {
   const diskData = buildChartData("disk_pct");
   const memoryData = buildChartData("memory_pct");
   const cpuData = buildChartData("cpu_pct");
+
+  // VPN server chart data
+  const vpnServerIds = Object.keys(vpnServers);
+
+  const buildVpnChartData = (field: "disk_pct" | "memory_pct" | "cpu_pct") => {
+    const grouped: Record<number, Record<string, number | null>> = {};
+    for (const m of vpnMetrics) {
+      const ts = m.timestamp;
+      if (!grouped[ts]) grouped[ts] = {};
+      grouped[ts][String(m.vpn_server_id)] = m[field];
+    }
+    return Object.entries(grouped)
+      .sort(([a], [b]) => Number(a) - Number(b))
+      .map(([ts, vals]) => ({
+        time: Number(ts),
+        ...vals,
+      }));
+  };
+
+  const vpnDiskData = buildVpnChartData("disk_pct");
+  const vpnMemoryData = buildVpnChartData("memory_pct");
+  const vpnCpuData = buildVpnChartData("cpu_pct");
 
   const formatTime = (ts: unknown) => {
     if (typeof ts !== "number") return String(ts);
@@ -154,7 +193,8 @@ export default function MonitoringTab() {
         ))}
       </Box>
 
-      {/* Charts */}
+      {/* Exit Server Charts */}
+      <Typography variant="h6" sx={{ mb: 2 }}>{t("monitoring.exitServers")}</Typography>
       {metricsLoading ? (
         <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
           <CircularProgress />
@@ -237,6 +277,102 @@ export default function MonitoringTab() {
                     key={sid}
                     dataKey={sid}
                     name={servers[sid]?.display_name || sid}
+                    stroke={COLORS[i % COLORS.length]}
+                    dot={false}
+                    strokeWidth={2}
+                    connectNulls
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </Box>
+        </Box>
+      )}
+
+      {/* VPN Server Charts */}
+      <Typography variant="h6" sx={{ mb: 2, mt: 2 }}>{t("monitoring.vpnServers")}</Typography>
+      {vpnMetricsLoading ? (
+        <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+          <CircularProgress />
+        </Box>
+      ) : vpnMetrics.length === 0 ? (
+        <Alert severity="info" sx={{ mb: 3 }}>{t("monitoring.noVpnData")}</Alert>
+      ) : (
+        <Box sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap" }}>
+          {/* VPN Disk chart */}
+          <Box sx={{ flex: 1, minWidth: 350, minHeight: 250 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>{t("monitoring.diskUsage")}</Typography>
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={vpnDiskData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+                <XAxis dataKey="time" tickFormatter={formatTime} fontSize={11} stroke="#888" />
+                <YAxis domain={[0, 100]} unit="%" fontSize={11} stroke="#888" />
+                <Tooltip
+                  labelFormatter={formatTime}
+                  contentStyle={{ backgroundColor: "#1e1e1e", border: "1px solid #555" }}
+                />
+                <Legend />
+                {vpnServerIds.map((sid, i) => (
+                  <Line
+                    key={sid}
+                    dataKey={sid}
+                    name={vpnServers[sid]?.display_name || sid}
+                    stroke={COLORS[i % COLORS.length]}
+                    dot={false}
+                    strokeWidth={2}
+                    connectNulls
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </Box>
+
+          {/* VPN Memory chart */}
+          <Box sx={{ flex: 1, minWidth: 350, minHeight: 250 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>{t("monitoring.memoryUsage")}</Typography>
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={vpnMemoryData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+                <XAxis dataKey="time" tickFormatter={formatTime} fontSize={11} stroke="#888" />
+                <YAxis domain={[0, 100]} unit="%" fontSize={11} stroke="#888" />
+                <Tooltip
+                  labelFormatter={formatTime}
+                  contentStyle={{ backgroundColor: "#1e1e1e", border: "1px solid #555" }}
+                />
+                <Legend />
+                {vpnServerIds.map((sid, i) => (
+                  <Line
+                    key={sid}
+                    dataKey={sid}
+                    name={vpnServers[sid]?.display_name || sid}
+                    stroke={COLORS[i % COLORS.length]}
+                    dot={false}
+                    strokeWidth={2}
+                    connectNulls
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </Box>
+
+          {/* VPN CPU chart */}
+          <Box sx={{ flex: 1, minWidth: 350, minHeight: 250 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>{t("monitoring.cpuUsage")}</Typography>
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={vpnCpuData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+                <XAxis dataKey="time" tickFormatter={formatTime} fontSize={11} stroke="#888" />
+                <YAxis domain={[0, 100]} unit="%" fontSize={11} stroke="#888" />
+                <Tooltip
+                  labelFormatter={formatTime}
+                  contentStyle={{ backgroundColor: "#1e1e1e", border: "1px solid #555" }}
+                />
+                <Legend />
+                {vpnServerIds.map((sid, i) => (
+                  <Line
+                    key={sid}
+                    dataKey={sid}
+                    name={vpnServers[sid]?.display_name || sid}
                     stroke={COLORS[i % COLORS.length]}
                     dot={false}
                     strokeWidth={2}

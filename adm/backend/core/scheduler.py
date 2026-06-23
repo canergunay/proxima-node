@@ -13,9 +13,11 @@ from core.db import (
     cleanup_old_metrics,
     get_alert_config,
     get_all_servers,
+    get_all_vpn_servers,
     get_metrics,
     insert_alert,
     insert_metric,
+    insert_vpn_metric,
 )
 
 log = logging.getLogger("adm.scheduler")
@@ -47,6 +49,7 @@ def _loop() -> None:
     while not _stop.is_set():
         try:
             _collect_metrics()
+            _collect_vpn_metrics()
             _check_alerts()
             _maybe_cleanup()
         except Exception:
@@ -136,6 +139,71 @@ def _collect_metrics() -> None:
         + ", ".join(
             f"{s['name']}={'up' if results.get(s['id'], {}).get('online') else 'down'}"
             for s in servers
+        )
+    )
+
+
+def _poll_vpn_server(server: dict) -> dict:
+    """Poll a VPN server (Proxima instance) for system metrics."""
+    result = {"online": False}
+    enc_token = server.get("api_token_enc")
+    if not enc_token:
+        return result
+    try:
+        token = decrypt_value(enc_token)
+        headers = {"Authorization": f"Bearer {token}"} if token else {}
+        url = server["url"].rstrip("/") + "/api/status"
+        resp = http_requests.get(url, headers=headers, timeout=10, verify=False)
+        data = resp.json()
+        if data.get("ok"):
+            result["online"] = True
+            system = data.get("data", {}).get("system", {})
+            disk = system.get("disk", {})
+            if isinstance(disk, dict) and "used_pct" in disk:
+                result["disk_pct"] = disk["used_pct"]
+            memory = system.get("memory", {})
+            if isinstance(memory, dict) and "used_pct" in memory:
+                result["memory_pct"] = memory["used_pct"]
+            cpu = system.get("cpu", {})
+            if isinstance(cpu, dict) and "used_pct" in cpu:
+                result["cpu_pct"] = cpu["used_pct"]
+    except http_requests.exceptions.RequestException:
+        pass
+    except Exception:
+        log.debug(f"Error polling VPN server {server['name']}", exc_info=True)
+    return result
+
+
+def _collect_vpn_metrics() -> None:
+    """Poll all VPN servers and store system metrics."""
+    servers = get_all_vpn_servers()
+    if not servers:
+        return
+
+    # Only poll servers that have an API token
+    active = [s for s in servers if s.get("api_token_enc")]
+    if not active:
+        return
+
+    results = {}
+    with ThreadPoolExecutor(max_workers=min(len(active), 5)) as pool:
+        futures = {pool.submit(_poll_vpn_server, s): s for s in active}
+        for future in as_completed(futures):
+            server = futures[future]
+            try:
+                results[server["id"]] = future.result()
+            except Exception:
+                results[server["id"]] = {"online": False}
+
+    for server in active:
+        metric = results.get(server["id"], {"online": False})
+        insert_vpn_metric(server["id"], metric)
+
+    log.info(
+        f"Collected VPN metrics for {len(active)} server(s): "
+        + ", ".join(
+            f"{s['name']}={'up' if results.get(s['id'], {}).get('online') else 'down'}"
+            for s in active
         )
     )
 

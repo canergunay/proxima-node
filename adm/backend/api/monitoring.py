@@ -8,8 +8,10 @@ from core.alerts import send_telegram
 from core.db import (
     get_alert_config,
     get_all_servers,
+    get_all_vpn_servers,
     get_metrics,
     get_recent_alerts,
+    get_vpn_metrics,
     update_alert_config,
 )
 
@@ -29,6 +31,31 @@ def metrics():
     # Build server name map
     servers = {}
     for s in get_all_servers():
+        servers[str(s["id"])] = {
+            "name": s["name"],
+            "display_name": s["display_name"],
+        }
+
+    return jsonify({
+        "ok": True,
+        "data": {
+            "servers": servers,
+            "metrics": data,
+        },
+    })
+
+
+@bp.get("/api/monitoring/vpn-metrics")
+def vpn_metrics():
+    """VPN server system metrics. Params: vpn_server_id (optional), hours (default 24, max 720)."""
+    vpn_server_id = request.args.get("vpn_server_id", type=int)
+    hours = request.args.get("hours", 24, type=int)
+    hours = min(max(hours, 1), 720)
+
+    data = get_vpn_metrics(vpn_server_id=vpn_server_id, hours=hours)
+
+    servers = {}
+    for s in get_all_vpn_servers():
         servers[str(s["id"])] = {
             "name": s["name"],
             "display_name": s["display_name"],

@@ -97,6 +97,18 @@ def init_db() -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_metrics_ts ON server_metrics(server_id, timestamp);
 
+        CREATE TABLE IF NOT EXISTS vpn_server_metrics (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            vpn_server_id   INTEGER NOT NULL,
+            timestamp       INTEGER NOT NULL,
+            online          INTEGER NOT NULL DEFAULT 1,
+            disk_pct        REAL,
+            memory_pct      REAL,
+            cpu_pct         REAL,
+            FOREIGN KEY (vpn_server_id) REFERENCES vpn_servers(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_vpn_metrics_ts ON vpn_server_metrics(vpn_server_id, timestamp);
+
         CREATE TABLE IF NOT EXISTS alert_config (
             id                 INTEGER PRIMARY KEY CHECK (id = 1),
             enabled            INTEGER NOT NULL DEFAULT 0,
@@ -462,8 +474,47 @@ def cleanup_old_metrics(days: int = 30) -> int:
     conn = get_conn()
     cutoff = int(time.time()) - days * 86400
     cur = conn.execute("DELETE FROM server_metrics WHERE timestamp < ?", (cutoff,))
+    cur2 = conn.execute("DELETE FROM vpn_server_metrics WHERE timestamp < ?", (cutoff,))
     conn.commit()
-    return cur.rowcount
+    return cur.rowcount + cur2.rowcount
+
+
+# ── VPN Server Metrics CRUD ──────────────────────────────────────────
+
+def insert_vpn_metric(vpn_server_id: int, data: dict) -> None:
+    conn = get_conn()
+    conn.execute(
+        "INSERT INTO vpn_server_metrics "
+        "(vpn_server_id, timestamp, online, disk_pct, memory_pct, cpu_pct) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            vpn_server_id, int(time.time()),
+            1 if data.get("online") else 0,
+            data.get("disk_pct"),
+            data.get("memory_pct"),
+            data.get("cpu_pct"),
+        ),
+    )
+    conn.commit()
+
+
+def get_vpn_metrics(vpn_server_id: int | None = None, hours: int = 24) -> list[dict]:
+    conn = get_conn()
+    since = int(time.time()) - hours * 3600
+    if vpn_server_id:
+        rows = conn.execute(
+            "SELECT vpn_server_id, timestamp, online, disk_pct, memory_pct, cpu_pct "
+            "FROM vpn_server_metrics WHERE vpn_server_id = ? AND timestamp >= ? "
+            "ORDER BY timestamp",
+            (vpn_server_id, since),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT vpn_server_id, timestamp, online, disk_pct, memory_pct, cpu_pct "
+            "FROM vpn_server_metrics WHERE timestamp >= ? ORDER BY timestamp",
+            (since,),
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def get_alert_config() -> dict:
