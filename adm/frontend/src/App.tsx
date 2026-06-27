@@ -10,6 +10,7 @@ import {
   Box,
   Menu,
   MenuItem,
+  CircularProgress,
 } from "@mui/material";
 import SettingsIcon from "@mui/icons-material/Settings";
 import LogoutIcon from "@mui/icons-material/Logout";
@@ -77,7 +78,16 @@ export default function App() {
     setMenuAnchor(null);
   };
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <ThemeProvider theme={darkTheme}>
+        <CssBaseline />
+        <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh" }}>
+          <CircularProgress size={32} />
+        </Box>
+      </ThemeProvider>
+    );
+  }
 
   if (!authConfigured || !getToken() || !user) {
     return (
@@ -99,7 +109,7 @@ export default function App() {
           <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 700 }}>
             {t("app.title")}
           </Typography>
-          <IconButton color="inherit" onClick={(e) => setMenuAnchor(e.currentTarget)}>
+          <IconButton color="inherit" aria-label={t("common.settings")} onClick={(e) => setMenuAnchor(e.currentTarget)}>
             <SettingsIcon />
           </IconButton>
           <Menu
@@ -118,7 +128,7 @@ export default function App() {
           </Menu>
         </Toolbar>
       </AppBar>
-      <Box sx={{ maxWidth: 1400, mx: "auto", p: 2 }}>
+      <Box component="main" sx={{ maxWidth: 1400, mx: "auto", p: 2 }}>
         {page === "dashboard" && <Dashboard />}
         {page === "settings" && <Settings onBack={() => setPage("dashboard")} />}
       </Box>

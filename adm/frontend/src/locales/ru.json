@@ -163,6 +163,7 @@
   "vpnDetail.healthy": "Работает",
   "vpnDetail.unhealthy": "Не работает",
   "vpnDetail.unknown": "Неизвестно",
+  "vpnDetail.disabled": "Отключён",
   "vpnDetail.bypass": "Bypass",
   "vpnDetail.tunnels": "Туннели",
   "vpnDetail.addTunnel": "Добавить туннель",

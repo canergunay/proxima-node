@@ -163,6 +163,7 @@
   "vpnDetail.healthy": "Sağlıklı",
   "vpnDetail.unhealthy": "Sağlıksız",
   "vpnDetail.unknown": "Bilinmiyor",
+  "vpnDetail.disabled": "Devre Dışı",
   "vpnDetail.bypass": "Bypass",
   "vpnDetail.tunnels": "Tüneller",
   "vpnDetail.addTunnel": "Tünel Ekle",

@@ -91,6 +91,11 @@ function sortedSlots(slots: Record<string, ProximaSlotSummary>): [string, Proxim
   });
 }
 
+/** Check if slot is enabled (default true for backward compat) */
+function isSlotEnabled(slot: ProximaSlotSummary): boolean {
+  return slot.enabled !== false;
+}
+
 function slotDotColor(ipOk: boolean | null | undefined): string {
   if (ipOk === true) return "#4caf50";
   if (ipOk === false) return "#f44336";
@@ -102,11 +107,12 @@ export default function VpnServerCard({ server, onClick, onEdit, onDelete }: Pro
   const status = server.proxima_status;
   const isOnline = server.online;
 
-  // Count healthy slots (only checked ones)
+  // Count healthy slots (only enabled + checked ones)
   let healthyCount = 0;
   let totalSlots = 0;
   if (status?.slots) {
     for (const slot of Object.values(status.slots)) {
+      if (!isSlotEnabled(slot)) continue;
       if (slot.health?.last_ip_ok === null || slot.health?.last_ip_ok === undefined) continue;
       totalSlots++;
       if (slot.health.last_ip_ok === true) healthyCount++;
@@ -129,14 +135,15 @@ export default function VpnServerCard({ server, onClick, onEdit, onDelete }: Pro
       <CardActionArea onClick={onClick}>
         <CardContent>
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
-            <Typography variant="subtitle1" fontWeight={700}>
+            <Typography variant="subtitle1" fontWeight={700} sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
               {server.display_name}
             </Typography>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.25 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.25, flexShrink: 0 }}>
               {linkUrl && (
                 <Tooltip title={linkUrl} placement="top">
                   <IconButton
                     size="small"
+                    aria-label={t("vpnServer.edit")}
                     onClick={(e) => {
                       e.stopPropagation();
                       window.open(linkUrl, "_blank", "noopener");
@@ -150,6 +157,7 @@ export default function VpnServerCard({ server, onClick, onEdit, onDelete }: Pro
               <Tooltip title={t("vpnServer.edit")} placement="top">
                 <IconButton
                   size="small"
+                  aria-label={t("vpnServer.edit")}
                   onClick={(e) => { e.stopPropagation(); onEdit(); }}
                   sx={{ p: 0.25 }}
                 >
@@ -159,6 +167,7 @@ export default function VpnServerCard({ server, onClick, onEdit, onDelete }: Pro
               <Tooltip title={t("vpnServer.delete")} placement="top">
                 <IconButton
                   size="small"
+                  aria-label={t("vpnServer.delete")}
                   onClick={(e) => { e.stopPropagation(); onDelete(); }}
                   sx={{ p: 0.25 }}
                 >
@@ -178,7 +187,7 @@ export default function VpnServerCard({ server, onClick, onEdit, onDelete }: Pro
 
           {/* Service connectivity icons with latency */}
           {connectivityMap.size > 0 && (
-            <Box sx={{ display: "flex", gap: 0.75, mb: 1 }}>
+            <Box sx={{ display: "flex", gap: 0.75, mb: 1, flexWrap: "wrap" }}>
               {SERVICES.map((svc) => {
                 const st = connectivityMap.get(svc.id);
                 if (!st) return null;
@@ -238,11 +247,11 @@ export default function VpnServerCard({ server, onClick, onEdit, onDelete }: Pro
                   variant="outlined"
                 />
               )}
-              {/* Slot dots (compact) — only show checked slots */}
+              {/* Slot dots (compact) — only show enabled + checked slots */}
               {status.slots && Object.keys(status.slots).length > 0 && (
                 <Box sx={{ display: "flex", gap: 0.3, alignItems: "center" }}>
                   {sortedSlots(status.slots)
-                    .filter(([, slot]) => slot.health?.last_ip_ok !== null && slot.health?.last_ip_ok !== undefined)
+                    .filter(([, slot]) => isSlotEnabled(slot) && slot.health?.last_ip_ok !== null && slot.health?.last_ip_ok !== undefined)
                     .map(([id, slot]) => (
                     <Tooltip key={id} title={`${slot.active || slot.label}${slot.health?.last_ip ? ` — ${slot.health.last_ip}` : ""}`} placement="top">
                       <Box
@@ -299,6 +308,7 @@ export default function VpnServerCard({ server, onClick, onEdit, onDelete }: Pro
                 <LinearProgress
                   variant="determinate"
                   value={status.system.disk?.used_pct ?? 0}
+                  aria-label={`${t("server.disk")} ${status.system.disk?.used_pct?.toFixed(0) ?? 0}%`}
                   color={(status.system.disk?.used_pct ?? 0) > 90 ? "error" : "primary"}
                   sx={{ height: 4, borderRadius: 2 }}
                 />
@@ -310,6 +320,7 @@ export default function VpnServerCard({ server, onClick, onEdit, onDelete }: Pro
                 <LinearProgress
                   variant="determinate"
                   value={status.system.memory?.used_pct ?? 0}
+                  aria-label={`${t("server.memory")} ${status.system.memory?.used_pct?.toFixed(0) ?? 0}%`}
                   color={(status.system.memory?.used_pct ?? 0) > 90 ? "error" : "primary"}
                   sx={{ height: 4, borderRadius: 2 }}
                 />
@@ -321,6 +332,7 @@ export default function VpnServerCard({ server, onClick, onEdit, onDelete }: Pro
                 <LinearProgress
                   variant="determinate"
                   value={status.system.cpu?.used_pct ?? 0}
+                  aria-label={`${t("server.cpu")} ${status.system.cpu?.used_pct?.toFixed(0) ?? 0}%`}
                   color={(status.system.cpu?.used_pct ?? 0) > 80 ? "error" : "primary"}
                   sx={{ height: 4, borderRadius: 2 }}
                 />

@@ -120,6 +120,7 @@ export interface ProximaSlotSummary {
   type: string;
   active: string | null;
   pool: string[];
+  enabled?: boolean;
   health: {
     last_ip_ok: boolean | null;
     last_ip: string | null;

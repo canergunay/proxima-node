@@ -35,6 +35,7 @@ export default function MonitoringTab() {
   const [configSaving, setConfigSaving] = useState(false);
   const [configMsg, setConfigMsg] = useState("");
   const [testMsg, setTestMsg] = useState("");
+  const [testSuccess, setTestSuccess] = useState(false);
 
   const [alerts, setAlerts] = useState<AlertEntry[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(false);
@@ -171,8 +172,10 @@ export default function MonitoringTab() {
     setTestMsg("");
     try {
       const { data } = await api.post("/monitoring/test-alert");
+      setTestSuccess(!!data.ok);
       setTestMsg(data.ok ? t("monitoring.testAlertSent") : (data.error || t("monitoring.testAlertFailed")));
     } catch {
+      setTestSuccess(false);
       setTestMsg(t("monitoring.testAlertFailed"));
     }
     setTimeout(() => setTestMsg(""), 5000);
@@ -204,7 +207,7 @@ export default function MonitoringTab() {
       ) : (
         <Box sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap" }}>
           {/* Disk chart */}
-          <Box sx={{ flex: 1, minWidth: 350, minHeight: 250 }}>
+          <Box sx={{ flex: 1, minWidth: { xs: 0, sm: 350 }, minHeight: 250 }}>
             <Typography variant="subtitle2" sx={{ mb: 1 }}>{t("monitoring.diskUsage")}</Typography>
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={diskData}>
@@ -232,7 +235,7 @@ export default function MonitoringTab() {
           </Box>
 
           {/* Memory chart */}
-          <Box sx={{ flex: 1, minWidth: 350, minHeight: 250 }}>
+          <Box sx={{ flex: 1, minWidth: { xs: 0, sm: 350 }, minHeight: 250 }}>
             <Typography variant="subtitle2" sx={{ mb: 1 }}>{t("monitoring.memoryUsage")}</Typography>
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={memoryData}>
@@ -260,7 +263,7 @@ export default function MonitoringTab() {
           </Box>
 
           {/* CPU chart */}
-          <Box sx={{ flex: 1, minWidth: 350, minHeight: 250 }}>
+          <Box sx={{ flex: 1, minWidth: { xs: 0, sm: 350 }, minHeight: 250 }}>
             <Typography variant="subtitle2" sx={{ mb: 1 }}>{t("monitoring.cpuUsage")}</Typography>
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={cpuData}>
@@ -300,7 +303,7 @@ export default function MonitoringTab() {
       ) : (
         <Box sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap" }}>
           {/* VPN Disk chart */}
-          <Box sx={{ flex: 1, minWidth: 350, minHeight: 250 }}>
+          <Box sx={{ flex: 1, minWidth: { xs: 0, sm: 350 }, minHeight: 250 }}>
             <Typography variant="subtitle2" sx={{ mb: 1 }}>{t("monitoring.diskUsage")}</Typography>
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={vpnDiskData}>
@@ -328,7 +331,7 @@ export default function MonitoringTab() {
           </Box>
 
           {/* VPN Memory chart */}
-          <Box sx={{ flex: 1, minWidth: 350, minHeight: 250 }}>
+          <Box sx={{ flex: 1, minWidth: { xs: 0, sm: 350 }, minHeight: 250 }}>
             <Typography variant="subtitle2" sx={{ mb: 1 }}>{t("monitoring.memoryUsage")}</Typography>
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={vpnMemoryData}>
@@ -356,7 +359,7 @@ export default function MonitoringTab() {
           </Box>
 
           {/* VPN CPU chart */}
-          <Box sx={{ flex: 1, minWidth: 350, minHeight: 250 }}>
+          <Box sx={{ flex: 1, minWidth: { xs: 0, sm: 350 }, minHeight: 250 }}>
             <Typography variant="subtitle2" sx={{ mb: 1 }}>{t("monitoring.cpuUsage")}</Typography>
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={vpnCpuData}>
@@ -464,7 +467,7 @@ export default function MonitoringTab() {
                   <Typography variant="caption" color="success.main">{configMsg}</Typography>
                 )}
                 {testMsg && (
-                  <Typography variant="caption" color={testMsg.includes("sent") || testMsg.includes("gönderildi") || testMsg.includes("отправлено") ? "success.main" : "error"}>
+                  <Typography variant="caption" color={testSuccess ? "success.main" : "error"}>
                     {testMsg}
                   </Typography>
                 )}

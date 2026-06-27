@@ -5,13 +5,14 @@ import {
   CircularProgress, Accordion, AccordionSummary, AccordionDetails,
   Table, TableHead, TableRow, TableCell, TableBody,
   IconButton, Tooltip, Select, MenuItem, FormControl, InputLabel,
-  Tabs, Tab,
+  Tabs, Tab, TableContainer,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import CircleIcon from "@mui/icons-material/Circle";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DeleteIcon from "@mui/icons-material/Delete";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import BlockIcon from "@mui/icons-material/Block";
 import { useTranslation } from "react-i18next";
 import api from "../api/client";
 import type { VpnServer, ProximaSlot, ProximaTunnel } from "../api/types";
@@ -31,6 +32,7 @@ function CopyButton({ text }: { text: string }) {
     <Tooltip title={copied ? t("detail.copied") : t("common.copy")}>
       <IconButton
         size="small"
+        aria-label={t("common.copy")}
         onClick={(e) => {
           e.stopPropagation();
           navigator.clipboard.writeText(text);
@@ -55,6 +57,9 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
   const [tokenInput, setTokenInput] = useState("");
   const [tokenMsg, setTokenMsg] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+
+  // Tunnel delete confirmation state (replaces window.confirm)
+  const [deleteTunnelName, setDeleteTunnelName] = useState<string | null>(null);
 
   // Add tunnel state
   const [addTunnelOpen, setAddTunnelOpen] = useState(false);
@@ -128,7 +133,6 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
       } else if (action === "check-ip") {
         await api.post(`/vpn-servers/${serverId}/proxima/slots/${slotId}/check-ip`);
       }
-      // Refresh slots after action
       setTimeout(fetchSlots, 2000);
     } catch { /* */ }
     setActionLoading(false);
@@ -183,12 +187,12 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
   };
 
   const handleDeleteTunnel = async (tunnelName: string) => {
-    if (!confirm(t("vpnDetail.confirmDeleteTunnel"))) return;
     setActionLoading(true);
     try {
       await api.delete(`/vpn-servers/${serverId}/proxima/tunnels/${tunnelName}`);
       fetchTunnels();
     } catch { /* */ }
+    setDeleteTunnelName(null);
     setActionLoading(false);
   };
 
@@ -209,7 +213,7 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
       </DialogTitle>
 
       <DialogContent dividers>
-        <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2, borderBottom: 1, borderColor: "divider" }}>
+        <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" scrollButtons="auto" sx={{ mb: 2, borderBottom: 1, borderColor: "divider" }}>
           <Tab label={t("vpnDetail.status")} />
           <Tab label={t("vpnDetail.slots")} disabled={!isOnline} />
           <Tab label={t("vpnDetail.tunnels")} disabled={!isOnline} />
@@ -220,7 +224,7 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
           <Box>
             {status && (
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, mb: 2 }}>
-                <Box sx={{ display: "flex", gap: 4 }}>
+                <Box sx={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                   <Box>
                     <Typography variant="caption" color="text.secondary">{t("vpnDetail.serverIp")}</Typography>
                     <Typography variant="body2">{status.server_ip}</Typography>
@@ -244,7 +248,7 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
                     <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
                       {t("vpnDetail.dnsContainers")}
                     </Typography>
-                    <Box sx={{ display: "flex", gap: 1 }}>
+                    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
                       {Object.entries(status.dns_mode.containers).map(([name, st]) => (
                         <Chip
                           key={name}
@@ -279,7 +283,7 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
                 <Typography variant="subtitle2">{t("vpnDetail.tokenSection")}</Typography>
               </AccordionSummary>
               <AccordionDetails>
-                <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
+                <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start", flexDirection: { xs: "column", sm: "row" } }}>
                   <TextField
                     size="small"
                     fullWidth
@@ -304,7 +308,7 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
                     {tokenMsg}
                   </Typography>
                 )}
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block", wordBreak: "break-all" }}>
                   URL: {vpnServer.url}
                 </Typography>
               </AccordionDetails>
@@ -324,33 +328,35 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
                 {t("vpnDetail.noSlots")}
               </Typography>
             ) : (
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>{t("vpnDetail.slot")}</TableCell>
-                    <TableCell>{t("vpnDetail.slotType")}</TableCell>
-                    <TableCell>{t("vpnDetail.slotActive")}</TableCell>
-                    <TableCell>{t("vpnDetail.slotIp")}</TableCell>
-                    <TableCell>{t("vpnDetail.slotHealth")}</TableCell>
-                    <TableCell align="right">{t("common.actions")}</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {[...slots].sort((a, b) => {
-                    const aNum = parseInt(a.id.replace(/\D/g, ""), 10);
-                    const bNum = parseInt(b.id.replace(/\D/g, ""), 10);
-                    if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
-                    return a.id.localeCompare(b.id);
-                  }).map((slot) => (
-                    <SlotRow
-                      key={slot.id}
-                      slot={slot}
-                      onAction={handleSlotAction}
-                      actionLoading={actionLoading}
-                    />
-                  ))}
-                </TableBody>
-              </Table>
+              <TableContainer sx={{ overflowX: "auto" }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>{t("vpnDetail.slot")}</TableCell>
+                      <TableCell>{t("vpnDetail.slotType")}</TableCell>
+                      <TableCell>{t("vpnDetail.slotActive")}</TableCell>
+                      <TableCell>{t("vpnDetail.slotIp")}</TableCell>
+                      <TableCell>{t("vpnDetail.slotHealth")}</TableCell>
+                      <TableCell align="right">{t("common.actions")}</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {[...slots].sort((a, b) => {
+                      const aNum = parseInt(a.id.replace(/\D/g, ""), 10);
+                      const bNum = parseInt(b.id.replace(/\D/g, ""), 10);
+                      if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
+                      return a.id.localeCompare(b.id);
+                    }).map((slot) => (
+                      <SlotRow
+                        key={slot.id}
+                        slot={slot}
+                        onAction={handleSlotAction}
+                        actionLoading={actionLoading}
+                      />
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
             )}
             <Box sx={{ mt: 1, display: "flex", justifyContent: "flex-end" }}>
               <Button size="small" startIcon={<RefreshIcon />} onClick={fetchSlots} disabled={slotsLoading}>
@@ -372,51 +378,78 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
                 {t("vpnDetail.noTunnels")}
               </Typography>
             ) : (
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>{t("common.name")}</TableCell>
-                    <TableCell>{t("vpnDetail.tunnelType")}</TableCell>
-                    <TableCell>{t("vpnDetail.tunnelEndpoint")}</TableCell>
-                    <TableCell>{t("vpnDetail.tunnelTag")}</TableCell>
-                    <TableCell align="right"></TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {tunnels.map((tunnel) => (
-                    <TableRow key={tunnel.name}>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontFamily: "monospace", fontSize: "0.8rem" }}>
-                          {tunnel.name}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Chip label={tunnel.type} size="small" variant="outlined" />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontFamily: "monospace", fontSize: "0.8rem" }}>
-                          {tunnel.endpoint}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>{tunnel.tag || "—"}</TableCell>
-                      <TableCell align="right">
-                        {tunnel.ssconf_url && <CopyButton text={tunnel.ssconf_url} />}
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => handleDeleteTunnel(tunnel.name)}
-                          disabled={actionLoading}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </TableCell>
+              <TableContainer sx={{ overflowX: "auto" }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>{t("common.name")}</TableCell>
+                      <TableCell>{t("vpnDetail.tunnelType")}</TableCell>
+                      <TableCell>{t("vpnDetail.tunnelEndpoint")}</TableCell>
+                      <TableCell>{t("vpnDetail.tunnelTag")}</TableCell>
+                      <TableCell align="right"></TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHead>
+                  <TableBody>
+                    {tunnels.map((tunnel) => (
+                      <TableRow key={tunnel.name}>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontFamily: "monospace", fontSize: "0.8rem" }}>
+                            {tunnel.name}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Chip label={tunnel.type} size="small" variant="outlined" />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontFamily: "monospace", fontSize: "0.8rem" }}>
+                            {tunnel.endpoint}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>{tunnel.tag || "—"}</TableCell>
+                        <TableCell align="right">
+                          <Box sx={{ display: "flex", gap: 0.25, justifyContent: "flex-end" }}>
+                            {tunnel.ssconf_url && <CopyButton text={tunnel.ssconf_url} />}
+                            {deleteTunnelName === tunnel.name ? (
+                              <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
+                                <Button
+                                  size="small"
+                                  color="error"
+                                  variant="contained"
+                                  onClick={() => handleDeleteTunnel(tunnel.name)}
+                                  disabled={actionLoading}
+                                  sx={{ minWidth: 0, px: 1, fontSize: "0.7rem" }}
+                                >
+                                  {t("common.confirm")}
+                                </Button>
+                                <Button
+                                  size="small"
+                                  onClick={() => setDeleteTunnelName(null)}
+                                  sx={{ minWidth: 0, px: 1, fontSize: "0.7rem" }}
+                                >
+                                  {t("common.cancel")}
+                                </Button>
+                              </Box>
+                            ) : (
+                              <IconButton
+                                size="small"
+                                color="error"
+                                aria-label={t("common.delete")}
+                                onClick={() => setDeleteTunnelName(tunnel.name)}
+                                disabled={actionLoading}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            )}
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
             )}
 
-            <Box sx={{ mt: 2, display: "flex", gap: 1, justifyContent: "flex-end" }}>
+            <Box sx={{ mt: 2, display: "flex", gap: 1, justifyContent: "flex-end", flexWrap: "wrap" }}>
               <Button size="small" startIcon={<RefreshIcon />} onClick={fetchTunnels} disabled={tunnelsLoading}>
                 {t("dashboard.refresh")}
               </Button>
@@ -600,22 +633,35 @@ function SlotRow({ slot, onAction, actionLoading }: SlotRowProps) {
   const { t } = useTranslation();
   const [activateKey, setActivateKey] = useState("");
 
-  const healthColor = slot.health.last_ip_ok === true
-    ? "success"
-    : slot.health.last_ip_ok === false
-      ? "error"
-      : "default";
+  const isDisabled = slot.enabled === false;
 
-  const healthLabel = slot.health.last_ip_ok === true
-    ? t("vpnDetail.healthy")
-    : slot.health.last_ip_ok === false
-      ? t("vpnDetail.unhealthy")
-      : t("vpnDetail.unknown");
+  const healthColor = isDisabled
+    ? "default"
+    : slot.health.last_ip_ok === true
+      ? "success"
+      : slot.health.last_ip_ok === false
+        ? "error"
+        : "default";
+
+  const healthLabel = isDisabled
+    ? t("vpnDetail.disabled")
+    : slot.health.last_ip_ok === true
+      ? t("vpnDetail.healthy")
+      : slot.health.last_ip_ok === false
+        ? t("vpnDetail.unhealthy")
+        : t("vpnDetail.unknown");
 
   return (
-    <TableRow>
+    <TableRow sx={{ opacity: isDisabled ? 0.5 : 1 }}>
       <TableCell>
-        <Typography variant="body2" fontWeight={600}>{slot.active || slot.label || slot.id}</Typography>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+          {isDisabled && (
+            <Tooltip title={t("vpnDetail.disabled")}>
+              <BlockIcon sx={{ fontSize: 14, color: "text.disabled" }} />
+            </Tooltip>
+          )}
+          <Typography variant="body2" fontWeight={600}>{slot.active || slot.label || slot.id}</Typography>
+        </Box>
       </TableCell>
       <TableCell>
         {slot.type ? (
@@ -639,7 +685,7 @@ function SlotRow({ slot, onAction, actionLoading }: SlotRowProps) {
       </TableCell>
       <TableCell align="right">
         <Box sx={{ display: "flex", gap: 0.5, alignItems: "center", justifyContent: "flex-end" }}>
-          {slot.pool.length > 1 && (
+          {!isDisabled && slot.pool.length > 1 && (
             <>
               <Select
                 size="small"
@@ -665,7 +711,12 @@ function SlotRow({ slot, onAction, actionLoading }: SlotRowProps) {
             </>
           )}
           <Tooltip title={t("vpnDetail.checkIp")}>
-            <IconButton size="small" onClick={() => onAction(slot.id, "check-ip")} disabled={actionLoading}>
+            <IconButton
+              size="small"
+              aria-label={t("vpnDetail.checkIp")}
+              onClick={() => onAction(slot.id, "check-ip")}
+              disabled={actionLoading}
+            >
               <RefreshIcon fontSize="small" />
             </IconButton>
           </Tooltip>

@@ -73,7 +73,7 @@ export default function Dashboard() {
 
   return (
     <Box>
-      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2, flexWrap: "wrap", gap: 1 }}>
         <Typography variant="h5" fontWeight={700}>
           {t("dashboard.title")}
         </Typography>
@@ -117,6 +117,8 @@ export default function Dashboard() {
       <Tabs
         value={tab}
         onChange={handleTabChange}
+        variant="scrollable"
+        scrollButtons="auto"
         sx={{ mb: 2, borderBottom: 1, borderColor: "divider" }}
       >
         <Tab label={t("dashboard.tabExitServers")} />
@@ -181,13 +183,7 @@ export default function Dashboard() {
                     server={server}
                     onClick={() => setSelectedVpn(server)}
                     onEdit={() => setSelectedVpn(server)}
-                    onDelete={async () => {
-                      if (!confirm(t("vpnDetail.confirmDelete", { name: server.display_name }))) return;
-                      try {
-                        await api.delete(`/vpn-servers/${server.id}`);
-                        fetchVpnServers();
-                      } catch { /* handled by interceptor */ }
-                    }}
+                    onDelete={() => setSelectedVpn(server)}
                   />
                 </Grid>
               ))}

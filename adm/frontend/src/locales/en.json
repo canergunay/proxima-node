@@ -163,6 +163,7 @@
   "vpnDetail.healthy": "Healthy",
   "vpnDetail.unhealthy": "Unhealthy",
   "vpnDetail.unknown": "Unknown",
+  "vpnDetail.disabled": "Disabled",
   "vpnDetail.bypass": "Bypass",
   "vpnDetail.tunnels": "Tunnels",
   "vpnDetail.addTunnel": "Add Tunnel",
