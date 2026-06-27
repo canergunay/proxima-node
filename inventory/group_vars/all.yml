@@ -1,7 +1,6 @@
-# Shared defaults for all servers
 ss_cipher: chacha20-ietf-poly1305
 ss_port: 8388
-ss_prefix: "FgMBAgABAAH8AwM="
+ss_prefix: FgMBAgABAAH8AwM=
 agent_port: 5051
 ssconf_port: 8390
 
@@ -9,14 +8,11 @@ ssconf_port: 8390
 outline_ss_version: "1.9.2"
 
 # SSH key for ongoing management (injected during provisioning)
-# Replace with your actual public key
-ssh_public_key: "ssh-ed25519 CHANGE_ME proxima-adm"
+ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINkS7pA8RLRHAgCL2dwBbJAYMnNX/fcy+owjH1lSgqOT proxima-adm"
 
 # Proxima instance IPs (for UFW agent port restriction)
 proxima_ips:
-  - 46.138.254.119    # ERG public
-  - 46.39.245.211     # OFC public
-  - 192.168.2.91      # ERG LAN (for ERG-RU)
-
-# Docker install (needed for AWG/Xray/AdGuard)
+- 46.138.254.119
+- 46.39.245.211
+- 192.168.2.91
 install_docker: true
