@@ -102,23 +102,32 @@ proxima-node/
 
 | Server | SSH alias | Path | Service |
 |--------|-----------|------|---------|
-| ERG | `erg` | `/opt/erg/proxima-node` | `adm.service` (port 5002) |
+| ERG | `erg` | `/opt/erg/proxima-node` | `proxima-adm.service` (port 5002) |
 
 ### Deploy Command
 
-```bash
-# From local machine:
-ssh erg "cd /opt/erg/proxima-node && sudo git pull && cd adm && sudo make build && sudo systemctl restart adm.service"
-```
+Node.js is NOT installed on the server. Frontend is built locally, then copied via scp.
 
-**Note:** Node.js/npm must be available on the server for `make build`. Currently installed via nvm — may need `source ~/.nvm/nvm.sh` or full path.
+```bash
+# 1. Build frontend locally
+cd adm/frontend && npm run build
+
+# 2. Push code to GitHub
+git add . && git commit && git push
+
+# 3. Copy built frontend to server
+scp -r adm/backend/static/ erg:/tmp/adm-static/
+
+# 4. Deploy on server
+ssh erg "cd /opt/erg/proxima-node && sudo git pull && sudo rm -rf adm/backend/static && sudo mv /tmp/adm-static adm/backend/static && sudo systemctl restart proxima-adm.service"
+```
 
 ### Pre-deploy Checklist
 
 1. All changes committed locally
-2. `git push` completed
-3. Server has clean working tree (`git status` shows no changes)
-4. Build succeeds locally (`cd adm/frontend && npm run build`)
+2. Frontend build succeeds locally (`cd adm/frontend && npm run build`)
+3. `git push` completed
+4. Server has clean working tree (`git status` shows no changes)
 
 ---
 
