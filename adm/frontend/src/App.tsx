@@ -128,7 +128,7 @@ export default function App() {
           </Menu>
         </Toolbar>
       </AppBar>
-      <Box component="main" sx={{ maxWidth: 1400, mx: "auto", p: 2 }}>
+      <Box component="main" sx={{ maxWidth: 1400, mx: "auto", p: { xs: 1, sm: 2 } }}>
         {page === "dashboard" && <Dashboard />}
         {page === "settings" && <Settings onBack={() => setPage("dashboard")} />}
       </Box>

@@ -461,7 +461,7 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
             {/* Add tunnel form */}
             {addTunnelOpen && (
               <Box sx={{ mt: 2, p: 2, border: 1, borderColor: "divider", borderRadius: 1 }}>
-                <FormControl size="small" sx={{ mb: 2, minWidth: 150 }}>
+                <FormControl size="small" sx={{ mb: 2, minWidth: { xs: "100%", sm: 150 } }}>
                   <InputLabel>{t("vpnDetail.tunnelType")}</InputLabel>
                   <Select
                     value={tunnelType}
@@ -488,10 +488,11 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
                         onChange={(e) => setTunnelForm({ ...tunnelForm, ssconf_url: e.target.value })}
                         placeholder="ssconf://host:port/token"
                       />
-                      <Box sx={{ display: "flex", gap: 1 }}>
+                      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
                         <TextField
                           label={t("vpnDetail.tunnelTag")}
                           size="small"
+                          sx={{ flex: 1, minWidth: 120 }}
                           value={tunnelForm.tag || ""}
                           onChange={(e) => setTunnelForm({ ...tunnelForm, tag: e.target.value })}
                           placeholder="e.g. erg-tr"
@@ -499,6 +500,7 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
                         <TextField
                           label={t("vpnDetail.tunnelLocation")}
                           size="small"
+                          sx={{ flex: 1, minWidth: 120 }}
                           value={tunnelForm.location || ""}
                           onChange={(e) => setTunnelForm({ ...tunnelForm, location: e.target.value })}
                           placeholder="TR, DE..."
@@ -507,11 +509,11 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
                     </>
                   ) : (
                     <>
-                      <Box sx={{ display: "flex", gap: 1 }}>
+                      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
                         <TextField
                           label={t("common.server")}
                           size="small"
-                          fullWidth
+                          sx={{ flex: 1, minWidth: 150 }}
                           required
                           value={tunnelForm.server || ""}
                           onChange={(e) => setTunnelForm({ ...tunnelForm, server: e.target.value })}
@@ -534,11 +536,11 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
                         value={tunnelForm.vless_uuid || ""}
                         onChange={(e) => setTunnelForm({ ...tunnelForm, vless_uuid: e.target.value })}
                       />
-                      <Box sx={{ display: "flex", gap: 1 }}>
+                      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
                         <TextField
                           label={t("vpnDetail.publicKey")}
                           size="small"
-                          fullWidth
+                          sx={{ flex: 1, minWidth: 150 }}
                           required
                           value={tunnelForm.public_key || ""}
                           onChange={(e) => setTunnelForm({ ...tunnelForm, public_key: e.target.value })}
@@ -546,17 +548,17 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
                         <TextField
                           label={t("vpnDetail.shortId")}
                           size="small"
-                          sx={{ width: 150 }}
+                          sx={{ width: { xs: "100%", sm: 150 } }}
                           required
                           value={tunnelForm.short_id || ""}
                           onChange={(e) => setTunnelForm({ ...tunnelForm, short_id: e.target.value })}
                         />
                       </Box>
-                      <Box sx={{ display: "flex", gap: 1 }}>
+                      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
                         <TextField
                           label={t("vpnDetail.sni")}
                           size="small"
-                          fullWidth
+                          sx={{ flex: 1, minWidth: 150 }}
                           required
                           value={tunnelForm.server_name || ""}
                           onChange={(e) => setTunnelForm({ ...tunnelForm, server_name: e.target.value })}
@@ -565,6 +567,7 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
                         <TextField
                           label={t("vpnDetail.tunnelTag")}
                           size="small"
+                          sx={{ flex: 1, minWidth: 120 }}
                           value={tunnelForm.tag || ""}
                           onChange={(e) => setTunnelForm({ ...tunnelForm, tag: e.target.value })}
                           placeholder="erg-tr"

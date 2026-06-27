@@ -48,7 +48,7 @@ function CopyField({ label, value, mono }: { label: string; value: string | null
 
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-      <Typography variant="body2" color="text.secondary" sx={{ minWidth: 100, flexShrink: 0 }}>
+      <Typography variant="body2" color="text.secondary" sx={{ minWidth: { xs: 70, sm: 100 }, flexShrink: 0 }}>
         {label}
       </Typography>
       <Typography
@@ -353,7 +353,7 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
               <Typography variant="body2">{t("preflight.sshOk")}</Typography>
             </Box>
             <Box sx={{ pl: 3.5, mb: 1 }}>
-              <Typography variant="caption" color="text.secondary">
+              <Typography variant="caption" color="text.secondary" sx={{ wordBreak: "break-word" }}>
                 {t("preflight.os")}: {preflight.os} ({preflight.arch})
                 {preflight.python ? ` | ${t("preflight.python")}: ${preflight.python}` : ""}
                 {` | ${t("preflight.disk")}: ${preflight.disk_free_gb} GB`}
@@ -496,7 +496,7 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
 
         {/* Server info */}
         <Box sx={{ mb: 2 }}>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" color="text.secondary" sx={{ wordBreak: "break-word" }}>
             {t("detail.ip")}: {server.ip} | {t("detail.type")}: {server.server_type} | {t("detail.location")}: {server.location || "-"} | {t("detail.provider")}: {server.provider || "-"}
           </Typography>
           {server.node_id && (
@@ -551,7 +551,7 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
           </>
         )}
       </DialogContent>
-      <DialogActions>
+      <DialogActions sx={{ flexWrap: "wrap", gap: 0.5 }}>
         {(server.status === "new" || server.status === "error") && !preflight && (
           <Button
             variant="contained"

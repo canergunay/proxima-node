@@ -138,7 +138,7 @@ export default function VpnServerCard({ server, onClick, onEdit, onDelete }: Pro
             <Typography variant="subtitle1" fontWeight={700} sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
               {server.display_name}
             </Typography>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.25, flexShrink: 0 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexShrink: 0 }}>
               {linkUrl && (
                 <Tooltip title={linkUrl} placement="top">
                   <IconButton
@@ -148,7 +148,7 @@ export default function VpnServerCard({ server, onClick, onEdit, onDelete }: Pro
                       e.stopPropagation();
                       window.open(linkUrl, "_blank", "noopener");
                     }}
-                    sx={{ p: 0.25 }}
+                    sx={{ p: 0.5 }}
                   >
                     <LaunchIcon sx={{ fontSize: 16 }} />
                   </IconButton>
@@ -159,7 +159,7 @@ export default function VpnServerCard({ server, onClick, onEdit, onDelete }: Pro
                   size="small"
                   aria-label={t("vpnServer.edit")}
                   onClick={(e) => { e.stopPropagation(); onEdit(); }}
-                  sx={{ p: 0.25 }}
+                  sx={{ p: 0.5 }}
                 >
                   <EditIcon sx={{ fontSize: 16 }} />
                 </IconButton>
@@ -169,7 +169,7 @@ export default function VpnServerCard({ server, onClick, onEdit, onDelete }: Pro
                   size="small"
                   aria-label={t("vpnServer.delete")}
                   onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                  sx={{ p: 0.25 }}
+                  sx={{ p: 0.5 }}
                 >
                   <DeleteOutlineIcon sx={{ fontSize: 16, color: "error.main" }} />
                 </IconButton>

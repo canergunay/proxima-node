@@ -3,7 +3,7 @@ import {
   Box, Typography, Chip, CircularProgress, Alert,
   Accordion, AccordionSummary, AccordionDetails,
   TextField, Button, Switch, FormControlLabel,
-  Table, TableHead, TableRow, TableCell, TableBody,
+  Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { useTranslation } from "react-i18next";
@@ -206,89 +206,38 @@ export default function MonitoringTab() {
         <Alert severity="info" sx={{ mb: 3 }}>{t("monitoring.noData")}</Alert>
       ) : (
         <Box sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap" }}>
-          {/* Disk chart */}
-          <Box sx={{ flex: 1, minWidth: { xs: 0, sm: 350 }, minHeight: 250 }}>
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>{t("monitoring.diskUsage")}</Typography>
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={diskData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-                <XAxis dataKey="time" tickFormatter={formatTime} fontSize={11} stroke="#888" />
-                <YAxis domain={[0, 100]} unit="%" fontSize={11} stroke="#888" />
-                <Tooltip
-                  labelFormatter={formatTime}
-                  contentStyle={{ backgroundColor: "#1e1e1e", border: "1px solid #555" }}
-                />
-                <Legend />
-                {serverIds.map((sid, i) => (
-                  <Line
-                    key={sid}
-                    dataKey={sid}
-                    name={servers[sid]?.display_name || sid}
-                    stroke={COLORS[i % COLORS.length]}
-                    dot={false}
-                    strokeWidth={2}
-                    connectNulls
+          {[
+            { label: t("monitoring.diskUsage"), data: diskData },
+            { label: t("monitoring.memoryUsage"), data: memoryData },
+            { label: t("monitoring.cpuUsage"), data: cpuData },
+          ].map((chart) => (
+            <Box key={chart.label} sx={{ flex: 1, minWidth: { xs: "100%", sm: 300 }, minHeight: 250 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>{chart.label}</Typography>
+              <ResponsiveContainer width="100%" height={220}>
+                <LineChart data={chart.data}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+                  <XAxis dataKey="time" tickFormatter={formatTime} fontSize={11} stroke="#888" />
+                  <YAxis domain={[0, 100]} unit="%" fontSize={11} stroke="#888" width={40} />
+                  <Tooltip
+                    labelFormatter={formatTime}
+                    contentStyle={{ backgroundColor: "#1e1e1e", border: "1px solid #555" }}
                   />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </Box>
-
-          {/* Memory chart */}
-          <Box sx={{ flex: 1, minWidth: { xs: 0, sm: 350 }, minHeight: 250 }}>
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>{t("monitoring.memoryUsage")}</Typography>
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={memoryData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-                <XAxis dataKey="time" tickFormatter={formatTime} fontSize={11} stroke="#888" />
-                <YAxis domain={[0, 100]} unit="%" fontSize={11} stroke="#888" />
-                <Tooltip
-                  labelFormatter={formatTime}
-                  contentStyle={{ backgroundColor: "#1e1e1e", border: "1px solid #555" }}
-                />
-                <Legend />
-                {serverIds.map((sid, i) => (
-                  <Line
-                    key={sid}
-                    dataKey={sid}
-                    name={servers[sid]?.display_name || sid}
-                    stroke={COLORS[i % COLORS.length]}
-                    dot={false}
-                    strokeWidth={2}
-                    connectNulls
-                  />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </Box>
-
-          {/* CPU chart */}
-          <Box sx={{ flex: 1, minWidth: { xs: 0, sm: 350 }, minHeight: 250 }}>
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>{t("monitoring.cpuUsage")}</Typography>
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={cpuData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-                <XAxis dataKey="time" tickFormatter={formatTime} fontSize={11} stroke="#888" />
-                <YAxis domain={[0, 100]} unit="%" fontSize={11} stroke="#888" />
-                <Tooltip
-                  labelFormatter={formatTime}
-                  contentStyle={{ backgroundColor: "#1e1e1e", border: "1px solid #555" }}
-                />
-                <Legend />
-                {serverIds.map((sid, i) => (
-                  <Line
-                    key={sid}
-                    dataKey={sid}
-                    name={servers[sid]?.display_name || sid}
-                    stroke={COLORS[i % COLORS.length]}
-                    dot={false}
-                    strokeWidth={2}
-                    connectNulls
-                  />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </Box>
+                  <Legend />
+                  {serverIds.map((sid, i) => (
+                    <Line
+                      key={sid}
+                      dataKey={sid}
+                      name={servers[sid]?.display_name || sid}
+                      stroke={COLORS[i % COLORS.length]}
+                      dot={false}
+                      strokeWidth={2}
+                      connectNulls
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </Box>
+          ))}
         </Box>
       )}
 
@@ -302,89 +251,38 @@ export default function MonitoringTab() {
         <Alert severity="info" sx={{ mb: 3 }}>{t("monitoring.noVpnData")}</Alert>
       ) : (
         <Box sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap" }}>
-          {/* VPN Disk chart */}
-          <Box sx={{ flex: 1, minWidth: { xs: 0, sm: 350 }, minHeight: 250 }}>
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>{t("monitoring.diskUsage")}</Typography>
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={vpnDiskData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-                <XAxis dataKey="time" tickFormatter={formatTime} fontSize={11} stroke="#888" />
-                <YAxis domain={[0, 100]} unit="%" fontSize={11} stroke="#888" />
-                <Tooltip
-                  labelFormatter={formatTime}
-                  contentStyle={{ backgroundColor: "#1e1e1e", border: "1px solid #555" }}
-                />
-                <Legend />
-                {vpnServerIds.map((sid, i) => (
-                  <Line
-                    key={sid}
-                    dataKey={sid}
-                    name={vpnServers[sid]?.display_name || sid}
-                    stroke={COLORS[i % COLORS.length]}
-                    dot={false}
-                    strokeWidth={2}
-                    connectNulls
+          {[
+            { label: t("monitoring.diskUsage"), data: vpnDiskData },
+            { label: t("monitoring.memoryUsage"), data: vpnMemoryData },
+            { label: t("monitoring.cpuUsage"), data: vpnCpuData },
+          ].map((chart) => (
+            <Box key={chart.label} sx={{ flex: 1, minWidth: { xs: "100%", sm: 300 }, minHeight: 250 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>{chart.label}</Typography>
+              <ResponsiveContainer width="100%" height={220}>
+                <LineChart data={chart.data}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+                  <XAxis dataKey="time" tickFormatter={formatTime} fontSize={11} stroke="#888" />
+                  <YAxis domain={[0, 100]} unit="%" fontSize={11} stroke="#888" width={40} />
+                  <Tooltip
+                    labelFormatter={formatTime}
+                    contentStyle={{ backgroundColor: "#1e1e1e", border: "1px solid #555" }}
                   />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </Box>
-
-          {/* VPN Memory chart */}
-          <Box sx={{ flex: 1, minWidth: { xs: 0, sm: 350 }, minHeight: 250 }}>
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>{t("monitoring.memoryUsage")}</Typography>
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={vpnMemoryData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-                <XAxis dataKey="time" tickFormatter={formatTime} fontSize={11} stroke="#888" />
-                <YAxis domain={[0, 100]} unit="%" fontSize={11} stroke="#888" />
-                <Tooltip
-                  labelFormatter={formatTime}
-                  contentStyle={{ backgroundColor: "#1e1e1e", border: "1px solid #555" }}
-                />
-                <Legend />
-                {vpnServerIds.map((sid, i) => (
-                  <Line
-                    key={sid}
-                    dataKey={sid}
-                    name={vpnServers[sid]?.display_name || sid}
-                    stroke={COLORS[i % COLORS.length]}
-                    dot={false}
-                    strokeWidth={2}
-                    connectNulls
-                  />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </Box>
-
-          {/* VPN CPU chart */}
-          <Box sx={{ flex: 1, minWidth: { xs: 0, sm: 350 }, minHeight: 250 }}>
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>{t("monitoring.cpuUsage")}</Typography>
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={vpnCpuData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-                <XAxis dataKey="time" tickFormatter={formatTime} fontSize={11} stroke="#888" />
-                <YAxis domain={[0, 100]} unit="%" fontSize={11} stroke="#888" />
-                <Tooltip
-                  labelFormatter={formatTime}
-                  contentStyle={{ backgroundColor: "#1e1e1e", border: "1px solid #555" }}
-                />
-                <Legend />
-                {vpnServerIds.map((sid, i) => (
-                  <Line
-                    key={sid}
-                    dataKey={sid}
-                    name={vpnServers[sid]?.display_name || sid}
-                    stroke={COLORS[i % COLORS.length]}
-                    dot={false}
-                    strokeWidth={2}
-                    connectNulls
-                  />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </Box>
+                  <Legend />
+                  {vpnServerIds.map((sid, i) => (
+                    <Line
+                      key={sid}
+                      dataKey={sid}
+                      name={vpnServers[sid]?.display_name || sid}
+                      stroke={COLORS[i % COLORS.length]}
+                      dot={false}
+                      strokeWidth={2}
+                      connectNulls
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </Box>
+          ))}
         </Box>
       )}
 
@@ -418,7 +316,7 @@ export default function MonitoringTab() {
                 value={configForm.telegram_chat_id || ""}
                 onChange={(e) => setConfigForm({ ...configForm, telegram_chat_id: e.target.value })}
               />
-              <Box sx={{ display: "flex", gap: 2 }}>
+              <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
                 <TextField
                   label={t("monitoring.diskThreshold")}
                   size="small"
@@ -488,41 +386,43 @@ export default function MonitoringTab() {
           ) : alerts.length === 0 ? (
             <Typography variant="body2" color="text.secondary">{t("monitoring.noAlerts")}</Typography>
           ) : (
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>{t("monitoring.alertTime")}</TableCell>
-                  <TableCell>{t("monitoring.alertServer")}</TableCell>
-                  <TableCell>{t("monitoring.alertType")}</TableCell>
-                  <TableCell>{t("monitoring.alertMessage")}</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {alerts.map((a) => (
-                  <TableRow key={a.id}>
-                    <TableCell>
-                      <Typography variant="caption">
-                        {new Date(a.sent_at * 1000).toLocaleString()}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>{a.server_name || "—"}</TableCell>
-                    <TableCell>
-                      <Chip
-                        label={a.alert_type}
-                        size="small"
-                        color={a.alert_type === "offline" ? "error" : "warning"}
-                        variant="outlined"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {a.message}
-                      </Typography>
-                    </TableCell>
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>{t("monitoring.alertTime")}</TableCell>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>{t("monitoring.alertServer")}</TableCell>
+                    <TableCell>{t("monitoring.alertType")}</TableCell>
+                    <TableCell>{t("monitoring.alertMessage")}</TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHead>
+                <TableBody>
+                  {alerts.map((a) => (
+                    <TableRow key={a.id}>
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>
+                        <Typography variant="caption">
+                          {new Date(a.sent_at * 1000).toLocaleString()}
+                        </Typography>
+                      </TableCell>
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>{a.server_name || "—"}</TableCell>
+                      <TableCell>
+                        <Chip
+                          label={a.alert_type}
+                          size="small"
+                          color={a.alert_type === "offline" ? "error" : "warning"}
+                          variant="outlined"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {a.message}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
           )}
         </AccordionDetails>
       </Accordion>
