@@ -120,15 +120,28 @@ def _service_active(name: str) -> bool:
 
 
 def _get_public_ip() -> str | None:
-    for url in ["https://ifconfig.me", "https://api.ipify.org", "https://icanhazip.com"]:
+    for url in [
+        "https://httpbin.org/ip",
+        "https://api.ipify.org",
+        "https://ifconfig.me",
+        "https://icanhazip.com",
+    ]:
         try:
             result = subprocess.run(
-                ["curl", "-4", "-s", "--max-time", "5", url],
-                capture_output=True, text=True, timeout=10,
+                ["curl", "-4", "-s", "--max-time", "3", url],
+                capture_output=True, text=True, timeout=5,
             )
-            ip = result.stdout.strip()
-            if ip:
-                return ip
+            text = result.stdout.strip()
+            if not text:
+                continue
+            if url.endswith("/ip") and text.startswith("{"):
+                import json
+                data = json.loads(text)
+                ip = data.get("origin") or data.get("ip") or ""
+                if ip:
+                    return ip.strip()
+            else:
+                return text
         except Exception:
             continue
     return None
