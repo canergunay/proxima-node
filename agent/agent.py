@@ -120,6 +120,9 @@ def _service_active(name: str) -> bool:
 
 
 def _get_public_ip() -> str | None:
+    import json
+    import re
+    _IP_RE = re.compile(r"^\d{1,3}(\.\d{1,3}){3}$")
     for url in [
         "https://httpbin.org/ip",
         "https://api.ipify.org",
@@ -128,20 +131,21 @@ def _get_public_ip() -> str | None:
     ]:
         try:
             result = subprocess.run(
-                ["curl", "-4", "-s", "--max-time", "3", url],
+                ["curl", "-4", "-s", "-f", "--max-time", "3", url],
                 capture_output=True, text=True, timeout=5,
             )
+            if result.returncode != 0:
+                continue
             text = result.stdout.strip()
             if not text:
                 continue
-            if url.endswith("/ip") and text.startswith("{"):
-                import json
+            if text.startswith("{"):
                 data = json.loads(text)
-                ip = data.get("origin") or data.get("ip") or ""
-                if ip:
-                    return ip.strip()
+                ip = (data.get("origin") or data.get("ip") or "").strip()
             else:
-                return text
+                ip = text.splitlines()[0].strip()
+            if ip and _IP_RE.match(ip):
+                return ip
         except Exception:
             continue
     return None
