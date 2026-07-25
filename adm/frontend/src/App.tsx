@@ -14,6 +14,7 @@ import {
 } from "@mui/material";
 import SettingsIcon from "@mui/icons-material/Settings";
 import LogoutIcon from "@mui/icons-material/Logout";
+import MenuBookIcon from "@mui/icons-material/MenuBook";
 import { useTranslation } from "react-i18next";
 import api from "./api/client";
 import { getToken, setToken, clearToken } from "./auth";
@@ -21,12 +22,13 @@ import type { AuthMe } from "./api/types";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Settings from "./pages/Settings";
+import Docs from "./pages/Docs";
 
 const darkTheme = createTheme({
   palette: { mode: "dark" },
 });
 
-type Page = "dashboard" | "settings";
+type Page = "dashboard" | "settings" | "docs";
 
 export default function App() {
   const { t } = useTranslation();
@@ -121,6 +123,10 @@ export default function App() {
               <SettingsIcon fontSize="small" sx={{ mr: 1 }} />
               {t("common.settings")}
             </MenuItem>
+            <MenuItem onClick={() => { setPage("docs"); setMenuAnchor(null); }}>
+              <MenuBookIcon fontSize="small" sx={{ mr: 1 }} />
+              {t("docs.title")}
+            </MenuItem>
             <MenuItem onClick={handleLogout}>
               <LogoutIcon fontSize="small" sx={{ mr: 1 }} />
               {t("common.logout")}
@@ -131,6 +137,7 @@ export default function App() {
       <Box component="main" sx={{ maxWidth: 1400, mx: "auto", p: { xs: 1, sm: 2 } }}>
         {page === "dashboard" && <Dashboard />}
         {page === "settings" && <Settings onBack={() => setPage("dashboard")} />}
+        {page === "docs" && <Docs onBack={() => setPage("dashboard")} />}
       </Box>
     </ThemeProvider>
   );

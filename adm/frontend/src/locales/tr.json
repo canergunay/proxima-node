@@ -1,5 +1,8 @@
 {
   "app.title": "Proxima ADM",
+  "docs.title": "Dokümantasyon",
+  "docs.notFound": "Doküman bulunamadı",
+  "docs.back": "Geri",
   "login.title": "Giriş Yap",
   "login.username": "Kullanıcı Adı",
   "login.password": "Şifre",

@@ -1,5 +1,8 @@
 {
   "app.title": "Proxima ADM",
+  "docs.title": "Documentation",
+  "docs.notFound": "Document not found",
+  "docs.back": "Back",
   "login.title": "Sign In",
   "login.username": "Username",
   "login.password": "Password",
