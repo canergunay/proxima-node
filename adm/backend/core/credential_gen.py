@@ -17,3 +17,12 @@ def gen_ssconf_token() -> str:
 
 def gen_node_id(hostname: str) -> str:
     return f"proxima-node-{hostname}"
+
+
+# Ambiguous characters (0/O, 1/l/I) removed — these passwords are read off a
+# screen and typed by hand into a VPN client.
+_PWD_ALPHABET = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+
+def gen_vpn_user_password(length: int = 12) -> str:
+    return "".join(secrets.choice(_PWD_ALPHABET) for _ in range(length))

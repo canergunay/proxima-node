@@ -4,54 +4,21 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests as http_requests
-import urllib3
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from flask import Blueprint, jsonify, request
 
-from core.auth import decrypt_value, encrypt_value
+from core.auth import encrypt_value
 from core.db import (
+    count_access_for_server,
     create_vpn_server,
     delete_vpn_server,
     get_all_vpn_servers,
     get_vpn_server,
     update_vpn_server,
 )
+from core.proxima_client import request as _proxima_request
 
 log = logging.getLogger("adm.vpn_servers")
 bp = Blueprint("vpn_servers", __name__)
-
-
-# ── Proxima proxy helpers ────────────────────────────────────────────────
-
-def _proxima_headers(server: dict) -> dict:
-    """Build auth headers for a Proxima instance."""
-    headers = {}
-    enc_token = server.get("api_token_enc")
-    if enc_token:
-        token = decrypt_value(enc_token)
-        if token:
-            headers["Authorization"] = f"Bearer {token}"
-    return headers
-
-
-def _proxima_request(server: dict, method: str, path: str,
-                     body: dict | None = None, timeout: int = 15) -> http_requests.Response:
-    """Forward an HTTP request to a Proxima instance. Returns raw Response."""
-    base_url = server["url"].rstrip("/")
-    url = f"{base_url}{path}"
-    headers = _proxima_headers(server)
-
-    if method == "GET":
-        return http_requests.get(url, headers=headers, timeout=timeout, verify=False)
-    elif method == "POST":
-        return http_requests.post(url, json=body, headers=headers, timeout=timeout, verify=False)
-    elif method == "PUT":
-        return http_requests.put(url, json=body, headers=headers, timeout=timeout, verify=False)
-    elif method == "DELETE":
-        return http_requests.delete(url, headers=headers, timeout=timeout, verify=False)
-    else:
-        raise ValueError(f"Unsupported method: {method}")
 
 
 def _fetch_vpn_server_status(server: dict) -> dict:
@@ -238,6 +205,14 @@ def delete_vpn_server_endpoint(vpn_server_id: int):
     server = get_vpn_server(vpn_server_id)
     if not server:
         return jsonify({"ok": False, "error": "VPN server not found"}), 404
+
+    # Access rows cascade on delete — dropping them here would strand the
+    # matching accounts (and their peers) on the instance itself.
+    authorized = count_access_for_server(vpn_server_id)
+    if authorized:
+        return jsonify({"ok": False, "error":
+                        f"{authorized} VPN user(s) are still authorized on this "
+                        "server — revoke their access first"}), 409
 
     delete_vpn_server(vpn_server_id)
     return jsonify({"ok": True})

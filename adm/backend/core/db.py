@@ -129,6 +129,51 @@ def init_db() -> None:
             sent_at    INTEGER NOT NULL,
             FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE SET NULL
         );
+
+        -- Central VPN user identity. ADM is the sole writer; each Proxima
+        -- instance keeps a read-only replica in its own vpn_users table.
+        -- Only the password hash is stored — plaintext is shown once at
+        -- creation and never persisted.
+        CREATE TABLE IF NOT EXISTS vpn_users (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            username      TEXT NOT NULL UNIQUE,
+            full_name     TEXT NOT NULL DEFAULT '',
+            password_hash TEXT NOT NULL,
+            enabled       INTEGER NOT NULL DEFAULT 1,
+            note          TEXT NOT NULL DEFAULT '',
+            created_at    INTEGER NOT NULL,
+            updated_at    INTEGER NOT NULL
+        );
+
+        -- Which user is authorized on which Proxima instance, plus the
+        -- per-server limits. Limits are per-server by design: group ids and
+        -- quotas are site-local and have no global meaning.
+        -- remote_user_id is the local vpn_users.id on that Proxima — peers
+        -- reference it via peer.owner, so it must never be rewritten.
+        CREATE TABLE IF NOT EXISTS vpn_user_access (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id         INTEGER NOT NULL,
+            vpn_server_id   INTEGER NOT NULL,
+            remote_user_id  INTEGER,
+            enabled         INTEGER NOT NULL DEFAULT 1,
+            max_peers       INTEGER,
+            bandwidth_quota INTEGER,
+            speed_download  TEXT,
+            speed_upload    TEXT,
+            assigned_groups TEXT NOT NULL DEFAULT '[]',
+            sync_status     TEXT NOT NULL DEFAULT 'pending',
+            sync_error      TEXT,
+            synced_at       INTEGER,
+            created_at      INTEGER NOT NULL,
+            updated_at      INTEGER NOT NULL,
+            UNIQUE (user_id, vpn_server_id),
+            FOREIGN KEY (user_id) REFERENCES vpn_users(id) ON DELETE CASCADE,
+            FOREIGN KEY (vpn_server_id) REFERENCES vpn_servers(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_vpn_user_access_user
+            ON vpn_user_access(user_id);
+        CREATE INDEX IF NOT EXISTS idx_vpn_user_access_server
+            ON vpn_user_access(vpn_server_id);
     """)
     conn.commit()
 
@@ -565,3 +610,262 @@ def get_recent_alerts(limit: int = 100) -> list[dict]:
         (limit,),
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+# ── Central VPN user CRUD ────────────────────────────────────────────────
+
+def create_vpn_user(data: dict) -> int:
+    conn = get_conn()
+    ts = int(time.time())
+    cur = conn.execute(
+        "INSERT INTO vpn_users (username, full_name, password_hash, enabled, note, "
+        "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (
+            data["username"], data.get("full_name", ""), data["password_hash"],
+            1 if data.get("enabled", True) else 0, data.get("note", ""), ts, ts,
+        ),
+    )
+    conn.commit()
+    return cur.lastrowid
+
+
+def get_vpn_user(user_id: int) -> dict | None:
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM vpn_users WHERE id = ?", (user_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def get_vpn_user_by_username(username: str) -> dict | None:
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT * FROM vpn_users WHERE username = ?", (username,)
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def get_all_vpn_users() -> list[dict]:
+    conn = get_conn()
+    rows = conn.execute("SELECT * FROM vpn_users ORDER BY username").fetchall()
+    return [dict(r) for r in rows]
+
+
+def update_vpn_user(user_id: int, updates: dict) -> bool:
+    conn = get_conn()
+    allowed = {"username", "full_name", "password_hash", "enabled", "note"}
+    sets, vals = [], []
+    for key, val in updates.items():
+        if key in allowed:
+            sets.append(f"{key} = ?")
+            vals.append(val)
+    if not sets:
+        return False
+    sets.append("updated_at = ?")
+    vals.append(int(time.time()))
+    vals.append(user_id)
+    conn.execute(f"UPDATE vpn_users SET {', '.join(sets)} WHERE id = ?", vals)
+    conn.commit()
+    return True
+
+
+def delete_vpn_user(user_id: int) -> bool:
+    conn = get_conn()
+    cur = conn.execute("DELETE FROM vpn_users WHERE id = ?", (user_id,))
+    conn.commit()
+    return cur.rowcount > 0
+
+
+# ── VPN user ↔ server access CRUD ────────────────────────────────────────
+
+ACCESS_FIELDS = {
+    "enabled", "max_peers", "bandwidth_quota",
+    "speed_download", "speed_upload", "assigned_groups",
+}
+
+
+def get_user_access(user_id: int) -> list[dict]:
+    """All server-access rows for one user, with server display info."""
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT a.*, s.name AS server_name, s.display_name AS server_display_name "
+        "FROM vpn_user_access a "
+        "JOIN vpn_servers s ON a.vpn_server_id = s.id "
+        "WHERE a.user_id = ? ORDER BY s.id",
+        (user_id,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_all_user_access() -> list[dict]:
+    """Every access row — used to build the aggregated user list in one query."""
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT a.*, s.name AS server_name, s.display_name AS server_display_name "
+        "FROM vpn_user_access a "
+        "JOIN vpn_servers s ON a.vpn_server_id = s.id ORDER BY a.user_id, s.id"
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def count_access_for_server(vpn_server_id: int) -> int:
+    """How many users are still authorized on a server."""
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT COUNT(*) AS cnt FROM vpn_user_access WHERE vpn_server_id = ?",
+        (vpn_server_id,),
+    ).fetchone()
+    return row["cnt"] if row else 0
+
+
+def get_access(user_id: int, vpn_server_id: int) -> dict | None:
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT * FROM vpn_user_access WHERE user_id = ? AND vpn_server_id = ?",
+        (user_id, vpn_server_id),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def upsert_user_access(user_id: int, vpn_server_id: int, data: dict) -> int:
+    """Create or update an access row. Any change marks it pending re-sync."""
+    conn = get_conn()
+    ts = int(time.time())
+    existing = get_access(user_id, vpn_server_id)
+
+    if existing:
+        sets, vals = [], []
+        for key, val in data.items():
+            if key in ACCESS_FIELDS or key == "remote_user_id":
+                sets.append(f"{key} = ?")
+                vals.append(val)
+        sets += ["sync_status = 'pending'", "updated_at = ?"]
+        vals += [ts, existing["id"]]
+        conn.execute(
+            f"UPDATE vpn_user_access SET {', '.join(sets)} WHERE id = ?", vals
+        )
+        conn.commit()
+        return existing["id"]
+
+    cur = conn.execute(
+        "INSERT INTO vpn_user_access (user_id, vpn_server_id, remote_user_id, enabled, "
+        "max_peers, bandwidth_quota, speed_download, speed_upload, assigned_groups, "
+        "sync_status, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
+        (
+            user_id, vpn_server_id, data.get("remote_user_id"),
+            1 if data.get("enabled", True) else 0,
+            data.get("max_peers"), data.get("bandwidth_quota"),
+            data.get("speed_download"), data.get("speed_upload"),
+            data.get("assigned_groups", "[]"), ts, ts,
+        ),
+    )
+    conn.commit()
+    return cur.lastrowid
+
+
+def mark_access_pending_delete(user_id: int, vpn_server_id: int) -> bool:
+    """Flag an access row for removal.
+
+    The row is kept until the remote user has actually been deleted on the
+    Proxima instance — dropping it here would orphan the remote account.
+    """
+    conn = get_conn()
+    cur = conn.execute(
+        "UPDATE vpn_user_access SET sync_status = 'pending_delete', updated_at = ? "
+        "WHERE user_id = ? AND vpn_server_id = ?",
+        (int(time.time()), user_id, vpn_server_id),
+    )
+    conn.commit()
+    return cur.rowcount > 0
+
+
+def delete_user_access(user_id: int, vpn_server_id: int) -> bool:
+    """Drop the row outright. Only safe once the remote side is gone."""
+    conn = get_conn()
+    cur = conn.execute(
+        "DELETE FROM vpn_user_access WHERE user_id = ? AND vpn_server_id = ?",
+        (user_id, vpn_server_id),
+    )
+    conn.commit()
+    return cur.rowcount > 0
+
+
+def get_pending_access(vpn_server_id: int | None = None) -> list[dict]:
+    """Access rows awaiting a push ('pending' or 'pending_delete')."""
+    conn = get_conn()
+    sql = (
+        "SELECT a.*, u.username, u.password_hash, u.enabled AS user_enabled, "
+        "s.name AS server_name "
+        "FROM vpn_user_access a "
+        "JOIN vpn_users u ON a.user_id = u.id "
+        "JOIN vpn_servers s ON a.vpn_server_id = s.id "
+        "WHERE a.sync_status IN ('pending', 'pending_delete')"
+    )
+    params: tuple = ()
+    if vpn_server_id is not None:
+        sql += " AND a.vpn_server_id = ?"
+        params = (vpn_server_id,)
+    return [dict(r) for r in conn.execute(sql + " ORDER BY a.id", params).fetchall()]
+
+
+def mark_access_synced(access_id: int, remote_user_id: int | None = None) -> None:
+    conn = get_conn()
+    ts = int(time.time())
+    if remote_user_id is not None:
+        conn.execute(
+            "UPDATE vpn_user_access SET sync_status = 'synced', sync_error = NULL, "
+            "synced_at = ?, remote_user_id = ? WHERE id = ?",
+            (ts, remote_user_id, access_id),
+        )
+    else:
+        conn.execute(
+            "UPDATE vpn_user_access SET sync_status = 'synced', sync_error = NULL, "
+            "synced_at = ? WHERE id = ?",
+            (ts, access_id),
+        )
+    conn.commit()
+
+
+def mark_access_error(access_id: int, error: str) -> None:
+    conn = get_conn()
+    conn.execute(
+        "UPDATE vpn_user_access SET sync_status = 'error', sync_error = ? WHERE id = ?",
+        (error[:500], access_id),
+    )
+    conn.commit()
+
+
+def get_sync_summary() -> dict:
+    """Counts per sync state, plus the rows currently in error."""
+    conn = get_conn()
+    counts = {
+        r["sync_status"]: r["cnt"]
+        for r in conn.execute(
+            "SELECT sync_status, COUNT(*) AS cnt FROM vpn_user_access "
+            "GROUP BY sync_status"
+        ).fetchall()
+    }
+    errors = [dict(r) for r in conn.execute(
+        "SELECT u.username, s.name AS server_name, a.sync_error "
+        "FROM vpn_user_access a "
+        "JOIN vpn_users u ON a.user_id = u.id "
+        "JOIN vpn_servers s ON a.vpn_server_id = s.id "
+        "WHERE a.sync_status = 'error' ORDER BY u.username"
+    ).fetchall()]
+    return {
+        "synced": counts.get("synced", 0),
+        "pending": counts.get("pending", 0),
+        "pending_delete": counts.get("pending_delete", 0),
+        "error": counts.get("error", 0),
+        "errors": errors,
+    }
+
+
+def mark_all_access_pending(user_id: int) -> None:
+    """Called when identity fields (password, enabled) change for a user."""
+    conn = get_conn()
+    conn.execute(
+        "UPDATE vpn_user_access SET sync_status = 'pending', updated_at = ? "
+        "WHERE user_id = ?",
+        (int(time.time()), user_id),
+    )
+    conn.commit()
