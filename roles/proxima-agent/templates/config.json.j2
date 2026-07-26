@@ -1,7 +1,10 @@
+{# Jinja evaluates a default() argument eagerly, so `| default(ansible_hostname)`
+   fails on any fact-less run even when the variable is set in host_vars.
+   Spell the fallbacks out so this template renders with or without facts. #}
 {
     "api_key": "{{ agent_api_key | default('') }}",
-    "server_ip": "{{ server_ip | default(ansible_default_ipv4.address) }}",
-    "node_id": "{{ node_id | default('proxima-node-' + ansible_hostname) }}",
+    "server_ip": "{% if server_ip is defined %}{{ server_ip }}{% else %}{{ ansible_default_ipv4.address }}{% endif %}",
+    "node_id": "{% if node_id is defined %}{{ node_id }}{% else %}proxima-node-{{ ansible_hostname }}{% endif %}",
     "agent_port": {{ agent_port }},
     "ssconf_token": "{{ ssconf_token | default('') }}"{% if healthchecks_url is defined and healthchecks_url %},
     "healthchecks_url": "{{ healthchecks_url }}"{% endif %}
