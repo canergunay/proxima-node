@@ -7,8 +7,10 @@ push that fails leaves the row `pending`/`error` rather than failing the
 request: an unreachable site must not block editing the central record, and
 the sync endpoints re-drive it once the site is back.
 
-Only the password hash is stored. A generated password is returned once, in
-the response that created or reset it, and is never persisted in plaintext.
+Passwords are set by the admin. Only the hash is stored; the plaintext is
+echoed back in the response that set it — so the onboarding block can be
+assembled — and never persisted. One is generated only when a caller omits
+it entirely.
 """
 
 import json
@@ -280,17 +282,24 @@ def edit_user(user_id: int):
 
 
 @bp.post("/api/vpn-users/<int:user_id>/password")
-def reset_password(user_id: int):
-    """Generate a new password and return it once."""
+def set_password(user_id: int):
+    """Set a new password. Generated only when none is supplied."""
     user = get_vpn_user(user_id)
     if not user:
         return jsonify({"ok": False, "error": "User not found"}), 404
 
-    password = gen_vpn_user_password()
+    body = request.get_json(silent=True) or {}
+    password = (body.get("password") or "").strip()
+    if password and len(password) < MIN_PASSWORD_LEN:
+        return jsonify({"ok": False, "error":
+                        f"Password must be at least {MIN_PASSWORD_LEN} characters"}), 400
+    if not password:
+        password = gen_vpn_user_password()
+
     update_vpn_user(user_id, {"password_hash": hash_password(password)})
     mark_all_access_pending(user_id)
 
-    log.info(f"[VPN-USERS] Password reset for '{user['username']}'")
+    log.info(f"[VPN-USERS] Password changed for '{user['username']}'")
     sync = _push_now(user_id)
     return jsonify({"ok": True, "data": {"password": password, "sync": sync}})
 

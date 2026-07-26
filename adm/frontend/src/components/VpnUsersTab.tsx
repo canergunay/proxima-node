@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Box, Button, Chip, CircularProgress, IconButton, Paper, Table, TableBody,
-  TableCell, TableContainer, TableHead, TableRow, TextField, Tooltip,
-  Typography, Alert, Snackbar,
+  Alert, Box, Button, Chip, CircularProgress, IconButton, MenuItem, Paper,
+  Select, Snackbar, Table, TableBody, TableCell, TableContainer, TableHead,
+  TableRow, TableSortLabel, TextField, Tooltip, Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -17,10 +17,18 @@ import type { SyncSummary, VpnServer, VpnUser, VpnUserAccess } from "../api/type
 import VpnUserDialog from "./VpnUserDialog";
 import ConfirmRevokeDialog from "./ConfirmRevokeDialog";
 
-/** Cell state derived from the access row (or its absence). */
 function cellOf(user: VpnUser, serverId: number): VpnUserAccess | undefined {
   return user.servers.find((s) => s.vpn_server_id === serverId);
 }
+
+/** Rank a cell so sorting reads top-to-bottom as "most access first". */
+function cellRank(cell: VpnUserAccess | undefined): number {
+  if (!cell) return 0;
+  return cell.lan_access ? 2 : 1;
+}
+
+type SortKey = string; // "username" | "enabled" | `server:${id}`
+type ServerFilter = "" | "granted" | "not" | "lan_on" | "lan_off" | "pending";
 
 export default function VpnUsersTab() {
   const { t } = useTranslation();
@@ -29,10 +37,16 @@ export default function VpnUsersTab() {
   const [summary, setSummary] = useState<SyncSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
   const [dialogUser, setDialogUser] = useState<VpnUser | null | "new">(null);
   const [revoking, setRevoking] = useState<{ user: VpnUser; server: VpnServer } | null>(null);
   const [snack, setSnack] = useState<{ msg: string; error?: boolean } | null>(null);
+
+  // Column state
+  const [sortKey, setSortKey] = useState<SortKey>("username");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [fUser, setFUser] = useState("");
+  const [fEnabled, setFEnabled] = useState<"" | "on" | "off">("");
+  const [fServer, setFServer] = useState<Record<number, ServerFilter>>({});
 
   const fetchAll = useCallback(async () => {
     try {
@@ -50,19 +64,58 @@ export default function VpnUsersTab() {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return users;
-    return users.filter(
-      (u) => u.username.toLowerCase().includes(q) || u.full_name.toLowerCase().includes(q),
-    );
-  }, [users, search]);
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(key); setSortDir("asc"); }
+  };
 
-  /** Report what the immediate push did, so a silent failure is impossible. */
+  const visible = useMemo(() => {
+    const q = fUser.trim().toLowerCase();
+
+    const rows = users.filter((u) => {
+      if (q && !u.username.toLowerCase().includes(q) && !u.full_name.toLowerCase().includes(q)) {
+        return false;
+      }
+      if (fEnabled === "on" && !u.enabled) return false;
+      if (fEnabled === "off" && u.enabled) return false;
+
+      for (const s of servers) {
+        const f = fServer[s.id];
+        if (!f) continue;
+        const cell = cellOf(u, s.id);
+        if (f === "granted" && !cell) return false;
+        if (f === "not" && cell) return false;
+        if (f === "lan_on" && !(cell && cell.lan_access)) return false;
+        if (f === "lan_off" && !(cell && !cell.lan_access)) return false;
+        if (f === "pending" && !(cell && cell.sync_status !== "synced")) return false;
+      }
+      return true;
+    });
+
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      if (sortKey === "enabled") {
+        return (Number(a.enabled) - Number(b.enabled)) * dir
+          || a.username.localeCompare(b.username);
+      }
+      if (sortKey.startsWith("server:")) {
+        const id = Number(sortKey.slice(7));
+        return (cellRank(cellOf(a, id)) - cellRank(cellOf(b, id))) * dir
+          || a.username.localeCompare(b.username);
+      }
+      return a.username.localeCompare(b.username) * dir;
+    });
+  }, [users, servers, fUser, fEnabled, fServer, sortKey, sortDir]);
+
   const reportSync = (sync?: { failed?: { target: string; error: string }[] }) => {
     const failed = sync?.failed ?? [];
     if (failed.length) {
-      setSnack({ msg: t("vpnUsers.syncFailed", { detail: failed.map((f) => `${f.target}: ${f.error}`).join(", ") }), error: true });
+      setSnack({
+        msg: t("vpnUsers.syncFailed", {
+          detail: failed.map((f) => `${f.target}: ${f.error}`).join(", "),
+        }),
+        error: true,
+      });
     }
   };
 
@@ -119,31 +172,33 @@ export default function VpnUsersTab() {
     return <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}><CircularProgress size={28} /></Box>;
   }
 
-  const waiting = (summary?.pending ?? 0) + (summary?.pending_delete ?? 0) + (summary?.error ?? 0);
+  const waiting = (summary?.pending ?? 0) + (summary?.pending_delete ?? 0);
+  const filtersOn = Boolean(fUser || fEnabled || Object.values(fServer).some(Boolean));
+  const selectSx = { minWidth: 120, "& .MuiSelect-select": { py: 0.5, fontSize: 13 } };
 
   return (
     <Box>
       <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap", mb: 2 }}>
-        <TextField
-          size="small"
-          placeholder={t("vpnUsers.search")}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          sx={{ minWidth: 220 }}
-        />
+        <Typography variant="body2" color="text.secondary">
+          {filtersOn
+            ? t("vpnUsers.countFiltered", { shown: visible.length, total: users.length })
+            : t("vpnUsers.count", { count: users.length })}
+        </Typography>
+        {filtersOn && (
+          <Button size="small" onClick={() => { setFUser(""); setFEnabled(""); setFServer({}); }}>
+            {t("vpnUsers.clearFilters")}
+          </Button>
+        )}
         <Box sx={{ flexGrow: 1 }} />
         {waiting > 0 && (
-          <Chip
-            size="small"
-            color={summary?.error ? "error" : "warning"}
-            label={t("vpnUsers.waiting", { count: waiting })}
-          />
+          <Chip size="small" color="warning" label={t("vpnUsers.waiting", { count: waiting })} />
+        )}
+        {(summary?.error ?? 0) > 0 && (
+          <Chip size="small" color="error" label={t("vpnUsers.failed", { count: summary!.error })} />
         )}
         <Tooltip title={t("vpnUsers.syncNow")}>
           <span>
-            <IconButton onClick={syncAll} disabled={busy === "sync"}>
-              <SyncIcon />
-            </IconButton>
+            <IconButton onClick={syncAll} disabled={busy === "sync"}><SyncIcon /></IconButton>
           </span>
         </Tooltip>
         <Tooltip title={t("dashboard.refresh")}>
@@ -167,19 +222,89 @@ export default function VpnUsersTab() {
           <Table size="small" stickyHeader>
             <TableHead>
               <TableRow>
-                <TableCell sx={{ minWidth: 180 }}>{t("vpnUsers.user")}</TableCell>
+                <TableCell sx={{ minWidth: 200 }}>
+                  <TableSortLabel
+                    active={sortKey === "username"}
+                    direction={sortKey === "username" ? sortDir : "asc"}
+                    onClick={() => toggleSort("username")}
+                  >
+                    {t("vpnUsers.user")}
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell sx={{ minWidth: 120 }}>
+                  <TableSortLabel
+                    active={sortKey === "enabled"}
+                    direction={sortKey === "enabled" ? sortDir : "asc"}
+                    onClick={() => toggleSort("enabled")}
+                  >
+                    {t("vpnUsers.status")}
+                  </TableSortLabel>
+                </TableCell>
                 {servers.map((s) => (
-                  <TableCell key={s.id} align="center" sx={{ minWidth: 110 }}>
-                    {s.display_name}
-                    <Typography variant="caption" sx={{ display: "block", color: "text.secondary" }}>
-                      {t("vpnUsers.accessLan")}
-                    </Typography>
+                  <TableCell key={s.id} align="center" sx={{ minWidth: 150 }}>
+                    <TableSortLabel
+                      active={sortKey === `server:${s.id}`}
+                      direction={sortKey === `server:${s.id}` ? sortDir : "asc"}
+                      onClick={() => toggleSort(`server:${s.id}`)}
+                    >
+                      {s.display_name}
+                    </TableSortLabel>
+                  </TableCell>
+                ))}
+              </TableRow>
+
+              {/* Filter row — one control per column, mirroring the header. */}
+              <TableRow>
+                <TableCell sx={{ py: 0.5 }}>
+                  <TextField
+                    size="small"
+                    fullWidth
+                    placeholder={t("vpnUsers.search")}
+                    value={fUser}
+                    onChange={(e) => setFUser(e.target.value)}
+                    slotProps={{ input: { sx: { fontSize: 13 } } }}
+                  />
+                </TableCell>
+                <TableCell sx={{ py: 0.5 }}>
+                  <Select
+                    size="small"
+                    fullWidth
+                    displayEmpty
+                    value={fEnabled}
+                    onChange={(e) => setFEnabled(e.target.value as typeof fEnabled)}
+                    sx={selectSx}
+                  >
+                    <MenuItem value="">{t("vpnUsers.filterAllStatus")}</MenuItem>
+                    <MenuItem value="on">{t("vpnUsers.filterEnabled")}</MenuItem>
+                    <MenuItem value="off">{t("vpnUsers.filterDisabled")}</MenuItem>
+                  </Select>
+                </TableCell>
+                {servers.map((s) => (
+                  <TableCell key={s.id} align="center" sx={{ py: 0.5 }}>
+                    <Select
+                      size="small"
+                      fullWidth
+                      displayEmpty
+                      value={fServer[s.id] ?? ""}
+                      onChange={(e) =>
+                        setFServer((f) => ({ ...f, [s.id]: e.target.value as ServerFilter }))
+                      }
+                      sx={selectSx}
+                    >
+                      <MenuItem value="">{t("vpnUsers.filterAll")}</MenuItem>
+                      <MenuItem value="granted">{t("vpnUsers.filterGranted")}</MenuItem>
+                      <MenuItem value="not">{t("vpnUsers.filterNotGranted")}</MenuItem>
+                      <MenuItem value="lan_on">{t("vpnUsers.filterLanOn")}</MenuItem>
+                      <MenuItem value="lan_off">{t("vpnUsers.filterLanOff")}</MenuItem>
+                      <MenuItem value="pending">{t("vpnUsers.filterPending")}</MenuItem>
+                    </Select>
                   </TableCell>
                 ))}
               </TableRow>
             </TableHead>
+
             <TableBody>
-              {filtered.map((u) => (
+              {visible.map((u) => (
                 <TableRow key={u.id} hover>
                   <TableCell>
                     <Box
@@ -187,9 +312,7 @@ export default function VpnUsersTab() {
                       onClick={() => setDialogUser(u)}
                       sx={{
                         background: "none", border: 0, p: 0, cursor: "pointer",
-                        color: u.enabled ? "primary.main" : "text.disabled",
-                        textAlign: "left", font: "inherit",
-                        textDecoration: u.enabled ? "none" : "line-through",
+                        color: "primary.main", textAlign: "left", font: "inherit",
                       }}
                     >
                       {u.username}
@@ -199,6 +322,15 @@ export default function VpnUsersTab() {
                         {u.full_name}
                       </Typography>
                     )}
+                  </TableCell>
+
+                  <TableCell>
+                    <Chip
+                      size="small"
+                      color={u.enabled ? "success" : "default"}
+                      variant={u.enabled ? "filled" : "outlined"}
+                      label={u.enabled ? t("vpnUsers.filterEnabled") : t("vpnUsers.filterDisabled")}
+                    />
                   </TableCell>
 
                   {servers.map((s) => {
@@ -239,9 +371,9 @@ export default function VpnUsersTab() {
                   })}
                 </TableRow>
               ))}
-              {filtered.length === 0 && (
+              {visible.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={servers.length + 1}>
+                  <TableCell colSpan={servers.length + 2}>
                     <Typography color="text.secondary" sx={{ py: 2, textAlign: "center" }}>
                       {t("vpnUsers.noUsers")}
                     </Typography>
