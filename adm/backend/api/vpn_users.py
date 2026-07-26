@@ -1,9 +1,11 @@
 """Central VPN user management — ADM is the sole writer.
 
 Each Proxima instance holds a read-only replica of these users in its own
-`vpn_users` table. Writes here only touch the ADM database and mark the
-affected access rows `pending`; pushing them to the Proxima instances is a
-separate step (see api/vpn_user_sync.py).
+`vpn_users` table. Every mutation here writes to the ADM database and then
+immediately tries to push the affected rows (see core/vpn_user_sync.py). A
+push that fails leaves the row `pending`/`error` rather than failing the
+request: an unreachable site must not block editing the central record, and
+the sync endpoints re-drive it once the site is back.
 
 Only the password hash is stored. A generated password is returned once, in
 the response that created or reset it, and is never persisted in plaintext.
@@ -81,6 +83,22 @@ def _public_access(a: dict) -> dict:
         "sync_error": a["sync_error"],
         "synced_at": a["synced_at"],
     }
+
+
+def _push_now(user_id: int) -> dict:
+    """Push a user's pending rows immediately (hybrid sync).
+
+    Every mutation tries to reach the instances right away, so the admin sees
+    the result while still looking at the change. A failure is not raised: the
+    row stays pending/error and the UI surfaces it, because an unreachable
+    site must not block editing the central record.
+    """
+    try:
+        result = sync_pending(user_id=user_id)
+    except Exception as e:  # noqa: BLE001 — reported, never fatal
+        log.error(f"[VPN-USERS] Immediate sync failed for user {user_id}: {e}")
+        return {"failed": [{"target": "sync", "error": str(e)}]}
+    return result
 
 
 def _parse_access_body(body: dict) -> tuple[dict | None, str | None]:
@@ -178,9 +196,11 @@ def add_user():
         upsert_user_access(user_id, server_id, data)
 
     log.info(f"[VPN-USERS] Created central user '{username}' (id={user_id})")
+    sync = _push_now(user_id)
     user = get_vpn_user(user_id)
     result = _public_user(user, get_user_access(user_id))
     result["password"] = password  # shown once, never stored in plaintext
+    result["sync"] = sync
     return jsonify({"ok": True, "data": result}), 201
 
 
@@ -251,9 +271,11 @@ def edit_user(user_id: int):
 
     log.info(f"[VPN-USERS] Updated central user '{user['username']}' "
              f"({', '.join(sorted(updates))})")
+    sync = _push_now(user_id)
     result = _public_user(get_vpn_user(user_id), get_user_access(user_id))
     if new_password:
         result["password"] = new_password
+    result["sync"] = sync
     return jsonify({"ok": True, "data": result})
 
 
@@ -269,7 +291,8 @@ def reset_password(user_id: int):
     mark_all_access_pending(user_id)
 
     log.info(f"[VPN-USERS] Password reset for '{user['username']}'")
-    return jsonify({"ok": True, "data": {"password": password}})
+    sync = _push_now(user_id)
+    return jsonify({"ok": True, "data": {"password": password, "sync": sync}})
 
 
 @bp.delete("/api/vpn-users/<int:user_id>")
@@ -361,10 +384,13 @@ def grant_access(user_id: int, vpn_server_id: int):
         return jsonify({"ok": False, "error": err}), 400
 
     upsert_user_access(user_id, vpn_server_id, data)
+    sync = _push_now(user_id)
     access = get_access(user_id, vpn_server_id)
+    if not access:  # pushed and then removed (revoke raced) — nothing to show
+        return jsonify({"ok": True, "data": {"sync": sync}})
     access["server_name"] = server["name"]
     access["server_display_name"] = server["display_name"]
-    return jsonify({"ok": True, "data": _public_access(access)})
+    return jsonify({"ok": True, "data": {**_public_access(access), "sync": sync}})
 
 
 @bp.delete("/api/vpn-users/<int:user_id>/access/<int:vpn_server_id>")
@@ -392,10 +418,12 @@ def revoke_access(user_id: int, vpn_server_id: int):
         }})
 
     mark_access_pending_delete(user_id, vpn_server_id)
+    sync = _push_now(user_id)
+    still_pending = get_access(user_id, vpn_server_id) is not None
     return jsonify({"ok": True, "data": {
-        "message": "Access revoked — the next sync deletes the remote account "
-                   "and its peers",
-        "pending_sync": True,
+        "message": "Access revoked — the remote account and its peers are removed",
+        "pending_sync": still_pending,
         "deletes_peers": True,
         "remote_user_id": access["remote_user_id"],
+        "sync": sync,
     }})

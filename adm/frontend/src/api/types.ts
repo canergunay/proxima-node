@@ -233,3 +233,53 @@ export interface PreflightData {
   conflicts: PreflightConflict[];
   ssh_ok: boolean;
 }
+
+// ── Central VPN users ────────────────────────────────────────────────────
+
+export interface VpnUserAccess {
+  vpn_server_id: number;
+  server_name: string;
+  server_display_name: string;
+  remote_user_id: number | null;
+  enabled: boolean;
+  lan_access: boolean;
+  max_peers: number | null;
+  bandwidth_quota: number | null;
+  speed_download: string | null;
+  speed_upload: string | null;
+  assigned_groups: string[];
+  sync_status: "synced" | "pending" | "pending_delete" | "error";
+  sync_error: string | null;
+  synced_at: number | null;
+}
+
+export interface VpnUser {
+  id: number;
+  username: string;
+  full_name: string;
+  enabled: boolean;
+  note: string;
+  created_at: number;
+  updated_at: number;
+  servers: VpnUserAccess[];
+  /** Only present in the response that created or reset it. */
+  password?: string;
+  sync?: SyncResult;
+}
+
+export interface SyncResult {
+  created?: string[];
+  adopted?: string[];
+  updated?: string[];
+  recreated?: string[];
+  removed?: string[];
+  failed?: { target: string; error: string; action?: string }[];
+}
+
+export interface SyncSummary {
+  synced: number;
+  pending: number;
+  pending_delete: number;
+  error: number;
+  errors: { username: string; server_name: string; sync_error: string }[];
+}

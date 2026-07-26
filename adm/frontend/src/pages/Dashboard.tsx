@@ -14,6 +14,7 @@ import VpnServerCard from "../components/VpnServerCard";
 import AddVpnServerDialog from "../components/AddVpnServerDialog";
 import VpnServerDetailDialog from "../components/VpnServerDetailDialog";
 import MonitoringTab from "../components/MonitoringTab";
+import VpnUsersTab from "../components/VpnUsersTab";
 
 export default function Dashboard() {
   const { t } = useTranslation();
@@ -78,7 +79,9 @@ export default function Dashboard() {
           {t("dashboard.title")}
         </Typography>
         <Box sx={{ display: "flex", gap: 1 }}>
-          {tab !== 2 && (
+          {/* Only the server tabs use this toolbar; Users and Monitoring
+              bring their own. */}
+          {tab < 2 && (
             <Button
               startIcon={<RefreshIcon />}
               onClick={() => {
@@ -123,6 +126,7 @@ export default function Dashboard() {
       >
         <Tab label={t("dashboard.tabExitServers")} />
         <Tab label={t("dashboard.tabVpnServers")} />
+        <Tab label={t("dashboard.tabUsers")} />
         <Tab label={t("dashboard.tabMonitoring")} />
       </Tabs>
 
@@ -209,7 +213,8 @@ export default function Dashboard() {
       )}
 
       {/* ── Tab 2: Monitoring ──────────────────────── */}
-      {tab === 2 && <MonitoringTab />}
+      {tab === 2 && <VpnUsersTab />}
+      {tab === 3 && <MonitoringTab />}
     </Box>
   );
 }

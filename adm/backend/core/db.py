@@ -830,16 +830,28 @@ def mark_access_synced(access_id: int, remote_user_id: int | None = None) -> Non
 
 
 def mark_access_error(access_id: int, error: str) -> None:
+    """Record a failed push without losing what still has to be done.
+
+    sync_status stays the *intent* ('pending' or 'pending_delete') so the row
+    is picked up again on the next attempt — an error is a pending row that
+    has not succeeded yet, not a state of its own. Overwriting the status
+    would both strand the row forever and, for a revocation, forget that a
+    remote account was supposed to be deleted.
+    """
     conn = get_conn()
     conn.execute(
-        "UPDATE vpn_user_access SET sync_status = 'error', sync_error = ? WHERE id = ?",
+        "UPDATE vpn_user_access SET sync_error = ? WHERE id = ?",
         (error[:500], access_id),
     )
     conn.commit()
 
 
 def get_sync_summary() -> dict:
-    """Counts per sync state, plus the rows currently in error."""
+    """Counts per sync state, plus the rows whose last push failed.
+
+    'error' is not a status but an attribute of a still-pending row, so it is
+    counted from sync_error rather than from sync_status.
+    """
     conn = get_conn()
     counts = {
         r["sync_status"]: r["cnt"]
@@ -853,13 +865,14 @@ def get_sync_summary() -> dict:
         "FROM vpn_user_access a "
         "JOIN vpn_users u ON a.user_id = u.id "
         "JOIN vpn_servers s ON a.vpn_server_id = s.id "
-        "WHERE a.sync_status = 'error' ORDER BY u.username"
+        "WHERE a.sync_error IS NOT NULL AND a.sync_status != 'synced' "
+        "ORDER BY u.username"
     ).fetchall()]
     return {
         "synced": counts.get("synced", 0),
         "pending": counts.get("pending", 0),
         "pending_delete": counts.get("pending_delete", 0),
-        "error": counts.get("error", 0),
+        "error": len(errors),
         "errors": errors,
     }
 
