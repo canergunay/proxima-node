@@ -23,6 +23,7 @@ from core.db import (
     delete_user_access,
     get_all_vpn_servers,
     get_pending_access,
+    get_user_access,
     mark_access_error,
     mark_access_synced,
 )
@@ -66,6 +67,49 @@ def _password_is_ours(row: dict) -> bool:
     return changed > synced
 
 
+def _password_for_new_grant(row: dict, servers: dict) -> str:
+    """The hash to seed a brand-new account on a site with.
+
+    ADM's stored hash is not always the current one: a user may have changed
+    their password from the client since it was issued. Adding them to a
+    second site should give them the password they actually use, so the hash
+    is copied from a site they already have — which carries the password
+    without ADM ever learning it.
+
+    ADM's own hash wins when the admin set a password that has not reached
+    any site yet; that is a deliberate reset and must not be undone.
+    """
+    access = get_user_access(row["user_id"])
+    synced = [
+        a for a in access
+        if a["vpn_server_id"] != row["vpn_server_id"]
+        and a.get("remote_user_id") is not None
+        and a["sync_status"] == "synced"
+    ]
+    if not synced:
+        return row["password_hash"]
+
+    changed = row.get("password_changed_at") or 0
+    last_push = max((a.get("password_synced_at") or 0) for a in synced)
+    if changed > last_push:
+        return row["password_hash"]
+
+    for a in synced:
+        srv = servers.get(a["vpn_server_id"])
+        if not srv:
+            continue
+        data, error = call(srv, "GET", "/api/vpn/users", timeout=20)
+        if error or not isinstance(data, list):
+            continue
+        for user in data:
+            if user.get("username") == row["username"] and user.get("password_hash"):
+                log.info(f"[SYNC] Seeding '{row['username']}' from {a['server_name']} "
+                         "so the password they use today keeps working")
+                return user["password_hash"]
+
+    return row["password_hash"]
+
+
 def _find_remote_by_username(server: dict, username: str) -> int | None:
     """Look up an existing remote account by username."""
     data, error = call(server, "GET", "/api/vpn/users", timeout=20)
@@ -96,8 +140,11 @@ def _push_delete(server: dict, row: dict) -> tuple[bool, str | None, str]:
     return True, None, "removed"
 
 
-def _push_create(server: dict, row: dict) -> tuple[bool, str | None, str]:
-    body = {"username": row["username"], "password_hash": row["password_hash"]}
+def _push_create(server: dict, row: dict, servers: dict) -> tuple[bool, str | None, str]:
+    body = {
+        "username": row["username"],
+        "password_hash": _password_for_new_grant(row, servers),
+    }
     body.update(_remote_payload(row))
 
     data, error = call(server, "POST", "/api/vpn/users", body=body, timeout=30)
@@ -109,7 +156,7 @@ def _push_create(server: dict, row: dict) -> tuple[bool, str | None, str]:
         remote_id = _find_remote_by_username(server, row["username"])
         if remote_id is None:
             return False, "Remote user exists but could not be located", "adopted"
-        ok, err, _ = _push_update(server, {**row, "remote_user_id": remote_id})
+        ok, err, _ = _push_update(server, {**row, "remote_user_id": remote_id}, servers)
         return ok, err, "adopted"
 
     if error:
@@ -132,7 +179,7 @@ def _push_create(server: dict, row: dict) -> tuple[bool, str | None, str]:
     return True, None, "created"
 
 
-def _push_update(server: dict, row: dict) -> tuple[bool, str | None, str]:
+def _push_update(server: dict, row: dict, servers: dict) -> tuple[bool, str | None, str]:
     remote_id = row["remote_user_id"]
     send_password = _password_is_ours(row)
     body = {"enabled": _effective_enabled(row)}
@@ -146,7 +193,7 @@ def _push_update(server: dict, row: dict) -> tuple[bool, str | None, str]:
         # Deleted on the instance behind ADM's back — recreate it.
         log.warning(f"[SYNC] '{row['username']}' missing on {row['server_name']}, "
                     "recreating")
-        ok, err, _ = _push_create(server, {**row, "remote_user_id": None})
+        ok, err, _ = _push_create(server, {**row, "remote_user_id": None}, servers)
         return ok, err, "recreated"
 
     if error:
@@ -187,9 +234,9 @@ def sync_pending(vpn_server_id: int | None = None,
         if row["sync_status"] == "pending_delete":
             ok, error, action = _push_delete(server, row)
         elif row.get("remote_user_id") is None:
-            ok, error, action = _push_create(server, row)
+            ok, error, action = _push_create(server, row, servers)
         else:
-            ok, error, action = _push_update(server, row)
+            ok, error, action = _push_update(server, row, servers)
 
         if ok:
             done[action].append(label)
