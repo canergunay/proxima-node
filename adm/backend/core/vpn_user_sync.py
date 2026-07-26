@@ -1,8 +1,13 @@
 """Push central VPN users down to the Proxima instances.
 
-ADM is the only writer, so this is a one-way reconciliation: every access row
-marked `pending` is created or updated on its instance, and every row marked
-`pending_delete` has its remote account removed.
+Every access row marked `pending` is created or updated on its instance, and
+every row marked `pending_delete` has its remote account removed.
+
+Ownership is split rather than exclusive. ADM decides who exists, where they
+are authorized, and the limits; the user owns their own devices and may
+change their own password from the client. So the push is authoritative for
+every field *except* the password, which it carries only when ADM set it more
+recently than the last push delivered one — see _password_is_ours.
 
 Revocation deletes the remote account **with its peers**. A WireGuard peer
 keeps working on its own keys regardless of whether the owning account still
@@ -45,6 +50,20 @@ def _remote_payload(row: dict) -> dict:
 def _effective_enabled(row: dict) -> bool:
     """A user is active on a server only if both the account and the grant are."""
     return bool(row["user_enabled"]) and bool(row["enabled"])
+
+
+def _password_is_ours(row: dict) -> bool:
+    """Should this push carry the password?
+
+    Only when ADM set it more recently than the last push that delivered it.
+    Users may change their own password from the client, and a push triggered
+    by something unrelated — a peer limit, a LAN toggle — must not silently
+    put the old one back. An admin who sets a new password bumps the stamp
+    and wins on the next push, which is the intended precedence.
+    """
+    changed = row.get("password_changed_at") or 0
+    synced = row.get("password_synced_at") or 0
+    return changed > synced
 
 
 def _find_remote_by_username(server: dict, username: str) -> int | None:
@@ -107,7 +126,7 @@ def _push_create(server: dict, row: dict) -> tuple[bool, str | None, str]:
         if err:
             return False, f"Created but could not disable: {err}", "created"
 
-    mark_access_synced(row["id"], remote_user_id=remote_id)
+    mark_access_synced(row["id"], remote_user_id=remote_id, password_pushed=True)
     log.info(f"[SYNC] Created '{row['username']}' on {row['server_name']} "
              f"(remote id {remote_id})")
     return True, None, "created"
@@ -115,10 +134,10 @@ def _push_create(server: dict, row: dict) -> tuple[bool, str | None, str]:
 
 def _push_update(server: dict, row: dict) -> tuple[bool, str | None, str]:
     remote_id = row["remote_user_id"]
-    body = {
-        "password_hash": row["password_hash"],
-        "enabled": _effective_enabled(row),
-    }
+    send_password = _password_is_ours(row)
+    body = {"enabled": _effective_enabled(row)}
+    if send_password:
+        body["password_hash"] = row["password_hash"]
     body.update(_remote_payload(row))
 
     _, error = call(server, "PUT", f"/api/vpn/users/{remote_id}", body=body, timeout=30)
@@ -133,8 +152,10 @@ def _push_update(server: dict, row: dict) -> tuple[bool, str | None, str]:
     if error:
         return False, error, "updated"
 
-    mark_access_synced(row["id"], remote_user_id=remote_id)
-    log.info(f"[SYNC] Updated '{row['username']}' on {row['server_name']}")
+    mark_access_synced(row["id"], remote_user_id=remote_id,
+                       password_pushed=send_password)
+    log.info(f"[SYNC] Updated '{row['username']}' on {row['server_name']}"
+             + ("" if send_password else " (password left as-is)"))
     return True, None, "updated"
 
 

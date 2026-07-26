@@ -141,6 +141,10 @@ def init_db() -> None:
             password_hash TEXT NOT NULL,
             enabled       INTEGER NOT NULL DEFAULT 1,
             note          TEXT NOT NULL DEFAULT '',
+            -- When ADM last set the password. Compared against each access
+            -- row's password_synced_at to decide whether a push should carry
+            -- it; a user may have changed theirs on the instance since.
+            password_changed_at INTEGER,
             created_at    INTEGER NOT NULL,
             updated_at    INTEGER NOT NULL
         );
@@ -167,6 +171,7 @@ def init_db() -> None:
             sync_status     TEXT NOT NULL DEFAULT 'pending',
             sync_error      TEXT,
             synced_at       INTEGER,
+            password_synced_at INTEGER,
             created_at      INTEGER NOT NULL,
             updated_at      INTEGER NOT NULL,
             UNIQUE (user_id, vpn_server_id),
@@ -186,6 +191,28 @@ def init_db() -> None:
 
 def _migrate(conn: sqlite3.Connection) -> None:
     """Run schema migrations for columns added after initial release."""
+    # Password ownership is shared: ADM sets it, and a user may change their
+    # own from the client. Tracking when each side last wrote lets a push
+    # carry the password only when ADM's copy is the newer one, so routine
+    # limit changes stop clobbering a password the user just chose.
+    user_cols = {r[1] for r in conn.execute("PRAGMA table_info(vpn_users)").fetchall()}
+    if user_cols and "password_changed_at" not in user_cols:
+        conn.execute("ALTER TABLE vpn_users ADD COLUMN password_changed_at INTEGER")
+        conn.execute("UPDATE vpn_users SET password_changed_at = updated_at")
+        conn.commit()
+
+    access_cols = {r[1] for r in conn.execute(
+        "PRAGMA table_info(vpn_user_access)").fetchall()}
+    if access_cols and "password_synced_at" not in access_cols:
+        conn.execute("ALTER TABLE vpn_user_access ADD COLUMN password_synced_at INTEGER")
+        # Rows already in sync hold the password ADM knows about, so mark them
+        # current rather than forcing a pointless first push.
+        conn.execute(
+            "UPDATE vpn_user_access SET password_synced_at = updated_at "
+            "WHERE sync_status = 'synced'"
+        )
+        conn.commit()
+
     cols = {row[1] for row in conn.execute("PRAGMA table_info(servers)").fetchall()}
     if "ssh_port" not in cols:
         conn.execute("ALTER TABLE servers ADD COLUMN ssh_port INTEGER NOT NULL DEFAULT 22")
@@ -622,10 +649,10 @@ def create_vpn_user(data: dict) -> int:
     ts = int(time.time())
     cur = conn.execute(
         "INSERT INTO vpn_users (username, full_name, password_hash, enabled, note, "
-        "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "password_changed_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         (
             data["username"], data.get("full_name", ""), data["password_hash"],
-            1 if data.get("enabled", True) else 0, data.get("note", ""), ts, ts,
+            1 if data.get("enabled", True) else 0, data.get("note", ""), ts, ts, ts,
         ),
     )
     conn.commit()
@@ -662,8 +689,12 @@ def update_vpn_user(user_id: int, updates: dict) -> bool:
             vals.append(val)
     if not sets:
         return False
+    now = int(time.time())
+    if "password_hash" in updates:
+        sets.append("password_changed_at = ?")
+        vals.append(now)
     sets.append("updated_at = ?")
-    vals.append(int(time.time()))
+    vals.append(now)
     vals.append(user_id)
     conn.execute(f"UPDATE vpn_users SET {', '.join(sets)} WHERE id = ?", vals)
     conn.commit()
@@ -798,7 +829,7 @@ def get_pending_access(vpn_server_id: int | None = None) -> list[dict]:
     conn = get_conn()
     sql = (
         "SELECT a.*, u.username, u.password_hash, u.enabled AS user_enabled, "
-        "s.name AS server_name "
+        "u.password_changed_at, s.name AS server_name "
         "FROM vpn_user_access a "
         "JOIN vpn_users u ON a.user_id = u.id "
         "JOIN vpn_servers s ON a.vpn_server_id = s.id "
@@ -811,21 +842,26 @@ def get_pending_access(vpn_server_id: int | None = None) -> list[dict]:
     return [dict(r) for r in conn.execute(sql + " ORDER BY a.id", params).fetchall()]
 
 
-def mark_access_synced(access_id: int, remote_user_id: int | None = None) -> None:
+def mark_access_synced(access_id: int, remote_user_id: int | None = None,
+                       password_pushed: bool = False) -> None:
+    """Record a successful push.
+
+    password_pushed records that this push carried the password, which is
+    what lets a later push skip it — and so leave a password the user changed
+    on the instance alone.
+    """
     conn = get_conn()
     ts = int(time.time())
+    sets = ["sync_status = 'synced'", "sync_error = NULL", "synced_at = ?"]
+    vals: list = [ts]
     if remote_user_id is not None:
-        conn.execute(
-            "UPDATE vpn_user_access SET sync_status = 'synced', sync_error = NULL, "
-            "synced_at = ?, remote_user_id = ? WHERE id = ?",
-            (ts, remote_user_id, access_id),
-        )
-    else:
-        conn.execute(
-            "UPDATE vpn_user_access SET sync_status = 'synced', sync_error = NULL, "
-            "synced_at = ? WHERE id = ?",
-            (ts, access_id),
-        )
+        sets.append("remote_user_id = ?")
+        vals.append(remote_user_id)
+    if password_pushed:
+        sets.append("password_synced_at = ?")
+        vals.append(ts)
+    vals.append(access_id)
+    conn.execute(f"UPDATE vpn_user_access SET {', '.join(sets)} WHERE id = ?", vals)
     conn.commit()
 
 
