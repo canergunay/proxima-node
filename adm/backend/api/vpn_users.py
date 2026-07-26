@@ -1,4 +1,4 @@
-"""Central VPN user management — ADM is the sole writer.
+"""Central VPN user management — ADM defines accounts, instances replicate them.
 
 Each Proxima instance holds a read-only replica of these users in its own
 `vpn_users` table. Every mutation here writes to the ADM database and then
@@ -39,7 +39,7 @@ from core.db import (
     upsert_user_access,
 )
 from core.vpn_user_import import apply_import, build_preview
-from core.vpn_user_sync import sync_pending
+from core.vpn_user_sync import reconcile_passwords, sync_pending
 
 log = logging.getLogger("adm.vpn_users")
 bp = Blueprint("vpn_users", __name__)
@@ -335,6 +335,12 @@ def remove_user(user_id: int):
 def sync_status():
     """How many access rows are waiting to be pushed, and what failed."""
     return jsonify({"ok": True, "data": get_sync_summary()})
+
+
+@bp.post("/api/vpn-users/reconcile-passwords")
+def reconcile_passwords_endpoint():
+    """Carry self-service password changes to each user's other sites."""
+    return jsonify({"ok": True, "data": reconcile_passwords()})
 
 
 @bp.post("/api/vpn-users/sync")

@@ -57,6 +57,7 @@ def _loop() -> None:
             _collect_vpn_metrics()
             _check_alerts()
             _maybe_cleanup()
+            _reconcile_vpn_passwords()
         except Exception:
             log.exception("Scheduler error")
         _stop.wait(timeout=POLL_INTERVAL)
@@ -343,6 +344,23 @@ def _maybe_send_recovery(
     _cooldowns.pop(key, None)  # next occurrence alerts immediately
     insert_alert(server_id, f"{alert_type}_recovered", message)
     log.info(f"Recovery sent: {alert_type} for server {server_id}")
+
+
+def _reconcile_vpn_passwords() -> None:
+    """Converge a user's password across the sites they belong to.
+
+    Someone changing their password from the client only changes it on the
+    instance their client is talking to. Left alone the sites drift apart,
+    which the planned single-login client cannot tolerate. Cheap when there
+    is nothing to do — it only writes when two sites disagree.
+    """
+    try:
+        from core.vpn_user_sync import reconcile_passwords
+        result = reconcile_passwords()
+        if result["propagated"]:
+            log.info(f"Propagated {len(result['propagated'])} password change(s)")
+    except Exception:
+        log.exception("Password reconcile error")
 
 
 def _maybe_cleanup() -> None:

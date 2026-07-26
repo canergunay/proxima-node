@@ -22,10 +22,12 @@ import logging
 from core.db import (
     delete_user_access,
     get_all_vpn_servers,
+    get_all_vpn_users,
     get_pending_access,
     get_user_access,
     mark_access_error,
     mark_access_synced,
+    update_vpn_user,
 )
 from core.proxima_client import call
 
@@ -204,6 +206,93 @@ def _push_update(server: dict, row: dict, servers: dict) -> tuple[bool, str | No
     log.info(f"[SYNC] Updated '{row['username']}' on {row['server_name']}"
              + ("" if send_password else " (password left as-is)"))
     return True, None, "updated"
+
+
+def reconcile_passwords() -> dict:
+    """Carry a self-service password change to the user's other sites.
+
+    A user changes their password on whichever instance their client is
+    talking to, which leaves the others behind. Left alone that is fine
+    today — people log into each site separately — but the planned client
+    logs in once and expects one credential everywhere, so the sites have to
+    converge.
+
+    ADM cannot compare passwords (hashes are salted, and it holds no
+    plaintext), so it compares *when* each site last had one set and copies
+    the newest hash to the rest. That moves the password without ADM ever
+    learning it.
+    """
+    servers = {s["id"]: s for s in get_all_vpn_servers()}
+
+    # Remote records per (server, username), fetched once.
+    remote: dict[int, dict[str, dict]] = {}
+    unreachable: list[str] = []
+    for sid, srv in servers.items():
+        data, error = call(srv, "GET", "/api/vpn/users", timeout=20)
+        if error or not isinstance(data, list):
+            unreachable.append(srv["name"])
+            continue
+        remote[sid] = {u["username"]: u for u in data if u.get("username")}
+
+    propagated, skipped = [], []
+
+    for user in get_all_vpn_users():
+        present = [
+            (a, remote[a["vpn_server_id"]][user["username"]])
+            for a in get_user_access(user["id"])
+            if a["vpn_server_id"] in remote
+            and user["username"] in remote[a["vpn_server_id"]]
+        ]
+        if len(present) < 2:
+            continue
+
+        hashes = {r.get("password_hash") for _, r in present}
+        if len(hashes) <= 1:
+            continue  # already identical, nothing to do
+
+        # Newest wins. Without a timestamp on every side there is no safe
+        # way to pick, so leave it rather than guess and clobber someone.
+        stamped = [(a, r) for a, r in present if r.get("password_changed_at")]
+        if len(stamped) != len(present):
+            skipped.append({
+                "username": user["username"],
+                "reason": "an instance did not report password_changed_at",
+            })
+            continue
+
+        newest_access, newest = max(stamped, key=lambda ar: ar[1]["password_changed_at"])
+        winning_hash = newest["password_hash"]
+
+        for access, record in present:
+            if record.get("password_hash") == winning_hash:
+                continue
+            srv = servers[access["vpn_server_id"]]
+            _, error = call(srv, "PUT", f"/api/vpn/users/{record['id']}",
+                            body={"password_hash": winning_hash}, timeout=30)
+            target = f"{user['username']}@{access['server_name']}"
+            if error:
+                skipped.append({"username": user["username"], "reason": error})
+                log.warning(f"[RECONCILE] {target}: {error}")
+                continue
+            propagated.append({
+                "target": target,
+                "from": newest_access["server_name"],
+            })
+            log.info(f"[RECONCILE] {target} <- password from "
+                     f"{newest_access['server_name']}")
+
+        # Keep ADM's copy in step so its own pushes do not undo this.
+        if winning_hash != user["password_hash"]:
+            update_vpn_user(user["id"], {"password_hash": winning_hash})
+
+    if propagated or skipped:
+        log.info(f"[RECONCILE] propagated={len(propagated)} skipped={len(skipped)}")
+
+    return {
+        "propagated": propagated,
+        "skipped": skipped,
+        "unreachable_servers": unreachable,
+    }
 
 
 def sync_pending(vpn_server_id: int | None = None,
