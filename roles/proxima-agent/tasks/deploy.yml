@@ -57,8 +57,10 @@
       proxima_ips is empty, so the agent port would stay open to the internet.
       Set it in inventory/group_vars/all.yml before deploying.
 
+# shell, not command: `command -v` is a shell builtin and always fails under
+# the command module, which would silently push every host down the fallback path.
 - name: Check whether ufw is available
-  ansible.builtin.command: command -v ufw
+  ansible.builtin.shell: command -v ufw
   register: ufw_bin
   changed_when: false
   failed_when: false
@@ -109,6 +111,35 @@
     state: started
     daemon_reload: true
   when: ufw_bin.rc != 0
+
+# Keep exactly one owner of the rule. A host that gained ufw — or that got the
+# fallback by mistake — must not end up with two mechanisms guarding the port.
+- name: Remove fallback unit and script where ufw owns the port
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/systemd/system/proxima-agent-firewall.service
+    - /usr/local/sbin/proxima-agent-firewall.sh
+  when: ufw_bin.rc == 0
+  notify: daemon reload
+
+- name: Check for a leftover fallback iptables chain
+  ansible.builtin.command: iptables -L PROXIMA_AGENT -n
+  register: fallback_chain
+  changed_when: false
+  failed_when: false
+  when: ufw_bin.rc == 0
+
+- name: Remove leftover fallback iptables chain
+  ansible.builtin.shell: |
+    set -e
+    while iptables -C INPUT -p tcp --dport {{ agent_port }} -j PROXIMA_AGENT 2>/dev/null; do
+        iptables -D INPUT -p tcp --dport {{ agent_port }} -j PROXIMA_AGENT
+    done
+    iptables -F PROXIMA_AGENT
+    iptables -X PROXIMA_AGENT
+  when: ufw_bin.rc == 0 and fallback_chain.rc == 0
 
 - name: Enable and start proxima-agent
   ansible.builtin.systemd:
