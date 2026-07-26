@@ -161,6 +161,9 @@ def init_db() -> None:
             speed_download  TEXT,
             speed_upload    TEXT,
             assigned_groups TEXT NOT NULL DEFAULT '[]',
+            -- May this user's devices reach that site's LAN? Per-server by
+            -- nature: someone can be trusted on one site and not another.
+            lan_access      INTEGER NOT NULL DEFAULT 1,
             sync_status     TEXT NOT NULL DEFAULT 'pending',
             sync_error      TEXT,
             synced_at       INTEGER,
@@ -678,7 +681,7 @@ def delete_vpn_user(user_id: int) -> bool:
 
 ACCESS_FIELDS = {
     "enabled", "max_peers", "bandwidth_quota",
-    "speed_download", "speed_upload", "assigned_groups",
+    "speed_download", "speed_upload", "assigned_groups", "lan_access",
 }
 
 
@@ -748,14 +751,15 @@ def upsert_user_access(user_id: int, vpn_server_id: int, data: dict) -> int:
     cur = conn.execute(
         "INSERT INTO vpn_user_access (user_id, vpn_server_id, remote_user_id, enabled, "
         "max_peers, bandwidth_quota, speed_download, speed_upload, assigned_groups, "
-        "sync_status, created_at, updated_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
+        "lan_access, sync_status, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
         (
             user_id, vpn_server_id, data.get("remote_user_id"),
             1 if data.get("enabled", True) else 0,
             data.get("max_peers"), data.get("bandwidth_quota"),
             data.get("speed_download"), data.get("speed_upload"),
-            data.get("assigned_groups", "[]"), ts, ts,
+            data.get("assigned_groups", "[]"),
+            1 if data.get("lan_access", True) else 0, ts, ts,
         ),
     )
     conn.commit()

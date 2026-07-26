@@ -71,6 +71,7 @@ def _public_access(a: dict) -> dict:
         "server_display_name": a.get("server_display_name"),
         "remote_user_id": a.get("remote_user_id"),
         "enabled": bool(a["enabled"]),
+        "lan_access": bool(a["lan_access"]),
         "max_peers": a["max_peers"],
         "bandwidth_quota": a["bandwidth_quota"],
         "speed_download": a["speed_download"],
@@ -86,8 +87,9 @@ def _parse_access_body(body: dict) -> tuple[dict | None, str | None]:
     """Validate the per-server limit fields. Returns (data, error)."""
     data: dict = {}
 
-    if "enabled" in body:
-        data["enabled"] = 1 if body["enabled"] else 0
+    for flag in ("enabled", "lan_access"):
+        if flag in body:
+            data[flag] = 1 if body[flag] else 0
 
     for field in ("max_peers", "bandwidth_quota"):
         if field in body:

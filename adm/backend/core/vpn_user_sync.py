@@ -38,6 +38,7 @@ def _remote_payload(row: dict) -> dict:
         "speed_download": row["speed_download"],
         "speed_upload": row["speed_upload"],
         "assigned_groups": groups,
+        "lan_access": bool(row["lan_access"]),
     }
 
 
