@@ -45,15 +45,18 @@ def may_manage_server(vpn_server_id: int) -> bool:
 
 
 def may_manage_user(user_id: int) -> bool:
-    """True when every server this user belongs to is in the caller's scope.
+    """True when this user belongs to the caller's scope and nowhere else.
 
-    A user with no access rows yet is fair game — they are not visible on any
-    server the caller cannot see.
+    Both halves matter. "Nowhere else" stops a site admin from resetting a
+    password that also unlocks a site they cannot see. "Belongs to the scope"
+    stops them from reaching a user with no grants at all — one somebody else
+    created and has not assigned yet is not theirs to rename or delete.
     """
     allowed = scoped_server_ids()
     if allowed is None:
         return True
-    return all(a["vpn_server_id"] in allowed for a in get_user_access(user_id))
+    access = get_user_access(user_id)
+    return bool(access) and all(a["vpn_server_id"] in allowed for a in access)
 
 
 def forbidden(message: str = "Not permitted for this account"):

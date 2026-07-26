@@ -101,10 +101,12 @@ def _push_now(user_id: int) -> dict:
     Every mutation tries to reach the instances right away, so the admin sees
     the result while still looking at the change. A failure is not raised: the
     row stays pending/error and the UI surfaces it, because an unreachable
-    site must not block editing the central record.
+    site must not block editing the central record. Confined to the caller's
+    own servers so an edit never flushes someone else's pending changes.
     """
     try:
-        result = sync_pending(user_id=user_id)
+        result = sync_pending(user_id=user_id,
+                              allowed_server_ids=scoped_server_ids())
     except Exception as e:  # noqa: BLE001 — reported, never fatal
         log.error(f"[VPN-USERS] Immediate sync failed for user {user_id}: {e}")
         return {"failed": [{"target": "sync", "error": str(e)}]}

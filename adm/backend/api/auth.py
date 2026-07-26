@@ -78,6 +78,13 @@ def login():
 
     admin = get_admin_by_username(username)
     if admin and verify_password(password, admin["password_hash"]):
+        # Every request re-checks this, so a disabled operator could not do
+        # anything with the token — but handing one out and only failing
+        # afterwards makes it look like the account still works.
+        if not admin.get("enabled", 1):
+            log.warning(f"[AUTH] Login denied (disabled): '{username}' from {ip}")
+            record_login_failure(ip)
+            return jsonify({"ok": False, "error": "Account disabled"}), 403
         token = create_token(username)
         log.info(f"[AUTH] Login OK: '{username}' from {ip}")
         clear_login_failures(ip)

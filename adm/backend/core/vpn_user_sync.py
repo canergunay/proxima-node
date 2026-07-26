@@ -296,11 +296,20 @@ def reconcile_passwords() -> dict:
 
 
 def sync_pending(vpn_server_id: int | None = None,
-                 user_id: int | None = None) -> dict:
-    """Reconcile every pending row, optionally scoped to a server or user."""
+                 user_id: int | None = None,
+                 allowed_server_ids: list[int] | None = None) -> dict:
+    """Reconcile pending rows, optionally narrowed to a server or user.
+
+    allowed_server_ids confines the push to what the caller is entitled to
+    write. A site admin editing someone who also belongs to another site
+    would otherwise flush that other site's pending changes too — an
+    out-of-scope write they never asked for.
+    """
     rows = get_pending_access(vpn_server_id)
     if user_id is not None:
         rows = [r for r in rows if r["user_id"] == user_id]
+    if allowed_server_ids is not None:
+        rows = [r for r in rows if r["vpn_server_id"] in allowed_server_ids]
 
     servers = {s["id"]: s for s in get_all_vpn_servers()}
 
