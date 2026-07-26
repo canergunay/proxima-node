@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Alert, Box, Button, Chip, CircularProgress, IconButton, MenuItem, Paper,
-  Select, Snackbar, Table, TableBody, TableCell, TableContainer, TableHead,
-  TableRow, TableSortLabel, TextField, Tooltip, Typography,
+  Alert, Box, Button, Checkbox, Chip, CircularProgress, IconButton, ListItemIcon,
+  ListItemText, MenuItem, Paper, Select, Snackbar, Table, TableBody, TableCell,
+  TableContainer, TableHead, TableRow, TableSortLabel, TextField, Tooltip,
+  Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -28,7 +29,44 @@ function cellRank(cell: VpnUserAccess | undefined): number {
 }
 
 type SortKey = string; // "username" | "enabled" | `server:${id}`
-type ServerFilter = "" | "granted" | "not" | "lan_on" | "lan_off" | "pending";
+type ServerFilter = "granted" | "not" | "lan_on" | "lan_off" | "pending";
+
+const SERVER_FILTERS: ServerFilter[] = ["granted", "not", "lan_on", "lan_off", "pending"];
+
+const FILTER_LABEL: Record<ServerFilter, string> = {
+  granted: "vpnUsers.filterGranted",
+  not: "vpnUsers.filterNotGranted",
+  lan_on: "vpnUsers.filterLanOn",
+  lan_off: "vpnUsers.filterLanOff",
+  pending: "vpnUsers.filterPending",
+};
+
+/** The same glyphs the cells use, so a filter reads as "rows that look like this". */
+function FilterIcon({ kind }: { kind: ServerFilter }) {
+  const sx = { fontSize: 18 };
+  switch (kind) {
+    case "granted": return <CheckCircleIcon sx={sx} color="success" />;
+    case "not": return <RadioButtonUncheckedIcon sx={{ ...sx, color: "action.disabled" }} />;
+    case "lan_on": return <LanIcon sx={sx} color="primary" />;
+    case "lan_off": return <BlockIcon sx={sx} color="error" />;
+    case "pending": return <CheckCircleIcon sx={sx} color="warning" />;
+  }
+}
+
+/**
+ * Does a cell match one option? Selections within a column are OR-ed, which
+ * is what makes a combination like "not authorized" + "LAN blocked" useful:
+ * everyone who cannot reach that site's LAN, whichever way.
+ */
+function matchesFilter(cell: VpnUserAccess | undefined, f: ServerFilter): boolean {
+  switch (f) {
+    case "granted": return Boolean(cell);
+    case "not": return !cell;
+    case "lan_on": return Boolean(cell && cell.lan_access);
+    case "lan_off": return Boolean(cell && !cell.lan_access);
+    case "pending": return Boolean(cell && cell.sync_status !== "synced");
+  }
+}
 
 export default function VpnUsersTab() {
   const { t } = useTranslation();
@@ -46,7 +84,7 @@ export default function VpnUsersTab() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [fUser, setFUser] = useState("");
   const [fEnabled, setFEnabled] = useState<"" | "on" | "off">("");
-  const [fServer, setFServer] = useState<Record<number, ServerFilter>>({});
+  const [fServer, setFServer] = useState<Record<number, ServerFilter[]>>({});
 
   const fetchAll = useCallback(async () => {
     try {
@@ -79,15 +117,12 @@ export default function VpnUsersTab() {
       if (fEnabled === "on" && !u.enabled) return false;
       if (fEnabled === "off" && u.enabled) return false;
 
+      // Within a column: OR. Across columns: AND.
       for (const s of servers) {
-        const f = fServer[s.id];
-        if (!f) continue;
+        const picked = fServer[s.id];
+        if (!picked?.length) continue;
         const cell = cellOf(u, s.id);
-        if (f === "granted" && !cell) return false;
-        if (f === "not" && cell) return false;
-        if (f === "lan_on" && !(cell && cell.lan_access)) return false;
-        if (f === "lan_off" && !(cell && !cell.lan_access)) return false;
-        if (f === "pending" && !(cell && cell.sync_status !== "synced")) return false;
+        if (!picked.some((f) => matchesFilter(cell, f))) return false;
       }
       return true;
     });
@@ -173,7 +208,8 @@ export default function VpnUsersTab() {
   }
 
   const waiting = (summary?.pending ?? 0) + (summary?.pending_delete ?? 0);
-  const filtersOn = Boolean(fUser || fEnabled || Object.values(fServer).some(Boolean));
+  const filtersOn = Boolean(fUser) || Boolean(fEnabled)
+    || Object.values(fServer).some((v) => v.length > 0);
   const selectSx = { minWidth: 120, "& .MuiSelect-select": { py: 0.5, fontSize: 13 } };
 
   return (
@@ -279,27 +315,47 @@ export default function VpnUsersTab() {
                     <MenuItem value="off">{t("vpnUsers.filterDisabled")}</MenuItem>
                   </Select>
                 </TableCell>
-                {servers.map((s) => (
-                  <TableCell key={s.id} align="center" sx={{ py: 0.5 }}>
-                    <Select
-                      size="small"
-                      fullWidth
-                      displayEmpty
-                      value={fServer[s.id] ?? ""}
-                      onChange={(e) =>
-                        setFServer((f) => ({ ...f, [s.id]: e.target.value as ServerFilter }))
-                      }
-                      sx={selectSx}
-                    >
-                      <MenuItem value="">{t("vpnUsers.filterAll")}</MenuItem>
-                      <MenuItem value="granted">{t("vpnUsers.filterGranted")}</MenuItem>
-                      <MenuItem value="not">{t("vpnUsers.filterNotGranted")}</MenuItem>
-                      <MenuItem value="lan_on">{t("vpnUsers.filterLanOn")}</MenuItem>
-                      <MenuItem value="lan_off">{t("vpnUsers.filterLanOff")}</MenuItem>
-                      <MenuItem value="pending">{t("vpnUsers.filterPending")}</MenuItem>
-                    </Select>
-                  </TableCell>
-                ))}
+                {servers.map((s) => {
+                  const picked = fServer[s.id] ?? [];
+                  return (
+                    <TableCell key={s.id} align="center" sx={{ py: 0.5 }}>
+                      <Select
+                        multiple
+                        size="small"
+                        fullWidth
+                        displayEmpty
+                        value={picked}
+                        onChange={(e) => {
+                          // Defensive: MUI hands back whatever the clicked
+                          // child carried as `value`.
+                          const v = (e.target.value as (ServerFilter | undefined)[])
+                            .filter(Boolean) as ServerFilter[];
+                          setFServer((f) => ({ ...f, [s.id]: v }));
+                        }}
+                        renderValue={(sel) =>
+                          sel.length === 0 ? (
+                            <Box component="span" sx={{ color: "text.secondary" }}>
+                              {t("vpnUsers.filterAll")}
+                            </Box>
+                          ) : (
+                            <Box sx={{ display: "flex", gap: 0.5, justifyContent: "center" }}>
+                              {sel.map((f) => <FilterIcon key={f} kind={f} />)}
+                            </Box>
+                          )
+                        }
+                        sx={selectSx}
+                      >
+                        {SERVER_FILTERS.map((f) => (
+                          <MenuItem key={f} value={f} dense>
+                            <Checkbox size="small" checked={picked.includes(f)} sx={{ py: 0 }} />
+                            <ListItemIcon sx={{ minWidth: 30 }}><FilterIcon kind={f} /></ListItemIcon>
+                            <ListItemText primary={t(FILTER_LABEL[f])} />
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </TableCell>
+                  );
+                })}
               </TableRow>
             </TableHead>
 
