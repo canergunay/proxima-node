@@ -1,0 +1,23 @@
+#!/bin/sh
+# Managed by Ansible — roles/proxima-agent. Do not edit on the server.
+#
+# Restricts the proxima-agent management port to the Proxima instances that
+# poll it, on hosts that do not run ufw (erg-tr, erg-ru). Rules live in a
+# dedicated chain, so re-running is idempotent and removal is one flush.
+#
+# Reply traffic leaves via OUTPUT, so matching on source address alone is
+# enough — no conntrack rule is needed here.
+set -e
+
+CHAIN=PROXIMA_AGENT
+PORT={{ agent_port }}
+
+iptables -N "$CHAIN" 2>/dev/null || iptables -F "$CHAIN"
+
+{% for ip in proxima_ips %}
+iptables -A "$CHAIN" -s {{ ip }} -j ACCEPT
+{% endfor %}
+iptables -A "$CHAIN" -j DROP
+
+iptables -C INPUT -p tcp --dport "$PORT" -j "$CHAIN" 2>/dev/null \
+    || iptables -I INPUT 1 -p tcp --dport "$PORT" -j "$CHAIN"

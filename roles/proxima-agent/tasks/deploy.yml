@@ -44,24 +44,71 @@
     - daemon reload
     - restart proxima-agent
 
-# The management API is reachable only from the Proxima instances that poll it.
-# Leaving it open to the internet is what let a random scanner wedge the agent.
-- name: Allow agent port from Proxima instances only
-  ansible.builtin.command:
-    cmd: "ufw allow from {{ item }} to any port {{ agent_port }} proto tcp comment 'proxima-agent'"
-  loop: "{{ proxima_ips | default([]) }}"
-  register: ufw_allow
-  changed_when: "'Rule added' in ufw_allow.stdout or 'Rules updated' in ufw_allow.stdout"
+# ── Firewall ───────────────────────────────────────────────────────────────
+# The management API must only be reachable from the Proxima instances that
+# poll it. Leaving it open to the internet is what let a random scanner wedge
+# the agent on ERG-FI. Not every node runs ufw, so handle both cases — an
+# unrestricted port must never pass silently again.
+
+- name: Fail early if the agent port cannot be restricted
+  ansible.builtin.assert:
+    that: proxima_ips | default([]) | length > 0
+    fail_msg: >-
+      proxima_ips is empty, so the agent port would stay open to the internet.
+      Set it in inventory/group_vars/all.yml before deploying.
+
+- name: Check whether ufw is available
+  ansible.builtin.command: command -v ufw
+  register: ufw_bin
+  changed_when: false
   failed_when: false
 
+- name: Allow agent port from Proxima instances only (ufw)
+  ansible.builtin.command:
+    cmd: "ufw allow from {{ item }} to any port {{ agent_port }} proto tcp comment 'proxima-agent'"
+  loop: "{{ proxima_ips }}"
+  register: ufw_allow
+  changed_when: "'Rule added' in ufw_allow.stdout or 'Rules updated' in ufw_allow.stdout"
+  when: ufw_bin.rc == 0
+
 # Runs after the restricted rules above, so there is never a window without access.
-- name: Remove world-open agent port rule
+- name: Remove world-open agent port rule (ufw)
   ansible.builtin.command:
     cmd: "ufw --force delete allow {{ agent_port }}/tcp"
   register: ufw_delete
   changed_when: "'Deleting' in ufw_delete.stdout or 'Rule deleted' in ufw_delete.stdout"
   failed_when: false
-  when: proxima_ips | default([]) | length > 0
+  when: ufw_bin.rc == 0
+
+- name: Deploy agent firewall script (hosts without ufw)
+  ansible.builtin.template:
+    src: proxima-agent-firewall.sh.j2
+    dest: /usr/local/sbin/proxima-agent-firewall.sh
+    owner: root
+    group: root
+    mode: "0755"
+  when: ufw_bin.rc != 0
+  notify: reapply agent firewall
+
+- name: Deploy agent firewall unit (hosts without ufw)
+  ansible.builtin.template:
+    src: proxima-agent-firewall.service.j2
+    dest: /etc/systemd/system/proxima-agent-firewall.service
+    owner: root
+    group: root
+    mode: "0644"
+  when: ufw_bin.rc != 0
+  notify:
+    - daemon reload
+    - reapply agent firewall
+
+- name: Enable agent firewall unit (hosts without ufw)
+  ansible.builtin.systemd:
+    name: proxima-agent-firewall
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: ufw_bin.rc != 0
 
 - name: Enable and start proxima-agent
   ansible.builtin.systemd:

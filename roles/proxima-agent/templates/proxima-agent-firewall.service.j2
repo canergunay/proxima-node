@@ -1,0 +1,12 @@
+[Unit]
+Description=Proxima Agent firewall rules (restrict management port)
+After=network-pre.target
+Before=proxima-agent.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/proxima-agent-firewall.sh
+
+[Install]
+WantedBy=multi-user.target

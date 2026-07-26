@@ -7,3 +7,10 @@
   ansible.builtin.systemd:
     name: proxima-agent
     state: restarted
+
+# Oneshot + RemainAfterExit, so restart is what re-applies the rules.
+- name: reapply agent firewall
+  ansible.builtin.systemd:
+    name: proxima-agent-firewall
+    state: restarted
+    daemon_reload: true
