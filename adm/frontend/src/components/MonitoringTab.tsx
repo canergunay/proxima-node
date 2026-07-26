@@ -409,7 +409,13 @@ export default function MonitoringTab() {
                         <Chip
                           label={a.alert_type}
                           size="small"
-                          color={a.alert_type === "offline" ? "error" : "warning"}
+                          color={
+                            a.alert_type.endsWith("_recovered")
+                              ? "success"
+                              : a.alert_type === "offline"
+                                ? "error"
+                                : "warning"
+                          }
                           variant="outlined"
                         />
                       </TableCell>

@@ -1,0 +1,71 @@
+---
+# Agent code, service unit and firewall rules.
+#
+# Shared by the initial install (main.yml) and playbooks/update-agent.yml so the
+# two paths cannot drift apart. Nothing here touches config.json — an agent
+# update must never rotate the API key out from under ADM.
+
+- name: Create Python venv
+  ansible.builtin.command:
+    cmd: python3 -m venv {{ agent_dir }}/venv
+    creates: "{{ agent_dir }}/venv/bin/python"
+
+- name: Deploy agent script
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../agent/agent.py"
+    dest: "{{ agent_dir }}/agent.py"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart proxima-agent
+
+- name: Deploy requirements.txt
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../agent/requirements.txt"
+    dest: "{{ agent_dir }}/requirements.txt"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Install requirements in venv
+  ansible.builtin.pip:
+    requirements: "{{ agent_dir }}/requirements.txt"
+    virtualenv: "{{ agent_dir }}/venv"
+  notify: restart proxima-agent
+
+- name: Deploy proxima-agent systemd service
+  ansible.builtin.template:
+    src: proxima-agent.service.j2
+    dest: /etc/systemd/system/proxima-agent.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - daemon reload
+    - restart proxima-agent
+
+# The management API is reachable only from the Proxima instances that poll it.
+# Leaving it open to the internet is what let a random scanner wedge the agent.
+- name: Allow agent port from Proxima instances only
+  ansible.builtin.command:
+    cmd: "ufw allow from {{ item }} to any port {{ agent_port }} proto tcp comment 'proxima-agent'"
+  loop: "{{ proxima_ips | default([]) }}"
+  register: ufw_allow
+  changed_when: "'Rule added' in ufw_allow.stdout or 'Rules updated' in ufw_allow.stdout"
+  failed_when: false
+
+# Runs after the restricted rules above, so there is never a window without access.
+- name: Remove world-open agent port rule
+  ansible.builtin.command:
+    cmd: "ufw --force delete allow {{ agent_port }}/tcp"
+  register: ufw_delete
+  changed_when: "'Deleting' in ufw_delete.stdout or 'Rule deleted' in ufw_delete.stdout"
+  failed_when: false
+  when: proxima_ips | default([]) | length > 0
+
+- name: Enable and start proxima-agent
+  ansible.builtin.systemd:
+    name: proxima-agent
+    enabled: true
+    state: started
+    daemon_reload: true

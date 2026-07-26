@@ -20,6 +20,7 @@ import re
 import shutil
 import socket
 import subprocess
+import sys
 import threading
 import time
 
@@ -904,22 +905,53 @@ def _ensure_tls_cert():
     os.chmod(CERT_FILE, 0o644)
 
 
+# ── Startup ────────────────────────────────────────────────────────────────
+
+def _startup() -> None:
+    """Per-process initialisation.
+
+    Runs at import time so that `gunicorn agent:app` performs the same setup
+    the old `python agent.py` entry point did.
+    """
+    _ensure_tls_cert()
+
+    # ExecStartPre only needs the cert — don't start threads or log a banner.
+    if "--ensure-cert" in sys.argv:
+        return
+
+    config = _load_config()
+
+    # Start healthchecks.io push thread if configured
+    if config.get("healthchecks_url", ""):
+        threading.Thread(target=_healthcheck_ping, daemon=True).start()
+        print("  healthchecks.io push enabled", flush=True)
+
+    print(
+        f"proxima-agent v{VERSION} ready on :{config.get('agent_port', 5051)} "
+        f"(type={_detect_server_type()})",
+        flush=True,
+    )
+
+
+_startup()
+
+
 # ── Main ───────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    _ensure_tls_cert()
-    config = _load_config()
-    port = config.get("agent_port", 5051)
-    server_type = _detect_server_type()
+    # `--ensure-cert` is used by the systemd unit's ExecStartPre so the TLS
+    # material exists before gunicorn binds the socket. _startup() already
+    # generated it above, so there is nothing left to do.
+    if "--ensure-cert" in sys.argv:
+        sys.exit(0)
 
-    # Start healthchecks.io push thread if configured
-    hc_url = config.get("healthchecks_url", "")
-    if hc_url:
-        hc_thread = threading.Thread(target=_healthcheck_ping, daemon=True)
-        hc_thread.start()
-        print(f"  healthchecks.io push enabled", flush=True)
-
-    print(f"proxima-agent v{VERSION} starting on :{port} (type={server_type})", flush=True)
+    # Development fallback ONLY — production runs under gunicorn, see
+    # roles/proxima-agent/templates/proxima-agent.service.j2.
+    # Werkzeug's dev server terminates TLS inside its accept loop, so a single
+    # client that connects and never sends a ClientHello freezes the entire
+    # agent (ERG-FI, 2026-07-25: 19.5h of "Server Offline" alerts).
+    print("WARNING: Werkzeug dev server — not safe for production", flush=True)
+    port = _load_config().get("agent_port", 5051)
     app.run(
         host="0.0.0.0",
         port=port,

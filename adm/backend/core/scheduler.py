@@ -24,11 +24,16 @@ log = logging.getLogger("adm.scheduler")
 
 _stop = threading.Event()
 _cooldowns: dict[tuple[int, str], float] = {}  # (server_id, alert_type) -> last_sent_ts
+_active_alerts: set[tuple[int, str]] = set()  # alerts currently firing
 _last_cleanup: float = 0.0
 
 POLL_INTERVAL = 300  # 5 minutes
 COOLDOWN_SECONDS = 3600  # 1 hour between same alerts
 CLEANUP_INTERVAL = 86400  # daily cleanup
+
+# A metric must fall this far below its threshold before we call it recovered,
+# otherwise a value hovering on the threshold alternates alert/recovery forever.
+RECOVERY_MARGIN = 5.0
 
 
 def start_scheduler() -> None:
@@ -258,35 +263,41 @@ def _check_alerts() -> None:
                 )
             continue
 
-        # Check disk
-        disk = latest.get("disk_pct")
-        if disk is not None and disk >= disk_threshold:
-            _maybe_send_alert(
-                sid, "disk", bot_token, chat_id,
-                f"*Disk Warning*\nServer: {name}\n"
-                f"Disk Usage: {disk:.1f}%",
-                now,
-            )
+        _maybe_send_recovery(
+            sid, "offline", bot_token, chat_id,
+            f"*Server Recovered*\nServer: {name}\nAgent is responding again",
+        )
 
-        # Check memory
-        memory = latest.get("memory_pct")
-        if memory is not None and memory >= memory_threshold:
-            _maybe_send_alert(
-                sid, "memory", bot_token, chat_id,
-                f"*Memory Warning*\nServer: {name}\n"
-                f"Memory Usage: {memory:.1f}%",
-                now,
-            )
+        _check_metric(sid, name, "disk", "Disk", latest.get("disk_pct"),
+                      disk_threshold, bot_token, chat_id, now)
+        _check_metric(sid, name, "memory", "Memory", latest.get("memory_pct"),
+                      memory_threshold, bot_token, chat_id, now)
+        _check_metric(sid, name, "cpu", "CPU", latest.get("cpu_pct"),
+                      cpu_threshold, bot_token, chat_id, now)
 
-        # Check CPU
-        cpu = latest.get("cpu_pct")
-        if cpu is not None and cpu >= cpu_threshold:
-            _maybe_send_alert(
-                sid, "cpu", bot_token, chat_id,
-                f"*CPU Warning*\nServer: {name}\n"
-                f"CPU Usage: {cpu:.1f}%",
-                now,
-            )
+
+def _check_metric(
+    server_id: int, name: str, alert_type: str, label: str,
+    value: float | None, threshold: float,
+    bot_token: str, chat_id: str, now: float,
+) -> None:
+    """Alert above the threshold, notify recovery once it drops back below it."""
+    if value is None:
+        return
+
+    if value >= threshold:
+        _maybe_send_alert(
+            server_id, alert_type, bot_token, chat_id,
+            f"*{label} Warning*\nServer: {name}\n"
+            f"{label} Usage: {value:.1f}%",
+            now,
+        )
+    elif value < threshold - RECOVERY_MARGIN:
+        _maybe_send_recovery(
+            server_id, alert_type, bot_token, chat_id,
+            f"*{label} Recovered*\nServer: {name}\n"
+            f"{label} Usage: {value:.1f}%",
+        )
 
 
 def _maybe_send_alert(
@@ -303,10 +314,35 @@ def _maybe_send_alert(
     ok, error = send_telegram(bot_token, chat_id, message)
     if ok:
         _cooldowns[key] = now
+        _active_alerts.add(key)
         insert_alert(server_id, alert_type, message)
         log.info(f"Alert sent: {alert_type} for server {server_id}")
     else:
         log.error(f"Alert failed: {alert_type} for server {server_id}: {error}")
+
+
+def _maybe_send_recovery(
+    server_id: int, alert_type: str,
+    bot_token: str, chat_id: str, message: str,
+) -> None:
+    """Send a one-off recovery notice if this alert was firing.
+
+    Without this an unresolved condition produces one Telegram message per
+    cooldown window forever, with no way to tell from Telegram that it ended.
+    """
+    key = (server_id, alert_type)
+    if key not in _active_alerts:
+        return
+
+    ok, error = send_telegram(bot_token, chat_id, message)
+    if not ok:
+        log.error(f"Recovery failed: {alert_type} for server {server_id}: {error}")
+        return
+
+    _active_alerts.discard(key)
+    _cooldowns.pop(key, None)  # next occurrence alerts immediately
+    insert_alert(server_id, f"{alert_type}_recovered", message)
+    log.info(f"Recovery sent: {alert_type} for server {server_id}")
 
 
 def _maybe_cleanup() -> None:

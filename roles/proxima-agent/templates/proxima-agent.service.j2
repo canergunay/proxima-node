@@ -5,11 +5,32 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory={{ agent_dir }}
-ExecStart={{ agent_dir }}/venv/bin/python {{ agent_dir }}/agent.py
-Restart=always
-RestartSec=5
 Environment=PROXIMA_AGENT_DIR={{ agent_dir }}
 Environment=PROXIMA_AGENT_CONFIG={{ agent_dir }}/config.json
+
+# Generate the self-signed TLS cert before gunicorn binds the socket.
+ExecStartPre={{ agent_dir }}/venv/bin/python {{ agent_dir }}/agent.py --ensure-cert
+
+# gunicorn terminates TLS in a worker thread. The Werkzeug dev server used
+# before did the handshake inside its accept loop, so one stalled client froze
+# the whole agent (ERG-FI, 2026-07-25: 19.5h outage, accept queue at 129/128).
+# --workers MUST stay 1: blockcheck keeps its run state in a module global.
+ExecStart={{ agent_dir }}/venv/bin/gunicorn \
+    --chdir {{ agent_dir }} \
+    --bind 0.0.0.0:{{ agent_port }} \
+    --workers 1 \
+    --threads 16 \
+    --timeout 60 \
+    --graceful-timeout 30 \
+    --keep-alive 5 \
+    --certfile {{ agent_dir }}/cert.pem \
+    --keyfile {{ agent_dir }}/key.pem \
+    --access-logfile - \
+    --error-logfile - \
+    agent:app
+
+Restart=always
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target

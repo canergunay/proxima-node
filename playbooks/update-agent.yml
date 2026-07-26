@@ -1,6 +1,7 @@
 ---
 # Update proxima-agent on all servers
-# Deploys the latest agent.py and restarts the service.
+# Deploys the latest agent.py, service unit and firewall rules, then restarts.
+# config.json is deliberately NOT touched — see roles/proxima-agent/tasks/deploy.yml.
 #
 # Usage:
 #   ansible-playbook playbooks/update-agent.yml              # all servers
@@ -11,35 +12,13 @@
   gather_facts: false
 
   tasks:
-    - name: Deploy latest agent script
-      ansible.builtin.copy:
-        src: "{{ playbook_dir }}/../agent/agent.py"
-        dest: "{{ agent_dir | default('/opt/proxima-agent') }}/agent.py"
-        owner: root
-        group: root
-        mode: "0644"
-      register: agent_deployed
-
-    - name: Deploy latest requirements
-      ansible.builtin.copy:
-        src: "{{ playbook_dir }}/../agent/requirements.txt"
-        dest: "{{ agent_dir | default('/opt/proxima-agent') }}/requirements.txt"
-        owner: root
-        group: root
-        mode: "0644"
-      register: requirements_deployed
-
-    - name: Update venv packages
-      ansible.builtin.pip:
-        requirements: "{{ agent_dir | default('/opt/proxima-agent') }}/requirements.txt"
-        virtualenv: "{{ agent_dir | default('/opt/proxima-agent') }}/venv"
-      when: requirements_deployed.changed
-
-    - name: Restart proxima-agent
-      ansible.builtin.systemd:
+    - name: Deploy agent code, service and firewall rules
+      ansible.builtin.include_role:
         name: proxima-agent
-        state: restarted
-      when: agent_deployed.changed or requirements_deployed.changed
+        tasks_from: deploy.yml
+
+    - name: Apply pending restarts before health checking
+      ansible.builtin.meta: flush_handlers
 
     - name: Wait for agent to come up
       ansible.builtin.uri:
@@ -54,4 +33,4 @@
 
     - name: Report agent status
       ansible.builtin.debug:
-        msg: "{{ inventory_hostname }}: agent {{ 'updated and healthy' if agent_deployed.changed else 'already up to date' }}"
+        msg: "{{ inventory_hostname }}: agent healthy on {{ ansible_host }}:{{ agent_port | default(5051) }}"

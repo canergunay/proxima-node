@@ -18,34 +18,6 @@
     group: root
     mode: "0755"
 
-- name: Deploy agent script
-  ansible.builtin.copy:
-    src: "{{ playbook_dir }}/../agent/agent.py"
-    dest: "{{ agent_dir }}/agent.py"
-    owner: root
-    group: root
-    mode: "0644"
-  notify: restart proxima-agent
-
-- name: Deploy requirements.txt
-  ansible.builtin.copy:
-    src: "{{ playbook_dir }}/../agent/requirements.txt"
-    dest: "{{ agent_dir }}/requirements.txt"
-    owner: root
-    group: root
-    mode: "0644"
-
-- name: Create Python venv
-  ansible.builtin.command:
-    cmd: python3 -m venv {{ agent_dir }}/venv
-    creates: "{{ agent_dir }}/venv/bin/python"
-
-- name: Install requirements in venv
-  ansible.builtin.command:
-    cmd: "{{ agent_dir }}/venv/bin/pip install -r {{ agent_dir }}/requirements.txt"
-  register: pip_result
-  changed_when: "'Successfully installed' in pip_result.stdout"
-
 - name: Write agent config
   ansible.builtin.template:
     src: config.json.j2
@@ -55,27 +27,7 @@
     mode: "0600"
   notify: restart proxima-agent
 
-- name: Deploy proxima-agent systemd service
-  ansible.builtin.template:
-    src: proxima-agent.service.j2
-    dest: /etc/systemd/system/proxima-agent.service
-    owner: root
-    group: root
-    mode: "0644"
-  notify:
-    - daemon reload
-    - restart proxima-agent
-
-- name: Allow agent port in UFW
-  ansible.builtin.command:
-    cmd: "ufw allow {{ agent_port | default(5051) }}/tcp comment 'proxima-agent'"
-  register: ufw_result
-  changed_when: "'Added' in ufw_result.stdout or 'Rule added' in ufw_result.stdout"
-  failed_when: false
-
-- name: Enable and start proxima-agent
-  ansible.builtin.systemd:
-    name: proxima-agent
-    enabled: true
-    state: started
-    daemon_reload: true
+# Code, service unit and firewall rules — also used on its own by
+# playbooks/update-agent.yml, which must not rewrite config.json.
+- name: Deploy agent code, service and firewall rules
+  ansible.builtin.include_tasks: deploy.yml
