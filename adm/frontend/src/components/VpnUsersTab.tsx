@@ -12,6 +12,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import LanIcon from "@mui/icons-material/Lan";
 import BlockIcon from "@mui/icons-material/Block";
+import ClearIcon from "@mui/icons-material/Clear";
 import { useTranslation } from "react-i18next";
 import api from "../api/client";
 import type { SyncSummary, VpnServer, VpnUser, VpnUserAccess } from "../api/types";
@@ -66,6 +67,37 @@ function matchesFilter(cell: VpnUserAccess | undefined, f: ServerFilter): boolea
     case "lan_off": return Boolean(cell && !cell.lan_access);
     case "pending": return Boolean(cell && cell.sync_status !== "synced");
   }
+}
+
+/**
+ * A filter control with its own reset.
+ *
+ * The button sits beside the control rather than inside the dropdown: a
+ * valueless MenuItem inside a multiple Select races MUI's change handler.
+ * It keeps its space when inactive so column widths do not jump.
+ */
+function FilterCell({ active, onClear, title, children }: {
+  active: boolean;
+  onClear: () => void;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Box sx={{ display: "flex", alignItems: "center", gap: 0.25 }}>
+      <Box sx={{ flexGrow: 1, minWidth: 0 }}>{children}</Box>
+      <Tooltip title={title}>
+        <IconButton
+          size="small"
+          onClick={onClear}
+          tabIndex={active ? 0 : -1}
+          aria-hidden={!active}
+          sx={{ visibility: active ? "visible" : "hidden", p: 0.25 }}
+        >
+          <ClearIcon sx={{ fontSize: 16 }} />
+        </IconButton>
+      </Tooltip>
+    </Box>
+  );
 }
 
 export default function VpnUsersTab() {
@@ -292,33 +324,50 @@ export default function VpnUsersTab() {
               {/* Filter row — one control per column, mirroring the header. */}
               <TableRow>
                 <TableCell sx={{ py: 0.5 }}>
-                  <TextField
-                    size="small"
-                    fullWidth
-                    placeholder={t("vpnUsers.search")}
-                    value={fUser}
-                    onChange={(e) => setFUser(e.target.value)}
-                    slotProps={{ input: { sx: { fontSize: 13 } } }}
-                  />
+                  <FilterCell
+                    active={Boolean(fUser)}
+                    onClear={() => setFUser("")}
+                    title={t("vpnUsers.clearColumn")}
+                  >
+                    <TextField
+                      size="small"
+                      fullWidth
+                      placeholder={t("vpnUsers.search")}
+                      value={fUser}
+                      onChange={(e) => setFUser(e.target.value)}
+                      slotProps={{ input: { sx: { fontSize: 13 } } }}
+                    />
+                  </FilterCell>
                 </TableCell>
                 <TableCell sx={{ py: 0.5 }}>
-                  <Select
-                    size="small"
-                    fullWidth
-                    displayEmpty
-                    value={fEnabled}
-                    onChange={(e) => setFEnabled(e.target.value as typeof fEnabled)}
-                    sx={selectSx}
+                  <FilterCell
+                    active={Boolean(fEnabled)}
+                    onClear={() => setFEnabled("")}
+                    title={t("vpnUsers.clearColumn")}
                   >
-                    <MenuItem value="">{t("vpnUsers.filterAllStatus")}</MenuItem>
-                    <MenuItem value="on">{t("vpnUsers.filterEnabled")}</MenuItem>
-                    <MenuItem value="off">{t("vpnUsers.filterDisabled")}</MenuItem>
-                  </Select>
+                    <Select
+                      size="small"
+                      fullWidth
+                      displayEmpty
+                      value={fEnabled}
+                      onChange={(e) => setFEnabled(e.target.value as typeof fEnabled)}
+                      sx={selectSx}
+                    >
+                      <MenuItem value="">{t("vpnUsers.filterAllStatus")}</MenuItem>
+                      <MenuItem value="on">{t("vpnUsers.filterEnabled")}</MenuItem>
+                      <MenuItem value="off">{t("vpnUsers.filterDisabled")}</MenuItem>
+                    </Select>
+                  </FilterCell>
                 </TableCell>
                 {servers.map((s) => {
                   const picked = fServer[s.id] ?? [];
                   return (
                     <TableCell key={s.id} align="center" sx={{ py: 0.5 }}>
+                      <FilterCell
+                        active={picked.length > 0}
+                        onClear={() => setFServer((f) => ({ ...f, [s.id]: [] }))}
+                        title={t("vpnUsers.clearColumn")}
+                      >
                       <Select
                         multiple
                         size="small"
@@ -353,6 +402,7 @@ export default function VpnUsersTab() {
                           </MenuItem>
                         ))}
                       </Select>
+                      </FilterCell>
                     </TableCell>
                   );
                 })}

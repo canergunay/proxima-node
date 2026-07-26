@@ -295,5 +295,6 @@
   "vpnUsers.filterNotGranted": "Yetkisiz",
   "vpnUsers.filterLanOn": "LAN açık",
   "vpnUsers.filterLanOff": "LAN kapalı",
-  "vpnUsers.filterPending": "Senkron bekliyor"
+  "vpnUsers.filterPending": "Senkron bekliyor",
+  "vpnUsers.clearColumn": "Bu filtreyi temizle"
 }

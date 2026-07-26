@@ -295,5 +295,6 @@
   "vpnUsers.filterNotGranted": "Not authorized",
   "vpnUsers.filterLanOn": "LAN allowed",
   "vpnUsers.filterLanOff": "LAN blocked",
-  "vpnUsers.filterPending": "Sync pending"
+  "vpnUsers.filterPending": "Sync pending",
+  "vpnUsers.clearColumn": "Clear this filter"
 }

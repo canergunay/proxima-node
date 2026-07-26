@@ -295,5 +295,6 @@
   "vpnUsers.filterNotGranted": "Нет доступа",
   "vpnUsers.filterLanOn": "LAN разрешён",
   "vpnUsers.filterLanOff": "LAN запрещён",
-  "vpnUsers.filterPending": "Ожидает синхронизации"
+  "vpnUsers.filterPending": "Ожидает синхронизации",
+  "vpnUsers.clearColumn": "Сбросить этот фильтр"
 }
