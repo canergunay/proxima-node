@@ -46,6 +46,7 @@ def create_app() -> Flask:
     from api.operations import bp as operations_bp
     from api.vpn_servers import bp as vpn_servers_bp
     from api.vpn_users import bp as vpn_users_bp
+    from api.admins import bp as admins_bp
     from api.monitoring import bp as monitoring_bp
     app.register_blueprint(auth_bp)
     app.register_blueprint(servers_bp)
@@ -53,10 +54,28 @@ def create_app() -> Flask:
     app.register_blueprint(operations_bp)
     app.register_blueprint(vpn_servers_bp)
     app.register_blueprint(vpn_users_bp)
+    app.register_blueprint(admins_bp)
     app.register_blueprint(monitoring_bp)
 
     # Auth middleware
     NO_AUTH_PATHS = {"/api/auth/login", "/api/auth/setup", "/api/auth/me"}
+
+    def _scoped_admin_may(path: str, method: str) -> bool:
+        """What a non-superadmin may reach.
+
+        An allowlist rather than a blocklist: anything added later is
+        superadmin-only until somebody decides otherwise, which is the safer
+        way round for a panel that can provision servers.
+        """
+        if path in ("/api/auth/me", "/api/auth/password"):
+            return True
+        # Per-server and per-user checks happen inside these endpoints.
+        if path.startswith("/api/vpn-users"):
+            return True
+        # Needed to render their own servers; mutations stay superadmin-only.
+        if path == "/api/vpn-servers" and method == "GET":
+            return True
+        return False
 
     @app.before_request
     def check_auth():
@@ -76,8 +95,19 @@ def create_app() -> Flask:
             token = auth_header[7:]
             user_info = verify_token(token)
             if user_info:
+                # The token only carries a username; role and scope are read
+                # from the database on every request, so revoking an admin
+                # takes effect immediately instead of when their token
+                # eventually expires.
+                from core.db import get_admin_by_username
+                admin = get_admin_by_username(user_info["username"])
+                if not admin or not admin.get("enabled", 1):
+                    return jsonify({"ok": False, "error": "Unauthorized"}), 401
                 g.user = user_info["username"]
                 g.user_info = user_info
+                g.admin = admin
+                if admin["role"] != "superadmin" and not _scoped_admin_may(path, request.method):
+                    return jsonify({"ok": False, "error": "Superadmin only"}), 403
                 return None
 
         if requires_auth:

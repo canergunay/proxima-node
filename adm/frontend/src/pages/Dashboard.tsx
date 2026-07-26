@@ -6,7 +6,7 @@ import AddIcon from "@mui/icons-material/Add";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { useTranslation } from "react-i18next";
 import api from "../api/client";
-import type { Server, VpnServer } from "../api/types";
+import type { AdminRole, Server, VpnServer } from "../api/types";
 import ServerCard from "../components/ServerCard";
 import ProvisionDialog from "../components/ProvisionDialog";
 import ServerDetailDialog from "../components/ServerDetailDialog";
@@ -16,9 +16,13 @@ import VpnServerDetailDialog from "../components/VpnServerDetailDialog";
 import MonitoringTab from "../components/MonitoringTab";
 import VpnUsersTab from "../components/VpnUsersTab";
 
-export default function Dashboard() {
+export default function Dashboard({ role }: { role: AdminRole }) {
   const { t } = useTranslation();
+  // A scoped admin has nothing to do on the other tabs — the API refuses
+  // them anyway, so showing them would only produce dead controls.
+  const isSuperadmin = role === "superadmin";
   const [tab, setTab] = useState(() => {
+    if (role !== "superadmin") return 2;  // Users is all they can reach
     const saved = localStorage.getItem("adm_dashboard_tab");
     return saved ? parseInt(saved) : 0;
   });
@@ -81,7 +85,7 @@ export default function Dashboard() {
         <Box sx={{ display: "flex", gap: 1 }}>
           {/* Only the server tabs use this toolbar; Users and Monitoring
               bring their own. */}
-          {tab < 2 && (
+          {isSuperadmin && tab < 2 && (
             <Button
               startIcon={<RefreshIcon />}
               onClick={() => {
@@ -124,10 +128,10 @@ export default function Dashboard() {
         scrollButtons="auto"
         sx={{ mb: 2, borderBottom: 1, borderColor: "divider" }}
       >
-        <Tab label={t("dashboard.tabExitServers")} />
-        <Tab label={t("dashboard.tabVpnServers")} />
+        <Tab label={t("dashboard.tabExitServers")} sx={{ display: isSuperadmin ? undefined : "none" }} />
+        <Tab label={t("dashboard.tabVpnServers")} sx={{ display: isSuperadmin ? undefined : "none" }} />
         <Tab label={t("dashboard.tabUsers")} />
-        <Tab label={t("dashboard.tabMonitoring")} />
+        <Tab label={t("dashboard.tabMonitoring")} sx={{ display: isSuperadmin ? undefined : "none" }} />
       </Tabs>
 
       {/* ── Tab 0: Exit Servers ──────────────────── */}
@@ -213,7 +217,7 @@ export default function Dashboard() {
       )}
 
       {/* ── Tab 2: Monitoring ──────────────────────── */}
-      {tab === 2 && <VpnUsersTab />}
+      {tab === 2 && <VpnUsersTab isSuperadmin={isSuperadmin} />}
       {tab === 3 && <MonitoringTab />}
     </Box>
   );

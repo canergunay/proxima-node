@@ -15,6 +15,7 @@ from core.db import (
     get_vpn_server,
     update_vpn_server,
 )
+from core.authz import scoped_server_ids
 from core.proxima_client import request as _proxima_request
 
 log = logging.getLogger("adm.vpn_servers")
@@ -82,6 +83,10 @@ def _fetch_vpn_server_status(server: dict) -> dict:
 def list_vpn_servers():
     """List all VPN servers with live Proxima status (parallel fetch)."""
     servers = get_all_vpn_servers()
+    # A scoped admin only ever sees the sites they administer.
+    allowed = scoped_server_ids()
+    if allowed is not None:
+        servers = [s for s in servers if s["id"] in allowed]
     if not servers:
         return jsonify({"ok": True, "data": []})
 

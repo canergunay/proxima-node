@@ -100,7 +100,7 @@ function FilterCell({ active, onClear, title, children }: {
   );
 }
 
-export default function VpnUsersTab() {
+export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean }) {
   const { t } = useTranslation();
   const [users, setUsers] = useState<VpnUser[]>([]);
   const [servers, setServers] = useState<VpnServer[]>([]);
@@ -120,17 +120,20 @@ export default function VpnUsersTab() {
 
   const fetchAll = useCallback(async () => {
     try {
-      const [u, s, sum] = await Promise.all([
+      const [u, s] = await Promise.all([
         api.get("/vpn-users"),
         api.get("/vpn-servers"),
-        api.get("/vpn-users/sync/status"),
       ]);
       if (u.data.ok) setUsers(u.data.data);
       if (s.data.ok) setServers(s.data.data);
-      if (sum.data.ok) setSummary(sum.data.data);
+      // Estate-wide sync state belongs to whoever manages the estate.
+      if (isSuperadmin) {
+        const sum = await api.get("/vpn-users/sync/status");
+        if (sum.data.ok) setSummary(sum.data.data);
+      }
     } catch { /* handled by interceptor */ }
     setLoading(false);
-  }, []);
+  }, [isSuperadmin]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -264,11 +267,13 @@ export default function VpnUsersTab() {
         {(summary?.error ?? 0) > 0 && (
           <Chip size="small" color="error" label={t("vpnUsers.failed", { count: summary!.error })} />
         )}
-        <Tooltip title={t("vpnUsers.syncNow")}>
-          <span>
-            <IconButton onClick={syncAll} disabled={busy === "sync"}><SyncIcon /></IconButton>
-          </span>
-        </Tooltip>
+        {isSuperadmin && (
+          <Tooltip title={t("vpnUsers.syncNow")}>
+            <span>
+              <IconButton onClick={syncAll} disabled={busy === "sync"}><SyncIcon /></IconButton>
+            </span>
+          </Tooltip>
+        )}
         <Tooltip title={t("dashboard.refresh")}>
           <IconButton onClick={fetchAll}><RefreshIcon /></IconButton>
         </Tooltip>

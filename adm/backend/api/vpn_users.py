@@ -38,6 +38,14 @@ from core.db import (
     update_vpn_user,
     upsert_user_access,
 )
+from core.authz import (
+    forbidden,
+    is_superadmin,
+    may_manage_server,
+    may_manage_user,
+    scoped_server_ids,
+    superadmin_only,
+)
 from core.vpn_user_import import apply_import, build_preview
 from core.vpn_user_sync import reconcile_passwords, sync_pending
 
@@ -140,15 +148,28 @@ def _parse_access_body(body: dict) -> tuple[dict | None, str | None]:
 
 @bp.get("/api/vpn-users")
 def list_users():
-    """All central users with their server authorizations."""
+    """Central users with their authorizations, limited to the caller's scope.
+
+    A scoped admin sees only the sites they administer, and only the people
+    who appear on them — someone else's users are not their business.
+    """
+    allowed = scoped_server_ids()
     users = get_all_vpn_users()
     access_by_user: dict[int, list[dict]] = {}
     for a in get_all_user_access():
+        if allowed is not None and a["vpn_server_id"] not in allowed:
+            continue
         access_by_user.setdefault(a["user_id"], []).append(a)
 
-    return jsonify({"ok": True, "data": [
-        _public_user(u, access_by_user.get(u["id"], [])) for u in users
-    ]})
+    result = []
+    for u in users:
+        access = access_by_user.get(u["id"], [])
+        # Unassigned users stay visible to superadmins only; to a scoped
+        # admin they are invisible until granted one of their servers.
+        if allowed is not None and not access:
+            continue
+        result.append(_public_user(u, access))
+    return jsonify({"ok": True, "data": result})
 
 
 @bp.post("/api/vpn-users")
@@ -174,6 +195,11 @@ def add_user():
     if not password:
         password = gen_vpn_user_password()
 
+    # A scoped admin creating a user with no grants would produce an account
+    # they immediately cannot see. Require at least one of their servers.
+    if not is_superadmin() and not (body.get("servers") or []):
+        return forbidden("Assign at least one of your servers")
+
     # Validate every server grant before writing anything — a failure halfway
     # through would otherwise leave a user created with partial access.
     grants: list[tuple[int, dict]] = []
@@ -182,6 +208,8 @@ def add_user():
         if not server_id or not get_vpn_server(server_id):
             return jsonify({"ok": False, "error":
                             f"VPN server not found: {server_id}"}), 404
+        if not may_manage_server(server_id):
+            return forbidden(f"Not permitted on server {server_id}")
         data, err = _parse_access_body(entry)
         if err:
             return jsonify({"ok": False, "error": f"{err} (server {server_id})"}), 400
@@ -211,7 +239,13 @@ def get_user_detail(user_id: int):
     user = get_vpn_user(user_id)
     if not user:
         return jsonify({"ok": False, "error": "User not found"}), 404
-    return jsonify({"ok": True, "data": _public_user(user, get_user_access(user_id))})
+    allowed = scoped_server_ids()
+    access = get_user_access(user_id)
+    if allowed is not None:
+        access = [a for a in access if a["vpn_server_id"] in allowed]
+        if not access:
+            return forbidden()
+    return jsonify({"ok": True, "data": _public_user(user, access)})
 
 
 @bp.put("/api/vpn-users/<int:user_id>")
@@ -220,6 +254,8 @@ def edit_user(user_id: int):
     user = get_vpn_user(user_id)
     if not user:
         return jsonify({"ok": False, "error": "User not found"}), 404
+    if not may_manage_user(user_id):
+        return forbidden("This user also belongs to servers you do not manage")
 
     body = request.get_json(silent=True) or {}
     updates: dict = {}
@@ -287,6 +323,8 @@ def set_password(user_id: int):
     user = get_vpn_user(user_id)
     if not user:
         return jsonify({"ok": False, "error": "User not found"}), 404
+    if not may_manage_user(user_id):
+        return forbidden("This user also belongs to servers you do not manage")
 
     body = request.get_json(silent=True) or {}
     password = (body.get("password") or "").strip()
@@ -315,6 +353,8 @@ def remove_user(user_id: int):
     user = get_vpn_user(user_id)
     if not user:
         return jsonify({"ok": False, "error": "User not found"}), 404
+    if not may_manage_user(user_id):
+        return forbidden("This user also belongs to servers you do not manage")
 
     access = get_user_access(user_id)
     if access:
@@ -332,18 +372,21 @@ def remove_user(user_id: int):
 # ── Push to the Proxima instances ────────────────────────────────────────
 
 @bp.get("/api/vpn-users/sync/status")
+@superadmin_only
 def sync_status():
     """How many access rows are waiting to be pushed, and what failed."""
     return jsonify({"ok": True, "data": get_sync_summary()})
 
 
 @bp.post("/api/vpn-users/reconcile-passwords")
+@superadmin_only
 def reconcile_passwords_endpoint():
     """Carry self-service password changes to each user's other sites."""
     return jsonify({"ok": True, "data": reconcile_passwords()})
 
 
 @bp.post("/api/vpn-users/sync")
+@superadmin_only
 def sync_all():
     """Reconcile every pending row. Optional body: {"vpn_server_id": N}."""
     body = request.get_json(silent=True) or {}
@@ -364,12 +407,14 @@ def sync_one_user(user_id: int):
 # ── One-time import from the Proxima instances ───────────────────────────
 
 @bp.get("/api/vpn-users/import/preview")
+@superadmin_only
 def import_preview():
     """What the import would do. Read-only — changes nothing."""
     return jsonify({"ok": True, "data": build_preview()})
 
 
 @bp.post("/api/vpn-users/import")
+@superadmin_only
 def import_apply():
     """Import selected usernames as central users.
 
@@ -393,6 +438,8 @@ def grant_access(user_id: int, vpn_server_id: int):
     server = get_vpn_server(vpn_server_id)
     if not server:
         return jsonify({"ok": False, "error": "VPN server not found"}), 404
+    if not may_manage_server(vpn_server_id):
+        return forbidden()
 
     data, err = _parse_access_body(request.get_json(silent=True) or {})
     if err:
@@ -422,6 +469,9 @@ def revoke_access(user_id: int, vpn_server_id: int):
     keeping them would leave the access revoked in name only. To suspend
     without destroying devices, set enabled=0 on the grant instead.
     """
+    if not may_manage_server(vpn_server_id):
+        return forbidden()
+
     access = get_access(user_id, vpn_server_id)
     if not access:
         return jsonify({"ok": False, "error": "Access not found"}), 404

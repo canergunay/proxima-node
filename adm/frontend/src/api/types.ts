@@ -58,9 +58,25 @@ export interface Operation {
   completed_at: number | null;
 }
 
+export type AdminRole = "superadmin" | "admin";
+
 export interface AuthMe {
   auth_configured: boolean;
   username?: string;
+  role?: AdminRole;
+  /** VPN server ids a scoped admin may manage. Empty for a superadmin. */
+  scope?: number[];
+}
+
+export interface Admin {
+  id: number;
+  username: string;
+  role: AdminRole;
+  enabled: boolean;
+  created_at: number;
+  scope: number[];
+  /** Only present in the response that created it or reset the password. */
+  password?: string;
 }
 
 export interface VlessKeyData {

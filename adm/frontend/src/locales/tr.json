@@ -296,5 +296,21 @@
   "vpnUsers.filterLanOn": "LAN açık",
   "vpnUsers.filterLanOff": "LAN kapalı",
   "vpnUsers.filterPending": "Senkron bekliyor",
-  "vpnUsers.clearColumn": "Bu filtreyi temizle"
+  "vpnUsers.clearColumn": "Bu filtreyi temizle",
+  "admins.title": "Yöneticiler",
+  "admins.addAdmin": "Yeni yönetici",
+  "admins.username": "Kullanıcı adı",
+  "admins.role": "Rol",
+  "admins.servers": "Sunucular",
+  "admins.allServers": "Tüm sunucular",
+  "admins.superadmin": "Süper yönetici",
+  "admins.scopedAdmin": "Sunucu yöneticisi",
+  "admins.superadminHelp": "Tam yetki — sunucular, kurulum ve yönetici hesapları dahil.",
+  "admins.scopedAdminHelp": "Yalnızca aşağıda seçilen sunuculardaki VPN kullanıcılarını yönetebilir.",
+  "admins.scopeRequired": "En az bir sunucu seçin",
+  "admins.accountEnabled": "Hesap açık",
+  "admins.passwordOnce": "Bu parola bir kez gösterilir ve saklanmaz. Şimdi kopyalayın.",
+  "admins.deleteTitle": "Yöneticiyi sil",
+  "admins.deleteBody": "{{username}} hesabı silinsin mi? VPN kullanıcıları etkilenmez.",
+  "admins.roleExplainer": "Sunucu yöneticisi yalnızca kendi sunucularındaki VPN kullanıcılarını yönetir. Sunucu ekleyemez, kurulum yapamaz, izlemeyi göremez ve kapsamı dışındaki bir sunucuda da bulunan kullanıcıya dokunamaz."
 }

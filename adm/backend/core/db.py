@@ -65,11 +65,23 @@ def init_db() -> None:
             FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE SET NULL
         );
 
+        -- ADM operators. 'superadmin' may do anything; 'admin' is limited to
+        -- managing VPN users on the servers listed in admin_server_scope.
         CREATE TABLE IF NOT EXISTS admins (
             id            INTEGER PRIMARY KEY AUTOINCREMENT,
             username      TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
+            role          TEXT NOT NULL DEFAULT 'superadmin',
+            enabled       INTEGER NOT NULL DEFAULT 1,
             created_at    INTEGER NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS admin_server_scope (
+            admin_id      INTEGER NOT NULL,
+            vpn_server_id INTEGER NOT NULL,
+            PRIMARY KEY (admin_id, vpn_server_id),
+            FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE CASCADE,
+            FOREIGN KEY (vpn_server_id) REFERENCES vpn_servers(id) ON DELETE CASCADE
         );
 
         CREATE TABLE IF NOT EXISTS vpn_servers (
@@ -191,6 +203,20 @@ def init_db() -> None:
 
 def _migrate(conn: sqlite3.Connection) -> None:
     """Run schema migrations for columns added after initial release."""
+    # Roles arrived after the first admins existed. Everyone who predates
+    # them keeps full access — silently demoting the only operator would
+    # lock them out of their own panel.
+    admin_cols = {r[1] for r in conn.execute("PRAGMA table_info(admins)").fetchall()}
+    if admin_cols and "role" not in admin_cols:
+        conn.execute(
+            "ALTER TABLE admins ADD COLUMN role TEXT NOT NULL DEFAULT 'superadmin'"
+        )
+        conn.execute("UPDATE admins SET role = 'superadmin'")
+        conn.commit()
+    if admin_cols and "enabled" not in admin_cols:
+        conn.execute("ALTER TABLE admins ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1")
+        conn.commit()
+
     # Password ownership is shared: ADM sets it, and a user may change their
     # own from the client. Tracking when each side last wrote lets a push
     # carry the password only when ADM's copy is the newer one, so routine
@@ -411,12 +437,14 @@ def complete_operation(op_id: int, status: str, error: str | None = None) -> Non
 
 # ── Admin CRUD ───────────────────────────────────────────────────────────
 
-def create_admin(username: str, password_hash: str) -> int:
+def create_admin(username: str, password_hash: str,
+                 role: str = "superadmin") -> int:
     conn = get_conn()
     ts = int(time.time())
     cur = conn.execute(
-        "INSERT INTO admins (username, password_hash, created_at) VALUES (?, ?, ?)",
-        (username, password_hash, ts),
+        "INSERT INTO admins (username, password_hash, role, created_at) "
+        "VALUES (?, ?, ?, ?)",
+        (username, password_hash, role, ts),
     )
     conn.commit()
     return cur.lastrowid
@@ -425,10 +453,87 @@ def create_admin(username: str, password_hash: str) -> int:
 def get_admin_by_username(username: str) -> dict | None:
     conn = get_conn()
     row = conn.execute(
-        "SELECT id, username, password_hash, created_at FROM admins WHERE username = ?",
+        "SELECT id, username, password_hash, role, enabled, created_at "
+        "FROM admins WHERE username = ?",
         (username,),
     ).fetchone()
     return dict(row) if row else None
+
+
+def get_admin(admin_id: int) -> dict | None:
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT id, username, password_hash, role, enabled, created_at "
+        "FROM admins WHERE id = ?",
+        (admin_id,),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def get_all_admins() -> list[dict]:
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT id, username, role, enabled, created_at FROM admins ORDER BY username"
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def update_admin(admin_id: int, updates: dict) -> bool:
+    conn = get_conn()
+    allowed = {"username", "password_hash", "role", "enabled"}
+    sets, vals = [], []
+    for key, val in updates.items():
+        if key in allowed:
+            sets.append(f"{key} = ?")
+            vals.append(val)
+    if not sets:
+        return False
+    vals.append(admin_id)
+    conn.execute(f"UPDATE admins SET {', '.join(sets)} WHERE id = ?", vals)
+    conn.commit()
+    return True
+
+
+def delete_admin(admin_id: int) -> bool:
+    conn = get_conn()
+    cur = conn.execute("DELETE FROM admins WHERE id = ?", (admin_id,))
+    conn.commit()
+    return cur.rowcount > 0
+
+
+def superadmin_count(exclude_id: int | None = None) -> int:
+    """How many enabled superadmins remain — used to refuse the last one."""
+    conn = get_conn()
+    sql = "SELECT COUNT(*) AS c FROM admins WHERE role = 'superadmin' AND enabled = 1"
+    params: tuple = ()
+    if exclude_id is not None:
+        sql += " AND id != ?"
+        params = (exclude_id,)
+    return conn.execute(sql, params).fetchone()["c"]
+
+
+# ── Admin server scope ───────────────────────────────────────────────────
+
+def get_admin_scope(admin_id: int) -> list[int]:
+    """VPN server ids this admin may manage users on."""
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT vpn_server_id FROM admin_server_scope WHERE admin_id = ? "
+        "ORDER BY vpn_server_id",
+        (admin_id,),
+    ).fetchall()
+    return [r["vpn_server_id"] for r in rows]
+
+
+def set_admin_scope(admin_id: int, vpn_server_ids: list[int]) -> None:
+    conn = get_conn()
+    conn.execute("DELETE FROM admin_server_scope WHERE admin_id = ?", (admin_id,))
+    conn.executemany(
+        "INSERT OR IGNORE INTO admin_server_scope (admin_id, vpn_server_id) "
+        "VALUES (?, ?)",
+        [(admin_id, sid) for sid in vpn_server_ids],
+    )
+    conn.commit()
 
 
 def admin_count() -> int:

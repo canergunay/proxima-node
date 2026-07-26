@@ -296,5 +296,21 @@
   "vpnUsers.filterLanOn": "LAN разрешён",
   "vpnUsers.filterLanOff": "LAN запрещён",
   "vpnUsers.filterPending": "Ожидает синхронизации",
-  "vpnUsers.clearColumn": "Сбросить этот фильтр"
+  "vpnUsers.clearColumn": "Сбросить этот фильтр",
+  "admins.title": "Администраторы",
+  "admins.addAdmin": "Новый администратор",
+  "admins.username": "Имя пользователя",
+  "admins.role": "Роль",
+  "admins.servers": "Серверы",
+  "admins.allServers": "Все серверы",
+  "admins.superadmin": "Суперадминистратор",
+  "admins.scopedAdmin": "Администратор сервера",
+  "admins.superadminHelp": "Полный доступ, включая серверы, развёртывание и эти учётные записи.",
+  "admins.scopedAdminHelp": "Может управлять VPN-пользователями только на выбранных ниже серверах.",
+  "admins.scopeRequired": "Выберите хотя бы один сервер",
+  "admins.accountEnabled": "Учётная запись активна",
+  "admins.passwordOnce": "Пароль показывается один раз и не сохраняется. Скопируйте его сейчас.",
+  "admins.deleteTitle": "Удалить администратора",
+  "admins.deleteBody": "Удалить учётную запись {{username}}? VPN-пользователи не затрагиваются.",
+  "admins.roleExplainer": "Администратор сервера управляет VPN-пользователями только на своих серверах. Он не может регистрировать серверы, разворачивать их, видеть мониторинг или менять пользователя, который есть и на сервере вне его области."
 }

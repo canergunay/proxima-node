@@ -296,5 +296,21 @@
   "vpnUsers.filterLanOn": "LAN allowed",
   "vpnUsers.filterLanOff": "LAN blocked",
   "vpnUsers.filterPending": "Sync pending",
-  "vpnUsers.clearColumn": "Clear this filter"
+  "vpnUsers.clearColumn": "Clear this filter",
+  "admins.title": "Administrators",
+  "admins.addAdmin": "New administrator",
+  "admins.username": "Username",
+  "admins.role": "Role",
+  "admins.servers": "Servers",
+  "admins.allServers": "All servers",
+  "admins.superadmin": "Superadmin",
+  "admins.scopedAdmin": "Server admin",
+  "admins.superadminHelp": "Full access, including servers, provisioning and these accounts.",
+  "admins.scopedAdminHelp": "May only manage VPN users on the servers selected below.",
+  "admins.scopeRequired": "Select at least one server",
+  "admins.accountEnabled": "Account enabled",
+  "admins.passwordOnce": "This password is shown once and is not stored. Copy it now.",
+  "admins.deleteTitle": "Delete administrator",
+  "admins.deleteBody": "Delete the account {{username}}? Their VPN users are not affected.",
+  "admins.roleExplainer": "A server admin manages VPN users on their own servers only. They cannot register servers, provision, see monitoring, or change a user who also belongs to a server outside their scope."
 }

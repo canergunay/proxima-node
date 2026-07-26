@@ -24,11 +24,16 @@ def me():
     if admin_count() == 0:
         return jsonify({"ok": True, "data": {"auth_configured": False}})
 
-    user_info = getattr(g, "user_info", None)
-    if user_info:
+    admin = getattr(g, "admin", None)
+    if admin:
+        from core.db import get_admin_scope
         return jsonify({"ok": True, "data": {
             "auth_configured": True,
-            "username": user_info["username"],
+            "username": admin["username"],
+            "role": admin["role"],
+            # Which servers this account may manage users on. Empty for a
+            # superadmin, who is not scoped at all.
+            "scope": [] if admin["role"] == "superadmin" else get_admin_scope(admin["id"]),
         }})
 
     return jsonify({"ok": False, "error": "Unauthorized"}), 401

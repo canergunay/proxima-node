@@ -13,28 +13,31 @@ import {
   CircularProgress,
 } from "@mui/material";
 import SettingsIcon from "@mui/icons-material/Settings";
+import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import LogoutIcon from "@mui/icons-material/Logout";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
 import { useTranslation } from "react-i18next";
 import api from "./api/client";
 import { getToken, setToken, clearToken } from "./auth";
-import type { AuthMe } from "./api/types";
+import type { AdminRole, AuthMe } from "./api/types";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Settings from "./pages/Settings";
 import Docs from "./pages/Docs";
+import Admins from "./pages/Admins";
 
 const darkTheme = createTheme({
   palette: { mode: "dark" },
 });
 
-type Page = "dashboard" | "settings" | "docs";
+type Page = "dashboard" | "settings" | "docs" | "admins";
 
 export default function App() {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [authConfigured, setAuthConfigured] = useState(true);
   const [user, setUser] = useState<string | null>(null);
+  const [role, setRole] = useState<AdminRole>("superadmin");
   const [page, setPage] = useState<Page>("dashboard");
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
 
@@ -47,6 +50,7 @@ export default function App() {
       } else if (data.data.username) {
         setAuthConfigured(true);
         setUser(data.data.username);
+        setRole(data.data.role ?? "superadmin");
       } else {
         setUser(null);
       }
@@ -123,6 +127,12 @@ export default function App() {
               <SettingsIcon fontSize="small" sx={{ mr: 1 }} />
               {t("common.settings")}
             </MenuItem>
+            {role === "superadmin" && (
+              <MenuItem onClick={() => { setPage("admins"); setMenuAnchor(null); }}>
+                <AdminPanelSettingsIcon fontSize="small" sx={{ mr: 1 }} />
+                {t("admins.title")}
+              </MenuItem>
+            )}
             <MenuItem onClick={() => { setPage("docs"); setMenuAnchor(null); }}>
               <MenuBookIcon fontSize="small" sx={{ mr: 1 }} />
               {t("docs.title")}
@@ -135,9 +145,10 @@ export default function App() {
         </Toolbar>
       </AppBar>
       <Box component="main" sx={{ maxWidth: 1400, mx: "auto", p: { xs: 1, sm: 2 } }}>
-        {page === "dashboard" && <Dashboard />}
+        {page === "dashboard" && <Dashboard role={role} />}
         {page === "settings" && <Settings onBack={() => setPage("dashboard")} />}
         {page === "docs" && <Docs onBack={() => setPage("dashboard")} />}
+        {page === "admins" && <Admins onBack={() => setPage("dashboard")} />}
       </Box>
     </ThemeProvider>
   );
