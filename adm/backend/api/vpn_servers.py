@@ -248,7 +248,17 @@ def delete_vpn_server_endpoint(vpn_server_id: int):
         log.warning(f"[VPN] Could not remove {server['name']} from the "
                     f"management network: {e}")
 
+    name = server["name"]
     delete_vpn_server(vpn_server_id)
+
+    # Otherwise the host stays in the inventory and its host_vars file — with
+    # whatever credentials it held — outlives the server it belonged to, and a
+    # later playbook run happily targets a machine ADM no longer knows about.
+    from core.db import get_all_servers
+    from core.inventory_writer import remove_host_vars, write_hosts_yml
+    write_hosts_yml(get_all_servers(), get_all_vpn_servers())
+    remove_host_vars(name)
+
     return jsonify({"ok": True})
 
 
