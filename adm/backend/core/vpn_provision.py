@@ -193,8 +193,59 @@ def _finish_provision(vpn_server_id: int, address: str, admin_id: int | None,
         f"\n[ADM] Instance claimed at {url} as '{admin['username']}' — sign in "
         f"with your usual password. API token stored and the SSH password "
         f"discarded.\n")
+
+    _enable_singbox(vpn_server_id, op_id)
     log.info(f"[PROVISION] Claimed server {vpn_server_id} at {url} "
              f"as '{admin['username']}'")
+
+
+def _enable_singbox(vpn_server_id: int, op_id: int) -> None:
+    """Turn on sing-box, so a provisioned server can serve mobile clients.
+
+    Mobile goes through third-party apps, and sing-box is what makes the entry
+    protocol switchable and QUIC controllable there. A server without it is
+    installed but not finished: its peers get one WireGuard profile and
+    nothing else, which is the arrangement we already know performs worst on
+    mobile networks.
+
+    Done here rather than in the installer because it is an API call against a
+    running instance, and ADM is the thing holding the token. Not fatal: the
+    server is otherwise complete and this can be enabled from its own panel.
+    """
+    from core.db import append_operation_output, get_vpn_server
+    from core.proxima_client import request
+
+    server = get_vpn_server(vpn_server_id)
+    if not server or not server.get("vpn_subnet"):
+        return  # no ProximaVPN on this site, so nothing to layer on top of
+
+    try:
+        r = request(server, "POST", "/api/vpn/server/setup-singbox", timeout=90)
+    except Exception as e:  # noqa: BLE001
+        append_operation_output(op_id, f"\n[ADM] sing-box setup failed: {e}\n")
+        log.warning(f"[PROVISION] sing-box setup failed for {server['name']}: {e}")
+        return
+
+    if r.status_code in (200, 201):
+        append_operation_output(
+            op_id, "\n[ADM] sing-box enabled — peers now get a sing-box "
+                   "profile alongside the AmneziaWG one.\n")
+        log.info(f"[PROVISION] sing-box enabled on {server['name']}")
+        return
+
+    # 409 means it was already configured, which is a fine place to end up.
+    if r.status_code == 409:
+        append_operation_output(op_id, "\n[ADM] sing-box was already configured.\n")
+        return
+
+    try:
+        detail = (r.json() or {}).get("error") or f"HTTP {r.status_code}"
+    except ValueError:
+        detail = f"HTTP {r.status_code}"
+    append_operation_output(
+        op_id, f"\n[ADM] sing-box could not be enabled: {detail}. The server is "
+               f"otherwise ready; enable it from its ProximaVPN page.\n")
+    log.warning(f"[PROVISION] sing-box setup returned {detail}")
 
 
 # ── Version drift ────────────────────────────────────────────────────────
