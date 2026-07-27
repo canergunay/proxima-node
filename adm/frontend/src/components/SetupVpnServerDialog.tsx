@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import {
-  Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle,
+  Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
   Grid2 as Grid, Stack, TextField, Typography,
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import api from "../api/client";
+import type { SubnetRange } from "../api/types";
 import OutputViewer from "./OutputViewer";
 
 interface Props {
@@ -23,6 +24,9 @@ export default function SetupVpnServerDialog({ open, onClose, onCreated }: Props
   const [sshPort, setSshPort] = useState("22");
   const [sshUser, setSshUser] = useState("root");
   const [sshPassword, setSshPassword] = useState("");
+  const [vpnSubnet, setVpnSubnet] = useState("");
+  const [lanSubnet, setLanSubnet] = useState("");
+  const [ranges, setRanges] = useState<SubnetRange[]>([]);
 
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
@@ -47,9 +51,19 @@ export default function SetupVpnServerDialog({ open, onClose, onCreated }: Props
     return () => clearInterval(interval);
   }, [operationId]);
 
+  // Whoever picks the next range should be looking at the ones already taken,
+  // not at a document that drifted from what is deployed.
+  useEffect(() => {
+    if (!open) return;
+    api.get("/vpn-servers/subnets")
+      .then(({ data }) => { if (data.ok) setRanges(data.data.ranges); })
+      .catch(() => { /* handled by interceptor */ });
+  }, [open]);
+
   const reset = () => {
     setName(""); setDisplayName(""); setServerCode("");
     setSshHost(""); setSshPort("22"); setSshUser("root"); setSshPassword("");
+    setVpnSubnet(""); setLanSubnet("");
     setError(""); setOperationId(null); setOutput(""); setStatus("running");
   };
 
@@ -65,6 +79,8 @@ export default function SetupVpnServerDialog({ open, onClose, onCreated }: Props
         ssh_port: Number(sshPort) || 22,
         ssh_user: sshUser.trim(),
         ssh_password: sshPassword,
+        vpn_subnet: vpnSubnet.trim(),
+        lan_subnet: lanSubnet.trim(),
       });
       if (!data.ok) { setError(data.error); setStarting(false); return; }
       setOperationId(data.data.operation_id);
@@ -171,6 +187,47 @@ export default function SetupVpnServerDialog({ open, onClose, onCreated }: Props
                   />
                 </Grid>
               </Grid>
+            </Box>
+
+            <Box>
+              <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
+                {t("setupVpn.networks")}
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    label={t("setupVpn.vpnSubnet")} value={vpnSubnet} fullWidth
+                    onChange={(e) => setVpnSubnet(e.target.value)}
+                    placeholder="10.17.17.0/24"
+                    helperText={t("setupVpn.vpnSubnetHelp")}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    label={t("setupVpn.lanSubnet")} value={lanSubnet} fullWidth
+                    onChange={(e) => setLanSubnet(e.target.value)}
+                    placeholder="192.168.88.0/24"
+                    helperText={t("setupVpn.lanSubnetHelp")}
+                  />
+                </Grid>
+              </Grid>
+              {ranges.length > 0 && (
+                <Box sx={{ mt: 1.5 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    {t("setupVpn.takenRanges")}
+                  </Typography>
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mt: 0.5 }}>
+                    {ranges.map((r) => (
+                      <Chip
+                        key={`${r.owner}-${r.network}`}
+                        size="small"
+                        variant="outlined"
+                        label={`${r.network} — ${r.owner}`}
+                      />
+                    ))}
+                  </Box>
+                </Box>
+              )}
             </Box>
 
             <Alert severity="success" icon={false}>

@@ -349,5 +349,11 @@
   "panelAccess.revokeTitle": "Remove panel access?",
   "panelAccess.revokeBody": "{{username}} will no longer be able to sign into {{server}}. Their account there is deleted; anything else about them is untouched.",
   "panelAccess.revoke": "Remove access",
-  "setupVpn.panelAdminNote": "You become this server's panel admin, signing in with the password you already use here. Nothing is generated and nothing has to be handed over. Give someone else access later from Operators."
+  "setupVpn.panelAdminNote": "You become this server's panel admin, signing in with the password you already use here. Nothing is generated and nothing has to be handed over. Give someone else access later from Operators.",
+  "setupVpn.networks": "Site networks",
+  "setupVpn.vpnSubnet": "ProximaVPN subnet",
+  "setupVpn.vpnSubnetHelp": "As set on the router, e.g. 10.17.17.0/24",
+  "setupVpn.lanSubnet": "Site LAN",
+  "setupVpn.lanSubnetHelp": "The range the MikroTik hands out",
+  "setupVpn.takenRanges": "Already in use — anything overlapping these is refused:"
 }

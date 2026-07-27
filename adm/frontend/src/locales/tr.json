@@ -349,5 +349,11 @@
   "panelAccess.revokeTitle": "Panel erişimi kaldırılsın mı?",
   "panelAccess.revokeBody": "{{username}} artık {{server}} paneline giremeyecek. Oradaki hesabı silinir; kişiyle ilgili başka hiçbir şey değişmez.",
   "panelAccess.revoke": "Erişimi kaldır",
-  "setupVpn.panelAdminNote": "Bu sunucunun panel yöneticisi sen olursun ve burada zaten kullandığın parolayla girersin. Hiçbir şey üretilmez, kimseye bir şey teslim edilmez. Başkasına erişimi sonradan Operatörler'den verirsin."
+  "setupVpn.panelAdminNote": "Bu sunucunun panel yöneticisi sen olursun ve burada zaten kullandığın parolayla girersin. Hiçbir şey üretilmez, kimseye bir şey teslim edilmez. Başkasına erişimi sonradan Operatörler'den verirsin.",
+  "setupVpn.networks": "Saha ağları",
+  "setupVpn.vpnSubnet": "ProximaVPN subnet",
+  "setupVpn.vpnSubnetHelp": "Router'da belirlendiği gibi, örn. 10.17.17.0/24",
+  "setupVpn.lanSubnet": "Saha LAN'ı",
+  "setupVpn.lanSubnetHelp": "MikroTik'in dağıttığı aralık",
+  "setupVpn.takenRanges": "Kullanımda — bunlarla çakışan hiçbir aralık kabul edilmez:"
 }

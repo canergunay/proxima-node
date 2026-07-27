@@ -326,3 +326,10 @@ export interface SyncSummary {
   error: number;
   errors: { username: string; server_name: string; sync_error: string }[];
 }
+
+/** One range already spoken for, shown so the next one is picked knowingly. */
+export interface SubnetRange {
+  network: string;
+  owner: string;
+  kind: "management" | "ProximaVPN" | "LAN";
+}

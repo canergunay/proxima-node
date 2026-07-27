@@ -127,6 +127,13 @@ def init_db() -> None:
             ssh_password_enc TEXT,
             server_code     TEXT,
             callhome_ip     TEXT,
+            -- The site's own ranges, decided at the router step before the box
+            -- ships and recorded here rather than allocated. ADM's job is to
+            -- refuse an overlap, not to pick the number: the MikroTik already
+            -- has it, and a second authority deciding the same thing would
+            -- only ever lose.
+            vpn_subnet      TEXT,
+            lan_subnet      TEXT,
             created_at      INTEGER NOT NULL,
             updated_at      INTEGER NOT NULL
         );
@@ -346,6 +353,10 @@ def _migrate(conn: sqlite3.Connection) -> None:
             "ALTER TABLE vpn_servers ADD COLUMN callhome_ip TEXT",
         ):
             conn.execute(stmt)
+        conn.commit()
+    if "vpn_subnet" not in vpn_cols:
+        conn.execute("ALTER TABLE vpn_servers ADD COLUMN vpn_subnet TEXT")
+        conn.execute("ALTER TABLE vpn_servers ADD COLUMN lan_subnet TEXT")
         conn.commit()
 
 
@@ -729,13 +740,15 @@ def create_vpn_server(data: dict) -> int:
     cur = conn.execute(
         "INSERT INTO vpn_servers (name, display_name, url, public_url, api_token_enc, "
         "ssh_host, ssh_port, ssh_user, ssh_password_enc, server_code, callhome_ip, "
-        "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "vpn_subnet, lan_subnet, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             data["name"], data["display_name"], data["url"],
             data.get("public_url", ""), data.get("api_token_enc"),
             data.get("ssh_host"), data.get("ssh_port", 22),
             data.get("ssh_user", "root"), data.get("ssh_password_enc"),
             data.get("server_code"), data.get("callhome_ip"),
+            data.get("vpn_subnet"), data.get("lan_subnet"),
             ts, ts,
         ),
     )
@@ -761,7 +774,7 @@ def update_vpn_server(vpn_server_id: int, updates: dict) -> bool:
     conn = get_conn()
     allowed = {"name", "display_name", "url", "public_url", "api_token_enc",
                "ssh_host", "ssh_port", "ssh_user", "ssh_password_enc",
-               "server_code", "callhome_ip"}
+               "server_code", "callhome_ip", "vpn_subnet", "lan_subnet"}
     sets, vals = [], []
     for key, val in updates.items():
         if key in allowed:

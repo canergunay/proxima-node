@@ -17,6 +17,7 @@ from core.db import (
 )
 from core.authz import scoped_server_ids, superadmin_only
 from core.proxima_client import request as _proxima_request
+from core.subnets import validate_for_server
 
 log = logging.getLogger("adm.vpn_servers")
 bp = Blueprint("vpn_servers", __name__)
@@ -131,11 +132,19 @@ def add_vpn_server():
 
     public_url = (body.get("public_url") or "").strip().rstrip("/")
 
+    vpn_subnet = (body.get("vpn_subnet") or "").strip()
+    lan_subnet = (body.get("lan_subnet") or "").strip()
+    conflict = validate_for_server(vpn_subnet, lan_subnet)
+    if conflict:
+        return jsonify({"ok": False, "error": conflict}), 409
+
     data = {
         "name": name,
         "display_name": display_name,
         "url": url,
         "public_url": public_url,
+        "vpn_subnet": vpn_subnet,
+        "lan_subnet": lan_subnet,
     }
 
     api_token = (body.get("api_token") or "").strip()
@@ -183,7 +192,8 @@ def update_vpn_server_endpoint(vpn_server_id: int):
     body = request.get_json(force=True, silent=True) or {}
     updates = {}
 
-    for field in ("name", "display_name", "url", "public_url"):
+    for field in ("name", "display_name", "url", "public_url",
+                  "vpn_subnet", "lan_subnet", "server_code"):
         if field in body:
             val = body[field]
             updates[field] = val.strip() if isinstance(val, str) else val
@@ -192,6 +202,16 @@ def update_vpn_server_endpoint(vpn_server_id: int):
         updates["url"] = updates["url"].rstrip("/")
     if "public_url" in updates:
         updates["public_url"] = updates["public_url"].rstrip("/")
+
+    if "vpn_subnet" in updates or "lan_subnet" in updates:
+        # Checked against everything except this server's own current values —
+        # otherwise a range would be found to conflict with itself.
+        conflict = validate_for_server(
+            updates.get("vpn_subnet", server.get("vpn_subnet") or ""),
+            updates.get("lan_subnet", server.get("lan_subnet") or ""),
+            exclude_server_id=vpn_server_id)
+        if conflict:
+            return jsonify({"ok": False, "error": conflict}), 409
 
     api_token = (body.get("api_token") or "").strip()
     if api_token:
@@ -256,6 +276,20 @@ def proxy_to_proxima(vpn_server_id: int, subpath: str):
 
 # ── Provisioning ─────────────────────────────────────────────────────────
 
+@bp.get("/api/vpn-servers/subnets")
+def list_subnets():
+    """Every range ADM knows about, so whoever picks the next one can see them.
+
+    The register lived in a document, which meant it drifted from what was
+    actually deployed. Reading it from the servers themselves cannot.
+    """
+    from core.subnets import MANAGEMENT_NETWORK, existing_ranges
+    return jsonify({"ok": True, "data": {
+        "management_network": MANAGEMENT_NETWORK,
+        "ranges": existing_ranges(),
+    }})
+
+
 @bp.post("/api/vpn-servers/provision")
 @superadmin_only
 def provision_vpn_server():
@@ -291,8 +325,18 @@ def provision_vpn_server():
         return jsonify({"ok": False, "error":
                         f"A VPN server is already named {name}"}), 409
 
+    # The site's ranges come from the router step, so they are known before
+    # this runs. Refused here rather than after the box is built.
+    vpn_subnet = (body.get("vpn_subnet") or "").strip()
+    lan_subnet = (body.get("lan_subnet") or "").strip()
+    conflict = validate_for_server(vpn_subnet, lan_subnet)
+    if conflict:
+        return jsonify({"ok": False, "error": conflict}), 409
+
     server_code = (body.get("server_code") or name).strip().upper()[:5]
     data = {
+        "vpn_subnet": vpn_subnet,
+        "lan_subnet": lan_subnet,
         "name": name,
         "display_name": (body.get("display_name") or "").strip() or name.upper(),
         # Filled in once the instance is claimed over the management tunnel.
