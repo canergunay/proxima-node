@@ -327,7 +327,7 @@
   "setupVpn.sshUser": "Пользователь",
   "setupVpn.sshUserHelp": "Пользователь с sudo; Debian не пускает root по паролю",
   "setupVpn.sshPassword": "Пароль SSH",
-  "setupVpn.sshPasswordHelp": "Используется один раз для входа, затем удаляется",
+  "setupVpn.sshPasswordHelp": "Используется один раз для входа, затем удаляется. Оставьте пустым, если на машине уже есть ключ ADM.",
   "setupVpn.panelAdmin": "Администратор панели Proxima",
   "setupVpn.panelAdminHelp": "Минимум 8 символов",
   "setupVpn.start": "Установить",

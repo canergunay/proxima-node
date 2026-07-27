@@ -327,7 +327,7 @@
   "setupVpn.sshUser": "Kullanıcı",
   "setupVpn.sshUserHelp": "sudo yetkili kullanıcı; Debian root'a parolayla izin vermez",
   "setupVpn.sshPassword": "SSH parolası",
-  "setupVpn.sshPasswordHelp": "Bir kez girmek için kullanılır, sonra silinir",
+  "setupVpn.sshPasswordHelp": "Bir kez girmek için kullanılır, sonra silinir. Kutuda ADM'in anahtarı zaten varsa boş bırak.",
   "setupVpn.panelAdmin": "Proxima panel yöneticisi",
   "setupVpn.panelAdminHelp": "En az 8 karakter",
   "setupVpn.start": "Kur",

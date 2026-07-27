@@ -81,10 +81,11 @@ export default function SetupVpnServerDialog({ open, onClose, onCreated }: Props
     setStarting(false);
   };
 
+  // No password required: a box already carrying ADM's key is the normal case
+  // for a reinstall or a kit prepared before it ships.
   const canStart =
     name.trim().length > 0 &&
     sshHost.trim().length > 0 &&
-    sshPassword.length > 0 &&
     adminPassword.length >= MIN_PASSWORD;
 
   const running = operationId !== null;

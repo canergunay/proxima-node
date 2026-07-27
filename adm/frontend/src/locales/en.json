@@ -327,7 +327,7 @@
   "setupVpn.sshUser": "User",
   "setupVpn.sshUserHelp": "A sudo user; Debian blocks root by password",
   "setupVpn.sshPassword": "SSH password",
-  "setupVpn.sshPasswordHelp": "Used once to get in, then discarded",
+  "setupVpn.sshPasswordHelp": "Used once to get in, then discarded. Leave empty if the box already has ADM's key.",
   "setupVpn.panelAdmin": "Proxima panel admin",
   "setupVpn.panelAdminHelp": "At least 8 characters",
   "setupVpn.start": "Install",

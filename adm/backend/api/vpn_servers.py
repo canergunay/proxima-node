@@ -278,8 +278,10 @@ def provision_vpn_server():
         return jsonify({"ok": False, "error": "name is required"}), 400
     if not ssh_host:
         return jsonify({"ok": False, "error": "ssh_host is required"}), 400
-    if not ssh_password:
-        return jsonify({"ok": False, "error": "ssh_password is required"}), 400
+    # The password is optional on purpose. A box prepared in the workshop, or
+    # one being reinstalled, already carries ADM's key — demanding a password
+    # there would force the operator to keep a site password around, which is
+    # the exposure this whole flow exists to remove.
     if len(admin_password) < 8:
         return jsonify({"ok": False, "error":
                         "admin_password must be at least 8 characters"}), 400
@@ -304,7 +306,7 @@ def provision_vpn_server():
         "ssh_host": ssh_host,
         "ssh_port": int(body.get("ssh_port") or 22),
         "ssh_user": (body.get("ssh_user") or "root").strip(),
-        "ssh_password_enc": encrypt_value(ssh_password),
+        "ssh_password_enc": encrypt_value(ssh_password) if ssh_password else None,
         "server_code": server_code,
     }
 
