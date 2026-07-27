@@ -111,8 +111,12 @@ def render_conf() -> str:
         # an admin on wg-easy's interface has to reach the sites, so this
         # interface forwards rather than terminating.
         "PostUp   = sysctl -q -w net.ipv4.ip_forward=1",
-        f"PostUp   = iptables -A FORWARD -i {INTERFACE} -j ACCEPT",
-        f"PostUp   = iptables -A FORWARD -o {INTERFACE} -j ACCEPT",
+        # Inserted at the head, not appended. ufw jumps to its own chains
+        # early in FORWARD and the policy is DROP, so a rule at the end only
+        # works if ufw happens not to have decided first. Depending on that
+        # is how forwarding breaks silently months later.
+        f"PostUp   = iptables -I FORWARD 1 -i {INTERFACE} -j ACCEPT",
+        f"PostUp   = iptables -I FORWARD 1 -o {INTERFACE} -j ACCEPT",
         f"PostDown = iptables -D FORWARD -i {INTERFACE} -j ACCEPT",
         f"PostDown = iptables -D FORWARD -o {INTERFACE} -j ACCEPT",
     ]
