@@ -32,6 +32,12 @@ INTERFACE = os.environ.get("ADM_MGMT_INTERFACE", "wg-adm")
 SUBNET = os.environ.get("ADM_MGMT_SUBNET", "10.12.12.0/24")
 LISTEN_PORT = int(os.environ.get("ADM_MGMT_PORT", "51822"))
 ENDPOINT = os.environ.get("ADM_MGMT_ENDPOINT", "vpn.ergunay.com")
+# Where the humans are — wg-easy's interface. Sites have to route it back or
+# an admin reaching one gets no reply: the site would receive the packet and
+# have nowhere to send the answer. Carried explicitly rather than masqueraded,
+# so a site's logs name the device that reached it instead of showing every
+# admin as the gateway.
+ADMIN_NETWORK = os.environ.get("ADM_ADMIN_NETWORK", "10.13.13.0/24")
 CONF_PATH = os.environ.get("ADM_MGMT_CONF", f"/etc/wireguard/{INTERFACE}.conf")
 # Kept beside the database rather than in /etc: this is ADM's state, and it
 # should travel with the rest of it.
@@ -214,9 +220,10 @@ def ensure_peer(vpn_server_id: int) -> tuple[str | None, str | None]:
         "[Peer]\n"
         f"PublicKey    = {server_public_key()}\n"
         + (f"PresharedKey = {psk}\n" if psk else "")
-        # The management network only. A site has its own LAN, and routing
-        # ERG's into this tunnel would break it wherever the two overlap.
-        + f"AllowedIPs   = {SUBNET}\n"
+        # The management network and the admins' own — nothing more. A site
+        # has its own LAN, and routing ERG's into this tunnel would break it
+        # wherever the two overlap.
+        + f"AllowedIPs   = {SUBNET}, {ADMIN_NETWORK}\n"
         f"Endpoint     = {ENDPOINT}:{LISTEN_PORT}\n"
         "PersistentKeepalive = 25\n"
     )
