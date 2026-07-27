@@ -45,7 +45,7 @@ def _push_upsert(server: dict, row: dict) -> tuple[bool, str | None, bool]:
         payload["password_hash"] = row["password_hash"]
 
     try:
-        r = request(server, "PUT", f"/api/admins/{row['username']}", json=payload)
+        r = request(server, "PUT", f"/api/admins/{row['username']}", body=payload)
     except Exception as e:  # noqa: BLE001 — surfaced to the operator verbatim
         return False, str(e), False
 
@@ -58,7 +58,7 @@ def _push_upsert(server: dict, row: dict) -> tuple[bool, str | None, bool]:
     if r.status_code == 400 and not send_password:
         payload["password_hash"] = row["password_hash"]
         try:
-            r = request(server, "PUT", f"/api/admins/{row['username']}", json=payload)
+            r = request(server, "PUT", f"/api/admins/{row['username']}", body=payload)
         except Exception as e:  # noqa: BLE001
             return False, str(e), False
         if r.status_code in (200, 201):
