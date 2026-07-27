@@ -6,12 +6,13 @@ import AddIcon from "@mui/icons-material/Add";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { useTranslation } from "react-i18next";
 import api from "../api/client";
-import type { AdminRole, Server, VpnServer } from "../api/types";
+import type { AdminRole, Server, SourceRevision, VpnServer } from "../api/types";
 import ServerCard from "../components/ServerCard";
 import ProvisionDialog from "../components/ProvisionDialog";
 import ServerDetailDialog from "../components/ServerDetailDialog";
 import VpnServerCard from "../components/VpnServerCard";
 import AddVpnServerDialog from "../components/AddVpnServerDialog";
+import SetupVpnServerDialog from "../components/SetupVpnServerDialog";
 import VpnServerDetailDialog from "../components/VpnServerDetailDialog";
 import MonitoringTab from "../components/MonitoringTab";
 import VpnUsersTab from "../components/VpnUsersTab";
@@ -37,6 +38,8 @@ export default function Dashboard({ role }: { role: AdminRole }) {
   const [vpnServers, setVpnServers] = useState<VpnServer[]>([]);
   const [vpnLoading, setVpnLoading] = useState(true);
   const [addVpnOpen, setAddVpnOpen] = useState(false);
+  const [setupVpnOpen, setSetupVpnOpen] = useState(false);
+  const [sourceRevision, setSourceRevision] = useState<SourceRevision | null>(null);
   const [selectedVpn, setSelectedVpn] = useState<VpnServer | null>(null);
 
   const fetchServers = useCallback(async () => {
@@ -51,9 +54,14 @@ export default function Dashboard({ role }: { role: AdminRole }) {
     try {
       const { data } = await api.get("/vpn-servers");
       if (data.ok) setVpnServers(data.data);
+      // What ADM would deploy now — each card compares itself against it.
+      if (isSuperadmin) {
+        const rev = await api.get("/vpn-servers/source-revision");
+        if (rev.data.ok) setSourceRevision(rev.data.data);
+      }
     } catch { /* handled by interceptor */ }
     setVpnLoading(false);
-  }, []);
+  }, [isSuperadmin]);
 
   // Fetch exit servers on mount + polling
   useEffect(() => {
@@ -109,14 +117,24 @@ export default function Dashboard({ role }: { role: AdminRole }) {
             </Button>
           )}
           {tab === 1 && (
-            <Button
-              startIcon={<AddIcon />}
-              onClick={() => setAddVpnOpen(true)}
-              variant="contained"
-              size="small"
-            >
-              {t("dashboard.addVpnServer")}
-            </Button>
+            <>
+              <Button
+                startIcon={<AddIcon />}
+                onClick={() => setSetupVpnOpen(true)}
+                variant="contained"
+                size="small"
+              >
+                {t("dashboard.setupVpnServer")}
+              </Button>
+              <Button
+                startIcon={<AddIcon />}
+                onClick={() => setAddVpnOpen(true)}
+                variant="outlined"
+                size="small"
+              >
+                {t("dashboard.addVpnServer")}
+              </Button>
+            </>
           )}
         </Box>
       </Box>
@@ -189,6 +207,7 @@ export default function Dashboard({ role }: { role: AdminRole }) {
                 <Grid key={server.id} size={{ xs: 12, sm: 6, md: 4 }}>
                   <VpnServerCard
                     server={server}
+                    sourceRevision={sourceRevision}
                     onClick={() => setSelectedVpn(server)}
                     onEdit={() => setSelectedVpn(server)}
                     onDelete={() => setSelectedVpn(server)}
@@ -197,6 +216,12 @@ export default function Dashboard({ role }: { role: AdminRole }) {
               ))}
             </Grid>
           )}
+
+          <SetupVpnServerDialog
+            open={setupVpnOpen}
+            onClose={() => setSetupVpnOpen(false)}
+            onCreated={() => { setSetupVpnOpen(false); fetchVpnServers(); }}
+          />
 
           <AddVpnServerDialog
             open={addVpnOpen}

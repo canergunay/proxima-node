@@ -93,6 +93,20 @@ export interface VlessKeyData {
 
 // ── VPN Servers (Proxima instances) ─────────────────────────────────────
 
+export interface DeployedVersion {
+  commit: string;
+  short: string;
+  committed_at: number | null;
+  deployed_at: number | null;
+  source: string | null;
+}
+
+export interface SourceRevision {
+  commit: string;
+  short: string;
+  committed_at: number;
+}
+
 export interface VpnServer {
   id: number;
   name: string;
@@ -129,6 +143,8 @@ export interface ProximaStatus {
   bypass_active: boolean;
   bypass_slots: string[];
   system?: ProximaSystemMetrics;
+  /** Null when the server was not deployed by ADM. */
+  version?: DeployedVersion | null;
 }
 
 export interface ProximaSlotSummary {

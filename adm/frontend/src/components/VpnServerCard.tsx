@@ -70,6 +70,8 @@ const SERVICES: ServiceDef[] = [
 
 interface Props {
   server: VpnServer;
+  /** Revision ADM would deploy now; null while unknown. */
+  sourceRevision?: { commit: string; short: string } | null;
   onClick: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -102,7 +104,7 @@ function slotDotColor(ipOk: boolean | null | undefined): string {
   return "#616161";
 }
 
-export default function VpnServerCard({ server, onClick, onEdit, onDelete }: Props) {
+export default function VpnServerCard({ server, sourceRevision, onClick, onEdit, onDelete }: Props) {
   const { t } = useTranslation();
   const status = server.proxima_status;
   const isOnline = server.online;
@@ -295,6 +297,22 @@ export default function VpnServerCard({ server, onClick, onEdit, onDelete }: Pro
                   {t("vpnServer.deployment")}: {status.deployment}
                 </Typography>
               )}
+              {/* A server ADM never deployed reports no revision — which is
+                  itself worth showing, rather than implying it is current. */}
+              <Box sx={{ mt: 0.5 }}>
+                {!status.version ? (
+                  <Chip size="small" variant="outlined" label={t("vpnServer.unmanaged")} />
+                ) : sourceRevision && status.version.commit !== sourceRevision.commit ? (
+                  <Tooltip title={t("vpnServer.revision", { short: status.version.short })}>
+                    <Chip size="small" color="warning" label={t("vpnServer.updateAvailable")} />
+                  </Tooltip>
+                ) : (
+                  <Tooltip title={t("vpnServer.revision", { short: status.version.short })}>
+                    <Chip size="small" color="success" variant="outlined"
+                          label={t("vpnServer.upToDate")} />
+                  </Tooltip>
+                )}
+              </Box>
             </Box>
           )}
 
