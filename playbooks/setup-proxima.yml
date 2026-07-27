@@ -31,7 +31,9 @@
   become: true
 
   vars:
-    proxima_repo: "https://github.com/canergunay/proxima.git"
+    # Source checkout on the ADM host. ADM keeps this current; sites never
+    # talk to GitHub themselves.
+    proxima_src: "/opt/erg/proxima-src"
     install_path: "/opt/proxima"
     callhome_iface: "wg-erg"
     skip_callhome: false
@@ -189,6 +191,21 @@
         state: absent
       when: not skip_proxima | bool
 
+    - name: Record the deployed revision
+      ansible.builtin.copy:
+        content: "{{ {
+            'commit': src_rev.stdout_lines[0],
+            'short': src_rev.stdout_lines[0][:7],
+            'committed_at': src_rev.stdout_lines[1] | int,
+            'deployed_at': ansible_date_time.epoch | int,
+            'source': 'adm',
+          } | to_nice_json }}"
+        dest: "{{ install_path }}/config/version.json"
+        owner: root
+        group: root
+        mode: "0644"
+      when: not skip_proxima | bool
+
     - name: Wait for the Proxima API
       ansible.builtin.uri:
         url: "http://127.0.0.1:5050/api/status"
@@ -203,7 +220,8 @@
       ansible.builtin.debug:
         msg: >-
           Proxima is up on {{ ansible_default_ipv4.address }}:5050
-          (site {{ server_code }}). ADM can now claim it via /api/auth/setup.
+          (site {{ server_code }}, revision {{ src_rev.stdout_lines[0][:7] }}).
+          ADM can now claim it via /api/auth/setup.
       when: not skip_proxima | bool
 
   handlers:
