@@ -13,8 +13,6 @@ interface Props {
   onCreated: () => void;
 }
 
-const MIN_PASSWORD = 8;
-
 export default function SetupVpnServerDialog({ open, onClose, onCreated }: Props) {
   const { t } = useTranslation();
 
@@ -25,8 +23,6 @@ export default function SetupVpnServerDialog({ open, onClose, onCreated }: Props
   const [sshPort, setSshPort] = useState("22");
   const [sshUser, setSshUser] = useState("root");
   const [sshPassword, setSshPassword] = useState("");
-  const [adminUsername, setAdminUsername] = useState("admin");
-  const [adminPassword, setAdminPassword] = useState("");
 
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
@@ -54,7 +50,6 @@ export default function SetupVpnServerDialog({ open, onClose, onCreated }: Props
   const reset = () => {
     setName(""); setDisplayName(""); setServerCode("");
     setSshHost(""); setSshPort("22"); setSshUser("root"); setSshPassword("");
-    setAdminUsername("admin"); setAdminPassword("");
     setError(""); setOperationId(null); setOutput(""); setStatus("running");
   };
 
@@ -70,8 +65,6 @@ export default function SetupVpnServerDialog({ open, onClose, onCreated }: Props
         ssh_port: Number(sshPort) || 22,
         ssh_user: sshUser.trim(),
         ssh_password: sshPassword,
-        admin_username: adminUsername.trim(),
-        admin_password: adminPassword,
       });
       if (!data.ok) { setError(data.error); setStarting(false); return; }
       setOperationId(data.data.operation_id);
@@ -83,10 +76,7 @@ export default function SetupVpnServerDialog({ open, onClose, onCreated }: Props
 
   // No password required: a box already carrying ADM's key is the normal case
   // for a reinstall or a kit prepared before it ships.
-  const canStart =
-    name.trim().length > 0 &&
-    sshHost.trim().length > 0 &&
-    adminPassword.length >= MIN_PASSWORD;
+  const canStart = name.trim().length > 0 && sshHost.trim().length > 0;
 
   const running = operationId !== null;
   const finished = running && status !== "running";
@@ -183,28 +173,9 @@ export default function SetupVpnServerDialog({ open, onClose, onCreated }: Props
               </Grid>
             </Box>
 
-            <Box>
-              <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
-                {t("setupVpn.panelAdmin")}
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <TextField
-                    label={t("admins.username")} value={adminUsername} fullWidth
-                    onChange={(e) => setAdminUsername(e.target.value)}
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
-                  <TextField
-                    label={t("vpnUsers.password")} value={adminPassword}
-                    type="password" fullWidth
-                    onChange={(e) => setAdminPassword(e.target.value)}
-                    error={adminPassword.length > 0 && adminPassword.length < MIN_PASSWORD}
-                    helperText={t("setupVpn.panelAdminHelp")}
-                  />
-                </Grid>
-              </Grid>
-            </Box>
+            <Alert severity="success" icon={false}>
+              {t("setupVpn.panelAdminNote")}
+            </Alert>
           </Stack>
         )}
       </DialogContent>

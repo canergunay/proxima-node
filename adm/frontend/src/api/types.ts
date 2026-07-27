@@ -68,13 +68,24 @@ export interface AuthMe {
   scope?: number[];
 }
 
+/** Whether an operator can sign into one site's own Proxima panel. */
+export interface PanelAccess {
+  vpn_server_id: number;
+  sync_status: "pending" | "synced" | "pending_delete";
+  sync_error: string | null;
+  synced_at: number | null;
+}
+
 export interface Admin {
   id: number;
   username: string;
   role: AdminRole;
   enabled: boolean;
   created_at: number;
+  /** Whose users they may edit here — not the same as `access`. */
   scope: number[];
+  /** Which site panels they can log into. */
+  access: PanelAccess[];
   /** Only present in the response that created it or reset the password. */
   password?: string;
 }

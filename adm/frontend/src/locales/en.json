@@ -328,8 +328,6 @@
   "setupVpn.sshUserHelp": "A sudo user; Debian blocks root by password",
   "setupVpn.sshPassword": "SSH password",
   "setupVpn.sshPasswordHelp": "Used once to get in, then discarded. Leave empty if the box already has ADM's key.",
-  "setupVpn.panelAdmin": "Proxima panel admin",
-  "setupVpn.panelAdminHelp": "At least 8 characters",
   "setupVpn.start": "Install",
   "setupVpn.running": "Installing. This takes several minutes — Docker images are built and the AmneziaWG module is compiled on the machine.",
   "setupVpn.done": "Installed and claimed. The server is now managed from here.",
@@ -339,5 +337,17 @@
   "vpnServer.updateAvailable": "Update available",
   "vpnServer.unmanaged": "Not deployed by ADM",
   "vpnServer.revision": "Revision {{short}}",
-  "vpnServer.update": "Update"
+  "vpnServer.update": "Update",
+  "panelAccess.explainer": "The columns on the right decide who can sign into each site's own Proxima panel. They use the password they already have here — nothing separate to issue or remember. This is not the same as the servers column: that one only decides whose accounts they may edit in ADM.",
+  "panelAccess.granted": "Can sign into this panel",
+  "panelAccess.none": "No panel account here",
+  "panelAccess.pendingGrant": "Waiting to reach this site",
+  "panelAccess.pendingRevoke": "Waiting to be removed from this site",
+  "panelAccess.error": "Last attempt failed: {{error}}",
+  "panelAccess.retry": "{{count}} change(s) have not reached their site — retry",
+  "panelAccess.partial": "Saved, but a site could not be reached: {{detail}}",
+  "panelAccess.revokeTitle": "Remove panel access?",
+  "panelAccess.revokeBody": "{{username}} will no longer be able to sign into {{server}}. Their account there is deleted; anything else about them is untouched.",
+  "panelAccess.revoke": "Remove access",
+  "setupVpn.panelAdminNote": "You become this server's panel admin, signing in with the password you already use here. Nothing is generated and nothing has to be handed over. Give someone else access later from Operators."
 }

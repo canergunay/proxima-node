@@ -328,8 +328,6 @@
   "setupVpn.sshUserHelp": "sudo yetkili kullanıcı; Debian root'a parolayla izin vermez",
   "setupVpn.sshPassword": "SSH parolası",
   "setupVpn.sshPasswordHelp": "Bir kez girmek için kullanılır, sonra silinir. Kutuda ADM'in anahtarı zaten varsa boş bırak.",
-  "setupVpn.panelAdmin": "Proxima panel yöneticisi",
-  "setupVpn.panelAdminHelp": "En az 8 karakter",
   "setupVpn.start": "Kur",
   "setupVpn.running": "Kuruluyor. Birkaç dakika sürer — makinede Docker imajları derleniyor ve AmneziaWG modülü inşa ediliyor.",
   "setupVpn.done": "Kuruldu ve sahiplenildi. Sunucu artık buradan yönetiliyor.",
@@ -339,5 +337,17 @@
   "vpnServer.updateAvailable": "Güncelleme var",
   "vpnServer.unmanaged": "ADM ile kurulmamış",
   "vpnServer.revision": "Revizyon {{short}}",
-  "vpnServer.update": "Güncelle"
+  "vpnServer.update": "Güncelle",
+  "panelAccess.explainer": "Sağdaki sütunlar, her sahanın kendi Proxima paneline kimin girebileceğini belirler. Kişi burada zaten kullandığı parolayla girer — ayrıca üretilecek ya da akılda tutulacak bir şey yok. Bu, sunucular sütunuyla aynı şey değil: o sütun yalnızca ADM'de kimin hesaplarını düzenleyebileceğini belirler.",
+  "panelAccess.granted": "Bu panele girebilir",
+  "panelAccess.none": "Burada panel hesabı yok",
+  "panelAccess.pendingGrant": "Sahaya ulaşmayı bekliyor",
+  "panelAccess.pendingRevoke": "Sahadan kaldırılmayı bekliyor",
+  "panelAccess.error": "Son deneme başarısız: {{error}}",
+  "panelAccess.retry": "{{count}} değişiklik sahasına ulaşmadı — tekrar dene",
+  "panelAccess.partial": "Kaydedildi, ancak bir sahaya ulaşılamadı: {{detail}}",
+  "panelAccess.revokeTitle": "Panel erişimi kaldırılsın mı?",
+  "panelAccess.revokeBody": "{{username}} artık {{server}} paneline giremeyecek. Oradaki hesabı silinir; kişiyle ilgili başka hiçbir şey değişmez.",
+  "panelAccess.revoke": "Erişimi kaldır",
+  "setupVpn.panelAdminNote": "Bu sunucunun panel yöneticisi sen olursun ve burada zaten kullandığın parolayla girersin. Hiçbir şey üretilmez, kimseye bir şey teslim edilmez. Başkasına erişimi sonradan Operatörler'den verirsin."
 }

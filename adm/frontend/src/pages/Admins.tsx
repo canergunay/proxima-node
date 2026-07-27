@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert, Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogActions,
   DialogContent, DialogTitle, FormControlLabel, IconButton, MenuItem, Paper,
@@ -10,6 +10,10 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
+import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
+import SyncIcon from "@mui/icons-material/Sync";
 import { useTranslation } from "react-i18next";
 import api from "../api/client";
 import type { Admin, AdminRole, VpnServer } from "../api/types";
@@ -27,6 +31,8 @@ export default function Admins({ onBack }: Props) {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Admin | null | "new">(null);
   const [deleting, setDeleting] = useState<Admin | null>(null);
+  const [revoking, setRevoking] = useState<{ admin: Admin; serverId: number } | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
   const [snack, setSnack] = useState<{ msg: string; error?: boolean } | null>(null);
 
   const fetchAll = useCallback(async () => {
@@ -55,6 +61,62 @@ export default function Admins({ onBack }: Props) {
   const serverName = (id: number) =>
     servers.find((s) => s.id === id)?.display_name ?? `#${id}`;
 
+  // Panel access: whether this operator can sign into a site's own Proxima
+  // panel. Separate from `scope`, which only decides whose accounts they may
+  // edit here.
+  const setAccess = async (admin: Admin, serverIds: number[]) => {
+    setBusy(`${admin.id}`);
+    try {
+      const { data } = await api.put(`/admins/${admin.id}/access`, {
+        vpn_server_ids: serverIds,
+      });
+      if (!data.ok) {
+        setSnack({ msg: data.error, error: true });
+      } else {
+        const failed = data.data.sync?.failed ?? [];
+        if (failed.length) {
+          setSnack({
+            msg: t("panelAccess.partial", {
+              detail: failed.map((f: { error: string }) => f.error).join("; "),
+            }),
+            error: true,
+          });
+        }
+      }
+    } catch {
+      setSnack({ msg: t("vpnUsers.requestFailed"), error: true });
+    }
+    setBusy(null);
+    fetchAll();
+  };
+
+  const toggleAccess = (admin: Admin, serverId: number, granted: boolean) => {
+    const current = admin.access
+      .filter((a) => a.sync_status !== "pending_delete")
+      .map((a) => a.vpn_server_id);
+    if (granted) {
+      // Taking a panel away can strand whoever is relying on it, so it is
+      // asked about; granting one is reversible and is not.
+      setRevoking({ admin, serverId });
+      return;
+    }
+    setAccess(admin, [...current, serverId]);
+  };
+
+  const retryPending = async () => {
+    setBusy("sync");
+    try {
+      await api.post("/admins/sync");
+    } catch { /* handled by interceptor */ }
+    setBusy(null);
+    fetchAll();
+  };
+
+  const pendingCount = useMemo(
+    () => admins.reduce(
+      (n, a) => n + a.access.filter((x) => x.sync_status !== "synced").length, 0),
+    [admins]);
+
   if (loading) {
     return <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}><CircularProgress size={28} /></Box>;
   }
@@ -66,12 +128,22 @@ export default function Admins({ onBack }: Props) {
         <Typography variant="h5" fontWeight={700} sx={{ flexGrow: 1 }}>
           {t("admins.title")}
         </Typography>
+        {pendingCount > 0 && (
+          <Tooltip title={t("panelAccess.retry", { count: pendingCount })}>
+            <span>
+              <IconButton onClick={retryPending} disabled={busy === "sync"}>
+                <SyncIcon color="warning" />
+              </IconButton>
+            </span>
+          </Tooltip>
+        )}
         <Button variant="contained" startIcon={<AddIcon />} onClick={() => setEditing("new")}>
           {t("admins.addAdmin")}
         </Button>
       </Box>
 
       <Alert severity="info" sx={{ mb: 2 }}>{t("admins.roleExplainer")}</Alert>
+      <Alert severity="info" sx={{ mb: 2 }}>{t("panelAccess.explainer")}</Alert>
 
       <TableContainer component={Paper}>
         <Table size="small">
@@ -81,6 +153,11 @@ export default function Admins({ onBack }: Props) {
               <TableCell>{t("admins.role")}</TableCell>
               <TableCell>{t("admins.servers")}</TableCell>
               <TableCell>{t("vpnUsers.status")}</TableCell>
+              {servers.map((s) => (
+                <TableCell key={s.id} align="center" sx={{ whiteSpace: "nowrap" }}>
+                  {s.display_name}
+                </TableCell>
+              ))}
               <TableCell align="right">{t("common.actions")}</TableCell>
             </TableRow>
           </TableHead>
@@ -110,6 +187,41 @@ export default function Admins({ onBack }: Props) {
                     label={t(a.enabled ? "vpnUsers.filterEnabled" : "vpnUsers.filterDisabled")}
                   />
                 </TableCell>
+                {servers.map((s) => {
+                  const row = a.access.find((x) => x.vpn_server_id === s.id);
+                  const granted = !!row && row.sync_status !== "pending_delete";
+                  const title = row?.sync_error
+                    ? t("panelAccess.error", { error: row.sync_error })
+                    : row?.sync_status === "pending"
+                      ? t("panelAccess.pendingGrant")
+                      : row?.sync_status === "pending_delete"
+                        ? t("panelAccess.pendingRevoke")
+                        : granted ? t("panelAccess.granted") : t("panelAccess.none");
+                  return (
+                    <TableCell key={s.id} align="center">
+                      <Tooltip title={title}>
+                        <span>
+                          <IconButton
+                            size="small"
+                            disabled={busy === `${a.id}`}
+                            onClick={() => toggleAccess(a, s.id, granted)}
+                          >
+                            {row?.sync_error ? (
+                              <ErrorOutlineIcon fontSize="small" color="error" />
+                            ) : granted ? (
+                              <CheckCircleIcon
+                                fontSize="small"
+                                color={row?.sync_status === "synced" ? "success" : "warning"}
+                              />
+                            ) : (
+                              <RadioButtonUncheckedIcon fontSize="small" color="disabled" />
+                            )}
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    </TableCell>
+                  );
+                })}
                 <TableCell align="right">
                   <Tooltip title={t("common.save")}>
                     <IconButton size="small" onClick={() => setEditing(a)}>
@@ -145,6 +257,36 @@ export default function Admins({ onBack }: Props) {
         <DialogActions>
           <Button onClick={() => setDeleting(null)}>{t("common.cancel")}</Button>
           <Button color="error" variant="contained" onClick={remove}>{t("common.delete")}</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={!!revoking} onClose={() => setRevoking(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>{t("panelAccess.revokeTitle")}</DialogTitle>
+        <DialogContent>
+          <Typography>
+            {t("panelAccess.revokeBody", {
+              username: revoking?.admin.username,
+              server: revoking ? serverName(revoking.serverId) : "",
+            })}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRevoking(null)}>{t("common.cancel")}</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => {
+              if (!revoking) return;
+              const { admin, serverId } = revoking;
+              setRevoking(null);
+              setAccess(admin, admin.access
+                .filter((a) => a.sync_status !== "pending_delete"
+                  && a.vpn_server_id !== serverId)
+                .map((a) => a.vpn_server_id));
+            }}
+          >
+            {t("panelAccess.revoke")}
+          </Button>
         </DialogActions>
       </Dialog>
 
