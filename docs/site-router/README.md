@@ -322,7 +322,19 @@ what was set.
 
 ---
 
-## 10. What is left for the site
+## 10. After the router: the Proxima box
+
+The box is installed remotely from ADM — nothing on it is built by hand. Once
+the router is in place and the box is plugged into it, ADM's "Set up new
+server" does the rest, and the install log is shown while it runs.
+
+One part of the box does need a person, and only once the site's line is live:
+the reverse proxy's certificates and its four service names. That is a
+separate short guide, [npm-setup.md](npm-setup.md).
+
+---
+
+## 11. What is left for the site
 
 These need the real internet line and cannot be done on the bench:
 
