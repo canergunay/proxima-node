@@ -2254,6 +2254,11 @@ Public (no JWT) sing-box remote profile endpoint. Authenticated via `?token=<vle
 
 VPN user management for multi-user VPN deployments. VPN users can own peers and have bandwidth/peer limits.
 
+> These accounts are **managed centrally in ADM**, which is the only expected
+> caller of the write endpoints below. They remain available for scripted use
+> and for break-glass access when ADM is unavailable, but changes made here are
+> overwritten the next time ADM pushes that user. See **VPN Users & Access**.
+
 ### GET /api/vpn/users
 
 List all VPN users with peer counts and monthly bandwidth usage.
@@ -2272,6 +2277,9 @@ List all VPN users with peer counts and monthly bandwidth usage.
       "speed_download": "100mbit",
       "speed_upload": "50mbit",
       "assigned_groups": ["messaging", "streaming"],
+      "lan_access": true,
+      "password_hash": "pbkdf2:sha256:1000000$...",
+      "password_changed_at": 1785000000,
       "peer_count": 2,
       "monthly_usage": {
         "rx_bytes": 1073741824,
@@ -2282,6 +2290,12 @@ List all VPN users with peer counts and monthly bandwidth usage.
   ]
 }
 ```
+
+`password_hash` is returned so that ADM can adopt an account that already
+exists here without resetting anyone's login, and `password_changed_at` lets it
+tell which site holds the newest password when propagating a change. There is
+no plaintext password field — the reversible copy this endpoint used to return
+was removed.
 
 ---
 
@@ -2294,6 +2308,7 @@ Create a new VPN user.
 {
   "username": "alice",
   "password": "securepass",
+  "lan_access": true,
   "max_peers": 5,
   "bandwidth_quota": 107374182400,
   "speed_download": "100mbit",
@@ -2304,7 +2319,11 @@ Create a new VPN user.
 
 **Fields:**
 - `username` (required) — Must be unique
-- `password` (required) — Stored hashed; also encrypted for admin viewing
+- `password` — Plaintext; stored hashed. Either this or `password_hash`.
+- `password_hash` — A pre-computed hash, used by ADM so the plaintext never
+  leaves the machine that generated it. Takes precedence over `password`.
+- `lan_access` (optional, default `true`) — Whether this user's devices may
+  reach the server's LAN subnets. New peers inherit it from their owner.
 - `max_peers` (optional) — Maximum number of peers this user can create. `null` for unlimited.
 - `bandwidth_quota` (optional) — Monthly bandwidth quota in bytes. `null` for unlimited.
 - `speed_download` (optional) — Per-user download speed limit (e.g., `"100mbit"`, `"50"` → `"50mbit"`)
@@ -2341,6 +2360,7 @@ Update a VPN user. All fields are optional.
 {
   "password": "newpass",
   "enabled": true,
+  "lan_access": false,
   "max_peers": 10,
   "bandwidth_quota": null,
   "speed_download": "200mbit",
@@ -2349,8 +2369,12 @@ Update a VPN user. All fields are optional.
 }
 ```
 
+`password_hash` is accepted in place of `password`, as on create.
+
 **Behavior:**
 - Changing `speed_download` or `speed_upload` triggers immediate rebuild of per-peer tc/HTB speed limits
+- Sending `lan_access` applies the policy to every peer this user owns, and installs or removes the matching DROP rules. It is re-applied whenever the field is sent, not only when the stored value changes, so a push can repair a device whose flag drifted.
+- Setting a password moves `password_changed_at`; changing any other field leaves it alone. This is what lets ADM avoid overwriting a password the user set themselves.
 
 **Response (200):** Updated user object.
 

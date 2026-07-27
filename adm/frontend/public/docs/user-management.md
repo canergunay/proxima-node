@@ -1,6 +1,8 @@
-# User Management
+# Device Auth (DNS Mode)
 
 Proxima supports per-user authentication for DNS Mode, allowing administrators to control which devices on the network get VPN routing and which ones go direct. This document covers the user system, device authentication, per-user routing modes, and security considerations.
+
+> **Two different things share the word "user".** This page is about the `users` table — local accounts that decide whether a device on the network gets VPN routing. The accounts people type into the ProximaVPN client are `vpn_users`, they are managed centrally in ADM, and they are documented in **VPN Users & Access**. The two systems are unrelated: a person can exist in one and not the other.
 
 ---
 
@@ -431,15 +433,20 @@ Usage counters reset at the start of each calendar month.
 The typical flow for adding a new VPN user to the system:
 
 ```
-1. Admin creates a VPN user account (username, password, routing mode, groups)
-2. Admin shares credentials with the user (out-of-band)
+1. Admin creates the account in ADM and authorizes it on this server
+   → ADM pushes it down; it appears in this server's vpn_users
+2. ADM shows a copy-paste block (address, username, password) to hand over
 3. User installs the ProximaVPN client app on their device
 4. User adds the Proxima server (hostname/IP + port) in the app
-5. User logs in with their VPN user credentials
+5. User logs in — authentication happens here, against this server
 6. App registers the device → backend adds IP to nftsets
 7. VPN routing is now active for the user's device
 8. User can create WireGuard peers (up to max_peers) from the app
 ```
+
+Step 1 changed: accounts are no longer created in Proxima's own UI. See
+**VPN Users & Access** for the central model. Steps 3–8 are unchanged —
+the client talks to this server, not to ADM.
 
 For LAN users (devices already on the home/office network), the onboarding is simpler -- they log in via the Proxima web UI in a browser, and their device IP is immediately authenticated for VPN routing.
 
