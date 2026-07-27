@@ -18,8 +18,12 @@
 #     -e server_code=SVR \
 #     -e callhome_conf_b64=<base64 of the wg-erg.conf>
 #
-#   -e skip_callhome=true    already has a tunnel, only install Proxima
-#   -e skip_proxima=true     only establish the tunnel (kit preparation)
+#   -e proxima_src=/path      source checkout on this host (default below)
+#   -e skip_callhome=true     already has a tunnel, only install Proxima
+#   -e skip_proxima=true      only establish the tunnel (kit preparation)
+#
+# Re-running this is how a site is updated: the source is re-synced, the
+# installer runs again, and the recorded revision moves forward.
 
 - name: Install Proxima on a site server
   hosts: proxima_sites
@@ -118,20 +122,37 @@
 
     - name: Install installer prerequisites
       ansible.builtin.apt:
-        name: [git, python3, python3-pip]
+        name: [git, python3, python3-pip, rsync]
         state: present
         update_cache: true
         cache_valid_time: 3600
       when: not skip_proxima | bool
 
-    - name: Clone or update the Proxima repository
-      ansible.builtin.git:
-        repo: "{{ proxima_repo }}"
-        dest: "{{ install_path }}"
-        version: main
-        # An existing checkout may carry local edits from a hand-install; the
-        # installer is the source of truth from here on.
-        force: true
+    # The source is pushed from ADM rather than pulled from GitHub. The
+    # repository is private, so a site would need a credential to clone it —
+    # a secret distributed to every construction site, and a dependency on
+    # GitHub being reachable at the exact moment you are trying to repair
+    # something. ADM already holds a key to the site; the reverse is
+    # deliberately not true, and pushing keeps it that way.
+    - name: Read the revision being deployed
+      ansible.builtin.command:
+        cmd: "git -C {{ proxima_src }} log -1 --format=%H%n%ct"
+      delegate_to: localhost
+      become: false
+      register: src_rev
+      changed_when: false
+      when: not skip_proxima | bool
+
+    - name: Copy the Proxima source
+      ansible.posix.synchronize:
+        src: "{{ proxima_src }}/"
+        dest: "{{ install_path }}/"
+        delete: true
+        # config/ holds this server's identity, keys and peers — replacing it
+        # would be a wipe, not an update. .env is likewise site-local.
+        rsync_opts:
+          - "--exclude=config/"
+          - "--exclude=docker/.env"
       when: not skip_proxima | bool
 
     - name: Write the installer answer file
