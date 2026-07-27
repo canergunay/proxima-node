@@ -296,6 +296,35 @@ def proxy_to_proxima(vpn_server_id: int, subpath: str):
 
 # ── Provisioning ─────────────────────────────────────────────────────────
 
+@bp.get("/api/vpn-servers/<int:vpn_server_id>/services")
+def server_services(vpn_server_id: int):
+    """What a site actually runs, asked of the site itself.
+
+    ADM could guess most of this from what it provisioned, and would be wrong
+    in the way that matters: it would list what should be there rather than
+    what is. The point of looking is to catch the difference before a box
+    ships, not to have it confirmed back.
+    """
+    server = get_vpn_server(vpn_server_id)
+    if not server:
+        return jsonify({"ok": False, "error": "VPN server not found"}), 404
+
+    try:
+        r = _proxima_request(server, "GET", "/api/services", timeout=20)
+    except Exception as e:  # noqa: BLE001
+        return jsonify({"ok": False, "error": str(e)}), 502
+
+    if r.status_code != 200:
+        return jsonify({"ok": False, "error": f"HTTP {r.status_code}"}), 502
+
+    data = (r.json() or {}).get("data") or {}
+    # The addresses are ADM's to report: the site knows its own LAN address but
+    # not the one it was given on the management network.
+    data["management_address"] = server.get("callhome_ip") or ""
+    data["public_url"] = server.get("public_url") or ""
+    return jsonify({"ok": True, "data": data})
+
+
 @bp.get("/api/vpn-servers/management-network")
 @superadmin_only
 def management_network():
