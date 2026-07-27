@@ -358,6 +358,18 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE vpn_servers ADD COLUMN vpn_subnet TEXT")
         conn.execute("ALTER TABLE vpn_servers ADD COLUMN lan_subnet TEXT")
         conn.commit()
+    # The management tunnel's keys move here from wg-easy's store. Keeping
+    # them means a site can be re-provisioned without losing its tunnel
+    # identity, and it makes ADM the only writer — which wg-easy's file could
+    # never be, since its UI rewrites that file wholesale.
+    if "callhome_pubkey" not in vpn_cols:
+        for stmt in (
+            "ALTER TABLE vpn_servers ADD COLUMN callhome_pubkey TEXT",
+            "ALTER TABLE vpn_servers ADD COLUMN callhome_privkey_enc TEXT",
+            "ALTER TABLE vpn_servers ADD COLUMN callhome_psk_enc TEXT",
+        ):
+            conn.execute(stmt)
+        conn.commit()
 
 
 # ── Server CRUD ──────────────────────────────────────────────────────────
@@ -774,7 +786,8 @@ def update_vpn_server(vpn_server_id: int, updates: dict) -> bool:
     conn = get_conn()
     allowed = {"name", "display_name", "url", "public_url", "api_token_enc",
                "ssh_host", "ssh_port", "ssh_user", "ssh_password_enc",
-               "server_code", "callhome_ip", "vpn_subnet", "lan_subnet"}
+               "server_code", "callhome_ip", "vpn_subnet", "lan_subnet",
+               "callhome_pubkey", "callhome_privkey_enc", "callhome_psk_enc"}
     sets, vals = [], []
     for key, val in updates.items():
         if key in allowed:

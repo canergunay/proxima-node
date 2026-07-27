@@ -12,104 +12,24 @@ left to justify it.
 """
 
 import base64
-import json
 import logging
 import os
 import subprocess
-import tempfile
-import time
-import uuid
 
 import requests
 
-from core.auth import decrypt_value, encrypt_value
+from core.auth import encrypt_value
 from core.db import (
     create_operation,
     get_vpn_server,
-    next_callhome_ip,
     update_vpn_server,
 )
 from core.inventory_writer import regenerate_for_vpn_server
 
 log = logging.getLogger("adm.vpn_provision")
 
-# wg-easy stores its peers here; the file is mounted from the host, so ADM
-# edits it directly and applies the change live rather than restarting the
-# container and dropping everyone else's tunnel.
-WG_EASY_STORE = os.environ.get(
-    "ADM_WG_EASY_STORE", "/opt/erg/wireguard/wg-easy-data/wg0.json")
-WG_INTERFACE = os.environ.get("ADM_WG_INTERFACE", "wg0")
-WG_ENDPOINT = os.environ.get("ADM_WG_ENDPOINT", "vpn.ergunay.com:51820")
 PROXIMA_SRC = os.environ.get("ADM_PROXIMA_SRC", "/opt/erg/proxima-src")
 PROXIMA_PORT = 5050
-
-
-# ── Call-home peer ───────────────────────────────────────────────────────
-
-def _wg(*args: str, stdin: str | None = None) -> str:
-    return subprocess.run(["wg", *args], capture_output=True, text=True,
-                          input=stdin, check=True).stdout.strip()
-
-
-def ensure_callhome_peer(name: str, address: str) -> str:
-    """Register a site in the management network and return its config.
-
-    Idempotent: re-provisioning an existing site reuses its keys, so the box
-    does not lose its tunnel identity on a reinstall.
-    """
-    with open(WG_EASY_STORE) as f:
-        store = json.load(f)
-
-    peer = next((c for c in store["clients"].values()
-                 if c.get("address") == address), None)
-
-    if peer is None:
-        priv = _wg("genkey")
-        peer = {
-            "id": str(uuid.uuid4()),
-            "name": f"{name}-callhome",
-            "address": address,
-            "privateKey": priv,
-            "publicKey": _wg("pubkey", stdin=priv),
-            "preSharedKey": _wg("genpsk"),
-            "createdAt": time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime()),
-            "updatedAt": time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime()),
-            "enabled": True,
-        }
-        store["clients"][peer["id"]] = peer
-        tmp = WG_EASY_STORE + ".tmp"
-        with open(tmp, "w") as f:
-            json.dump(store, f, indent=2)
-        os.replace(tmp, WG_EASY_STORE)
-        log.info(f"[PROVISION] Registered call-home peer {address} for {name}")
-
-    # Apply live. Restarting wg-easy would rebuild the interface and drop
-    # every other peer, including the admin who is watching this run.
-    with tempfile.NamedTemporaryFile("w", delete=False) as f:
-        f.write(peer["preSharedKey"])
-        psk_path = f.name
-    try:
-        subprocess.run(
-            ["wg", "set", WG_INTERFACE, "peer", peer["publicKey"],
-             "preshared-key", psk_path, "allowed-ips", f"{address}/32"],
-            check=True, capture_output=True, text=True)
-    finally:
-        os.unlink(psk_path)
-
-    # AllowedIPs is the management network only. The site has its own LAN and
-    # routing ERG's into the tunnel would break it wherever the two overlap.
-    return (
-        "[Interface]\n"
-        f"PrivateKey = {peer['privateKey']}\n"
-        f"Address    = {address}/24\n"
-        "\n"
-        "[Peer]\n"
-        f"PublicKey    = {store['server']['publicKey']}\n"
-        f"PresharedKey = {peer['preSharedKey']}\n"
-        "AllowedIPs   = 10.13.13.0/24\n"
-        f"Endpoint     = {WG_ENDPOINT}\n"
-        "PersistentKeepalive = 25\n"
-    )
 
 
 # ── Claiming ─────────────────────────────────────────────────────────────
@@ -178,18 +98,19 @@ def start_provision(vpn_server_id: int, admin_id: int | None = None,
     if is_running():
         return None, "Another Ansible operation is already running"
 
-    address = server.get("callhome_ip") or next_callhome_ip()
-    if not address:
-        return None, "No free address left in the management network"
-
+    # The management network is ADM's own interface, not a guest in wg-easy's
+    # configuration — see core.mgmt_network for why that had to change.
+    from core.mgmt_network import ensure_peer
     try:
-        conf = ensure_callhome_peer(server["name"], address)
-    except (OSError, subprocess.CalledProcessError, KeyError) as e:
+        conf, error = ensure_peer(vpn_server_id)
+    except (OSError, subprocess.CalledProcessError) as e:
         log.exception("[PROVISION] Call-home peer setup failed")
         return None, f"Could not register the call-home peer: {e}"
+    if error:
+        return None, error
 
-    update_vpn_server(vpn_server_id, {"callhome_ip": address})
     server = get_vpn_server(vpn_server_id)
+    address = server["callhome_ip"]
     regenerate_for_vpn_server(server)
 
     op_id = create_operation(None, "provision_proxima", "setup-proxima.yml")

@@ -239,6 +239,15 @@ def delete_vpn_server_endpoint(vpn_server_id: int):
                         f"{authorized} VPN user(s) are still authorized on this "
                         "server — revoke their access first"}), 409
 
+    # Take it off the management network too. Leaving the peer would keep an
+    # address allocated and a tunnel accepted for a site ADM no longer knows.
+    from core.mgmt_network import forget_peer
+    try:
+        forget_peer(vpn_server_id)
+    except Exception as e:  # noqa: BLE001 — the row still has to go
+        log.warning(f"[VPN] Could not remove {server['name']} from the "
+                    f"management network: {e}")
+
     delete_vpn_server(vpn_server_id)
     return jsonify({"ok": True})
 
@@ -275,6 +284,19 @@ def proxy_to_proxima(vpn_server_id: int, subpath: str):
 
 
 # ── Provisioning ─────────────────────────────────────────────────────────
+
+@bp.get("/api/vpn-servers/management-network")
+@superadmin_only
+def management_network():
+    """The management network's state — which sites are actually dialled in.
+
+    This is where the call-home tunnels are looked at now. They are not in
+    wg-easy any more, and deliberately so: nobody adds or removes entries by
+    hand here, which is what made them disappear when they lived there.
+    """
+    from core.mgmt_network import status
+    return jsonify({"ok": True, "data": status()})
+
 
 @bp.get("/api/vpn-servers/subnets")
 def list_subnets():
