@@ -1,16 +1,21 @@
 # =============================================================
 # SVR RB4011 - STAGE 5: QoS
 #
-# *** DO NOT RUN THIS UNTIL THE SEVEN SKY LINE RATE IS MEASURED. ***
+# Set for the 200 Mbit Seven Sky line — the same product SHV runs. Safe to run
+# on the bench now; it no longer carries placeholder numbers.
 #
-# QoS with a placeholder bandwidth is worse than no QoS. The root max-limit IS
-# the ceiling: set 95M on a 200M line and you have silently thrown away half
-# the connection, and it will present as "the internet is slow at SVR".
+# CONFIRM ON SITE ANYWAY. The figure comes from the contract, not from a
+# measurement, and the two failures are not symmetrical: a ceiling below the
+# real rate costs bandwidth and is obvious, while a ceiling at or above it
+# costs the entire feature and is invisible — the queue never fills, so
+# priority is never consulted and QoS appears configured while doing nothing.
 #
-# Measure first, from the Proxima box, several times, at a busy hour:
+# Measure from the Proxima box, several times, at a busy hour:
 #   speedtest-cli --simple      (or the Proxima Speed Test page, direct slot)
-# Then set both roots to ~95% of the sustained figure and scale limit-at so the
-# children still sum to the root.
+# If the line does not sustain 200, set both roots to ~95% of what it does
+# sustain and rescale limit-at so the children still sum to the root.
+#
+# If upload is not also 200, change the Upload root on its own.
 #
 # =============================================================
 # Why SHV's QoS does nothing today - three independent faults:
@@ -104,29 +109,42 @@ add chain=postrouting action=mark-packet out-interface=ether5 passthrough=no con
 add chain=postrouting action=mark-packet out-interface=ether5 passthrough=no connection-mark=no-mark          new-packet-mark=Other-Up
 
 # ---------- Queue trees ----------
-### SET THESE TWO FIRST. Numbers below assume a 100/100 line.
+### Set for the 200 Mbit Seven Sky line, the same product SHV runs.
+#
+# 190M, not 200M, and the 5% is not caution - it is the whole mechanism. HTB
+# can only prioritise a parent that is actually full. Set the ceiling at or
+# above the real line rate and the queue never fills: packets leave as fast as
+# the ISP accepts them, the buffer forms at the ISP where this router has no
+# say, and priority is never consulted. QoS would appear configured and do
+# nothing, which is harder to notice than QoS that is plainly off.
+#
+# So the two errors are not symmetrical. Too low costs bandwidth and is
+# obvious. Too high costs the entire feature and is invisible.
+#
+# Still measure on site and correct these two numbers if the line does not
+# sustain 200. Everything below is derived from them.
 /queue tree
-add name=Download parent=global max-limit=95M comment="SET TO ~95% OF MEASURED DOWNLOAD"
-add name=Upload   parent=global max-limit=95M comment="SET TO ~95% OF MEASURED UPLOAD"
+add name=Download parent=global max-limit=190M comment="95% of the 200M line - measure and correct on site"
+add name=Upload   parent=global max-limit=190M comment="95% of the 200M line - lower this if upload is not symmetric"
 
-# limit-at values sum to exactly 95M - keep that true after rescaling.
-add name=VoIP-D    parent=Download packet-mark=VoIP-Down    priority=1 limit-at=10M max-limit=30M
-add name=Calls-D   parent=Download packet-mark=Calls-Down   priority=1 limit-at=10M max-limit=40M
-add name=PrioWeb-D parent=Download packet-mark=PrioWeb-Down priority=2 limit-at=20M max-limit=95M
-add name=Web-D     parent=Download packet-mark=Web-Down     priority=3 limit-at=25M max-limit=95M
-add name=VPN-D     parent=Download packet-mark=VPN-Down     priority=4 limit-at=15M max-limit=95M
-add name=Bulk-D    parent=Download packet-mark=Bulk-Down    priority=5 limit-at=5M  max-limit=20M
-add name=NAS-D     parent=Download packet-mark=NAS-Down     priority=6 limit-at=5M  max-limit=95M
-add name=Other-D   parent=Download packet-mark=Other-Down   priority=8 limit-at=5M  max-limit=95M
+# limit-at values sum to exactly 190M - keep that true if the roots change.
+add name=VoIP-D    parent=Download packet-mark=VoIP-Down    priority=1 limit-at=20M max-limit=30M
+add name=Calls-D   parent=Download packet-mark=Calls-Down   priority=1 limit-at=20M max-limit=40M
+add name=PrioWeb-D parent=Download packet-mark=PrioWeb-Down priority=2 limit-at=40M max-limit=190M
+add name=Web-D     parent=Download packet-mark=Web-Down     priority=3 limit-at=50M max-limit=190M
+add name=VPN-D     parent=Download packet-mark=VPN-Down     priority=4 limit-at=30M max-limit=190M
+add name=Bulk-D    parent=Download packet-mark=Bulk-Down    priority=5 limit-at=10M max-limit=40M
+add name=NAS-D     parent=Download packet-mark=NAS-Down     priority=6 limit-at=10M max-limit=190M
+add name=Other-D   parent=Download packet-mark=Other-Down   priority=8 limit-at=10M max-limit=190M
 
-add name=VoIP-U    parent=Upload packet-mark=VoIP-Up    priority=1 limit-at=10M max-limit=30M
-add name=Calls-U   parent=Upload packet-mark=Calls-Up   priority=1 limit-at=10M max-limit=40M
-add name=PrioWeb-U parent=Upload packet-mark=PrioWeb-Up priority=2 limit-at=20M max-limit=95M
-add name=Web-U     parent=Upload packet-mark=Web-Up     priority=3 limit-at=25M max-limit=95M
-add name=VPN-U     parent=Upload packet-mark=VPN-Up     priority=4 limit-at=15M max-limit=95M
-add name=Bulk-U    parent=Upload packet-mark=Bulk-Up    priority=5 limit-at=5M  max-limit=20M
-add name=NAS-U     parent=Upload packet-mark=NAS-Up     priority=6 limit-at=5M  max-limit=95M
-add name=Other-U   parent=Upload packet-mark=Other-Up   priority=8 limit-at=5M  max-limit=95M
+add name=VoIP-U    parent=Upload packet-mark=VoIP-Up    priority=1 limit-at=20M max-limit=30M
+add name=Calls-U   parent=Upload packet-mark=Calls-Up   priority=1 limit-at=20M max-limit=40M
+add name=PrioWeb-U parent=Upload packet-mark=PrioWeb-Up priority=2 limit-at=40M max-limit=190M
+add name=Web-U     parent=Upload packet-mark=Web-Up     priority=3 limit-at=50M max-limit=190M
+add name=VPN-U     parent=Upload packet-mark=VPN-Up     priority=4 limit-at=30M max-limit=190M
+add name=Bulk-U    parent=Upload packet-mark=Bulk-Up    priority=5 limit-at=10M max-limit=40M
+add name=NAS-U     parent=Upload packet-mark=NAS-Up     priority=6 limit-at=10M max-limit=190M
+add name=Other-U   parent=Upload packet-mark=Other-Up   priority=8 limit-at=10M max-limit=190M
 
 # Verify:  /queue tree print stats   - every queue should show bytes.
 # A queue stuck at 0 means its mangle rule never matches - which is exactly

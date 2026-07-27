@@ -278,14 +278,34 @@ Each access point should be listed.
 
 ## 8. Stage 5 — traffic shaping
 
-**Do not run this yet.**
+This is set for the site's 200 Mbit line, the same product the other office
+runs, so you can run it on the bench:
 
-It needs the measured speed of the site's real internet line. A wrong number is
-worse than not running it: set the ceiling to 95 Mbit on a 200 Mbit line and
-half the connection is gone permanently, and it will surface months later as
-"the internet is slow at the site".
+```
+/import svr-05-qos.rsc
+```
 
-Run it on site, once the line is installed and measured.
+Ends with `STAGE 5 COMPLETE`.
+
+**Confirm the line on site anyway.** The number comes from the contract, not
+from a measurement. If the line turns out slower, the ceiling has to come down
+— and if upload is not also 200 Mbit, its ceiling is a separate number. Both
+are two lines at the top of the queue section.
+
+Getting it wrong is not symmetrical. Too low and you lose bandwidth, which
+somebody notices. Too high and the shaper never engages at all: the queue
+never fills, priority is never consulted, and QoS looks configured while doing
+nothing. That is the one to be careful about.
+
+Once the site is live, check every queue is actually being used:
+
+```
+/queue tree print stats
+```
+
+A queue sitting at zero bytes means its rule never matches anything — which is
+exactly the state two of the other office's queues have been in since they
+were written.
 
 ---
 
@@ -306,7 +326,8 @@ what was set.
 
 These need the real internet line and cannot be done on the bench:
 
-- **Stage 5**, after measuring the line rate.
+- **Confirming the line rate**, and correcting stage 5's two ceilings if the
+  200 Mbit does not hold.
 - **Hairpin NAT** — the commented block at the end of stage 2. Without it a
   phone *inside* the site cannot reach the VPN on the site's public address.
   VPN profiles use a bare IP by design, so DNS cannot paper over it.
