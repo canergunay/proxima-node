@@ -4,6 +4,7 @@ import {
 } from "@mui/material";
 import CircleIcon from "@mui/icons-material/Circle";
 import LaunchIcon from "@mui/icons-material/Launch";
+import LanIcon from "@mui/icons-material/Lan";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
@@ -74,6 +75,7 @@ interface Props {
   sourceRevision?: { commit: string; short: string } | null;
   onClick: () => void;
   onEdit: () => void;
+  onServices: () => void;
   onDelete: () => void;
 }
 
@@ -104,7 +106,7 @@ function slotDotColor(ipOk: boolean | null | undefined): string {
   return "#616161";
 }
 
-export default function VpnServerCard({ server, sourceRevision, onClick, onEdit, onDelete }: Props) {
+export default function VpnServerCard({ server, sourceRevision, onClick, onEdit, onServices, onDelete }: Props) {
   const { t } = useTranslation();
   const status = server.proxima_status;
   const isOnline = server.online;
@@ -156,6 +158,16 @@ export default function VpnServerCard({ server, sourceRevision, onClick, onEdit,
                   </IconButton>
                 </Tooltip>
               )}
+              <Tooltip title={t("services.tooltip")} placement="top">
+                <IconButton
+                  size="small"
+                  aria-label={t("services.tooltip")}
+                  onClick={(e) => { e.stopPropagation(); onServices(); }}
+                  sx={{ p: 0.5 }}
+                >
+                  <LanIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Tooltip>
               <Tooltip title={t("vpnServer.edit")} placement="top">
                 <IconButton
                   size="small"

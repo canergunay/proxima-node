@@ -13,6 +13,7 @@ import ServerDetailDialog from "../components/ServerDetailDialog";
 import VpnServerCard from "../components/VpnServerCard";
 import AddVpnServerDialog from "../components/AddVpnServerDialog";
 import SetupVpnServerDialog from "../components/SetupVpnServerDialog";
+import ServiceInventoryDialog from "../components/ServiceInventoryDialog";
 import VpnServerDetailDialog from "../components/VpnServerDetailDialog";
 import MonitoringTab from "../components/MonitoringTab";
 import VpnUsersTab from "../components/VpnUsersTab";
@@ -39,6 +40,7 @@ export default function Dashboard({ role }: { role: AdminRole }) {
   const [vpnLoading, setVpnLoading] = useState(true);
   const [addVpnOpen, setAddVpnOpen] = useState(false);
   const [setupVpnOpen, setSetupVpnOpen] = useState(false);
+  const [servicesFor, setServicesFor] = useState<VpnServer | null>(null);
   const [sourceRevision, setSourceRevision] = useState<SourceRevision | null>(null);
   const [selectedVpn, setSelectedVpn] = useState<VpnServer | null>(null);
 
@@ -210,6 +212,7 @@ export default function Dashboard({ role }: { role: AdminRole }) {
                     sourceRevision={sourceRevision}
                     onClick={() => setSelectedVpn(server)}
                     onEdit={() => setSelectedVpn(server)}
+                    onServices={() => setServicesFor(server)}
                     onDelete={() => setSelectedVpn(server)}
                   />
                 </Grid>
@@ -217,7 +220,14 @@ export default function Dashboard({ role }: { role: AdminRole }) {
             </Grid>
           )}
 
-          <SetupVpnServerDialog
+          <ServiceInventoryDialog
+        open={!!servicesFor}
+        serverId={servicesFor?.id ?? null}
+        serverName={servicesFor?.display_name ?? ""}
+        onClose={() => setServicesFor(null)}
+      />
+
+      <SetupVpnServerDialog
             open={setupVpnOpen}
             onClose={() => setSetupVpnOpen(false)}
             onCreated={() => { setSetupVpnOpen(false); fetchVpnServers(); }}
