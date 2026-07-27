@@ -26,6 +26,7 @@ export default function SetupVpnServerDialog({ open, onClose, onCreated }: Props
   const [sshPassword, setSshPassword] = useState("");
   const [vpnSubnet, setVpnSubnet] = useState("");
   const [lanSubnet, setLanSubnet] = useState("");
+  const [vpnEndpoint, setVpnEndpoint] = useState("");
   const [ranges, setRanges] = useState<SubnetRange[]>([]);
 
   const [error, setError] = useState("");
@@ -63,7 +64,7 @@ export default function SetupVpnServerDialog({ open, onClose, onCreated }: Props
   const reset = () => {
     setName(""); setDisplayName(""); setServerCode("");
     setSshHost(""); setSshPort("22"); setSshUser("root"); setSshPassword("");
-    setVpnSubnet(""); setLanSubnet("");
+    setVpnSubnet(""); setLanSubnet(""); setVpnEndpoint("");
     setError(""); setOperationId(null); setOutput(""); setStatus("running");
   };
 
@@ -81,6 +82,7 @@ export default function SetupVpnServerDialog({ open, onClose, onCreated }: Props
         ssh_password: sshPassword,
         vpn_subnet: vpnSubnet.trim(),
         lan_subnet: lanSubnet.trim(),
+        vpn_endpoint: vpnEndpoint.trim(),
       });
       if (!data.ok) { setError(data.error); setStarting(false); return; }
       setOperationId(data.data.operation_id);
@@ -208,6 +210,14 @@ export default function SetupVpnServerDialog({ open, onClose, onCreated }: Props
                     onChange={(e) => setLanSubnet(e.target.value)}
                     placeholder="192.168.88.0/24"
                     helperText={t("setupVpn.lanSubnetHelp")}
+                  />
+                </Grid>
+                <Grid size={12}>
+                  <TextField
+                    label={t("setupVpn.vpnEndpoint")} value={vpnEndpoint} fullWidth
+                    onChange={(e) => setVpnEndpoint(e.target.value)}
+                    placeholder="site.example.com:5555"
+                    helperText={t("setupVpn.vpnEndpointHelp")}
                   />
                 </Grid>
               </Grid>

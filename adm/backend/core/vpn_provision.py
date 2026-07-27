@@ -136,8 +136,10 @@ def start_provision(vpn_server_id: int, admin_id: int | None = None,
             # record and the installer leaves ProximaVPN alone rather than
             # inventing one.
             "vpn_subnet": server.get("vpn_subnet") or "",
-            "vpn_endpoint": (server.get("public_url") or "").replace(
-                "https://", "").replace("http://", "").split(":")[0],
+            # Recorded, never detected. Every box behind one connection
+            # reports the same public address, so a detected one is plausible
+            # and points at whichever machine the router happens to forward to.
+            "vpn_endpoint": server.get("vpn_endpoint") or "",
         },
         on_complete=on_complete,
     )

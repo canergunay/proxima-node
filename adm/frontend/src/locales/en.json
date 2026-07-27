@@ -355,5 +355,7 @@
   "setupVpn.vpnSubnetHelp": "As set on the router, e.g. 10.17.17.0/24",
   "setupVpn.lanSubnet": "Site LAN",
   "setupVpn.lanSubnetHelp": "The range the MikroTik hands out",
-  "setupVpn.takenRanges": "Already in use — anything overlapping these is refused:"
+  "setupVpn.takenRanges": "Already in use — anything overlapping these is refused:",
+  "setupVpn.vpnEndpoint": "ProximaVPN endpoint",
+  "setupVpn.vpnEndpointHelp": "Where clients dial in — the site's public address and forwarded port. Left empty, peer configs point at this machine's LAN address, which only works on site."
 }

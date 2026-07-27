@@ -355,5 +355,7 @@
   "setupVpn.vpnSubnetHelp": "Router'da belirlendiği gibi, örn. 10.17.17.0/24",
   "setupVpn.lanSubnet": "Saha LAN'ı",
   "setupVpn.lanSubnetHelp": "MikroTik'in dağıttığı aralık",
-  "setupVpn.takenRanges": "Kullanımda — bunlarla çakışan hiçbir aralık kabul edilmez:"
+  "setupVpn.takenRanges": "Kullanımda — bunlarla çakışan hiçbir aralık kabul edilmez:",
+  "setupVpn.vpnEndpoint": "ProximaVPN endpoint'i",
+  "setupVpn.vpnEndpointHelp": "İstemcilerin bağlanacağı yer — sahanın public adresi ve yönlendirilmiş portu. Boş bırakılırsa peer config'leri bu makinenin LAN adresini gösterir, o da yalnızca sahada çalışır."
 }

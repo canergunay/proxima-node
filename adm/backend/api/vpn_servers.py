@@ -139,6 +139,7 @@ def add_vpn_server():
         return jsonify({"ok": False, "error": conflict}), 409
 
     data = {
+        "vpn_endpoint": (body.get("vpn_endpoint") or "").strip(),
         "name": name,
         "display_name": display_name,
         "url": url,
@@ -193,7 +194,7 @@ def update_vpn_server_endpoint(vpn_server_id: int):
     updates = {}
 
     for field in ("name", "display_name", "url", "public_url",
-                  "vpn_subnet", "lan_subnet", "server_code"):
+                  "vpn_subnet", "lan_subnet", "vpn_endpoint", "server_code"):
         if field in body:
             val = body[field]
             updates[field] = val.strip() if isinstance(val, str) else val
@@ -369,6 +370,7 @@ def provision_vpn_server():
     data = {
         "vpn_subnet": vpn_subnet,
         "lan_subnet": lan_subnet,
+        "vpn_endpoint": (body.get("vpn_endpoint") or "").strip(),
         "name": name,
         "display_name": (body.get("display_name") or "").strip() or name.upper(),
         # Filled in once the instance is claimed over the management tunnel.

@@ -134,6 +134,11 @@ def init_db() -> None:
             -- only ever lose.
             vpn_subnet      TEXT,
             lan_subnet      TEXT,
+            -- Where clients dial in: the site's public address and port. Also
+            -- a router-step decision, and also not guessable — every box
+            -- behind one connection reports the same public IP, so detecting
+            -- it produces a plausible address pointing at the wrong machine.
+            vpn_endpoint    TEXT,
             created_at      INTEGER NOT NULL,
             updated_at      INTEGER NOT NULL
         );
@@ -357,6 +362,9 @@ def _migrate(conn: sqlite3.Connection) -> None:
     if "vpn_subnet" not in vpn_cols:
         conn.execute("ALTER TABLE vpn_servers ADD COLUMN vpn_subnet TEXT")
         conn.execute("ALTER TABLE vpn_servers ADD COLUMN lan_subnet TEXT")
+        conn.commit()
+    if "vpn_endpoint" not in vpn_cols:
+        conn.execute("ALTER TABLE vpn_servers ADD COLUMN vpn_endpoint TEXT")
         conn.commit()
     # The management tunnel's keys move here from wg-easy's store. Keeping
     # them means a site can be re-provisioned without losing its tunnel
@@ -752,8 +760,8 @@ def create_vpn_server(data: dict) -> int:
     cur = conn.execute(
         "INSERT INTO vpn_servers (name, display_name, url, public_url, api_token_enc, "
         "ssh_host, ssh_port, ssh_user, ssh_password_enc, server_code, callhome_ip, "
-        "vpn_subnet, lan_subnet, created_at, updated_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "vpn_subnet, lan_subnet, vpn_endpoint, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             data["name"], data["display_name"], data["url"],
             data.get("public_url", ""), data.get("api_token_enc"),
@@ -761,6 +769,7 @@ def create_vpn_server(data: dict) -> int:
             data.get("ssh_user", "root"), data.get("ssh_password_enc"),
             data.get("server_code"), data.get("callhome_ip"),
             data.get("vpn_subnet"), data.get("lan_subnet"),
+            data.get("vpn_endpoint"),
             ts, ts,
         ),
     )
@@ -786,7 +795,7 @@ def update_vpn_server(vpn_server_id: int, updates: dict) -> bool:
     conn = get_conn()
     allowed = {"name", "display_name", "url", "public_url", "api_token_enc",
                "ssh_host", "ssh_port", "ssh_user", "ssh_password_enc",
-               "server_code", "callhome_ip", "vpn_subnet", "lan_subnet",
+               "server_code", "callhome_ip", "vpn_subnet", "lan_subnet", "vpn_endpoint",
                "callhome_pubkey", "callhome_privkey_enc", "callhome_psk_enc"}
     sets, vals = [], []
     for key, val in updates.items():
