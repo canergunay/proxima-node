@@ -15,7 +15,7 @@ from core.db import (
     get_vpn_server,
     update_vpn_server,
 )
-from core.authz import scoped_server_ids
+from core.authz import scoped_server_ids, superadmin_only
 from core.proxima_client import request as _proxima_request
 
 log = logging.getLogger("adm.vpn_servers")
@@ -252,3 +252,109 @@ def proxy_to_proxima(vpn_server_id: int, subpath: str):
     except Exception as e:
         log.error(f"Proxima proxy error for {server['name']}: {e}")
         return jsonify({"ok": False, "error": str(e)}), 502
+
+
+# ── Provisioning ─────────────────────────────────────────────────────────
+
+@bp.post("/api/vpn-servers/provision")
+@superadmin_only
+def provision_vpn_server():
+    """Register a site server and install Proxima on it.
+
+    The SSH password is held only until the install succeeds; the response
+    returns an operation id whose log carries the playbook output.
+    """
+    from core.db import get_all_servers
+    from core.vpn_provision import start_provision
+
+    body = request.get_json(silent=True) or {}
+
+    name = (body.get("name") or "").strip().lower()
+    ssh_host = (body.get("ssh_host") or "").strip()
+    ssh_password = (body.get("ssh_password") or "").strip()
+    admin_password = (body.get("admin_password") or "").strip()
+
+    if not name:
+        return jsonify({"ok": False, "error": "name is required"}), 400
+    if not ssh_host:
+        return jsonify({"ok": False, "error": "ssh_host is required"}), 400
+    if not ssh_password:
+        return jsonify({"ok": False, "error": "ssh_password is required"}), 400
+    if len(admin_password) < 8:
+        return jsonify({"ok": False, "error":
+                        "admin_password must be at least 8 characters"}), 400
+
+    # Ansible host names must be unique across the whole inventory, and both
+    # kinds of server write host_vars/<name>.yml — a clash would have one
+    # silently overwrite the other's credentials.
+    if any(s["name"] == name for s in get_all_servers()):
+        return jsonify({"ok": False, "error":
+                        f"An exit node is already named {name}"}), 409
+    if any(v["name"] == name for v in get_all_vpn_servers()):
+        return jsonify({"ok": False, "error":
+                        f"A VPN server is already named {name}"}), 409
+
+    server_code = (body.get("server_code") or name).strip().upper()[:5]
+    data = {
+        "name": name,
+        "display_name": (body.get("display_name") or "").strip() or name.upper(),
+        # Filled in once the instance is claimed over the management tunnel.
+        "url": "",
+        "public_url": (body.get("public_url") or "").strip().rstrip("/"),
+        "ssh_host": ssh_host,
+        "ssh_port": int(body.get("ssh_port") or 22),
+        "ssh_user": (body.get("ssh_user") or "root").strip(),
+        "ssh_password_enc": encrypt_value(ssh_password),
+        "server_code": server_code,
+    }
+
+    server_id = create_vpn_server(data)
+    op_id, error = start_provision(server_id, body.get("admin_username") or "admin",
+                                   admin_password)
+    if error:
+        # Leave the row: the operator can retry without re-entering everything.
+        return jsonify({"ok": False, "error": error, "id": server_id}), 400
+
+    log.info(f"[PROVISION] Started for {name} ({ssh_host}), operation {op_id}")
+    return jsonify({"ok": True, "data": {"id": server_id, "operation_id": op_id}}), 202
+
+
+@bp.post("/api/vpn-servers/<int:vpn_server_id>/update")
+@superadmin_only
+def update_vpn_server_software(vpn_server_id: int):
+    """Re-deploy the current source onto a server that is behind."""
+    from core.vpn_provision import start_provision
+
+    server = get_vpn_server(vpn_server_id)
+    if not server:
+        return jsonify({"ok": False, "error": "VPN server not found"}), 404
+    if not server.get("ssh_host"):
+        return jsonify({"ok": False, "error":
+                        "This server was registered by hand and has no SSH "
+                        "details; ADM cannot deploy to it"}), 400
+
+    # Already installed and claimed, so nothing is created here — the same
+    # playbook simply syncs the newer source and re-runs the installer.
+    op_id, error = start_provision(vpn_server_id, "", "", claim=False)
+    if error:
+        return jsonify({"ok": False, "error": error}), 400
+    return jsonify({"ok": True, "data": {"operation_id": op_id}}), 202
+
+
+@bp.get("/api/vpn-servers/source-revision")
+@superadmin_only
+def get_source_revision():
+    """What ADM would deploy right now — compared against each server."""
+    from core.vpn_provision import source_revision
+    return jsonify({"ok": True, "data": source_revision()})
+
+
+@bp.post("/api/vpn-servers/source-revision/refresh")
+@superadmin_only
+def refresh_source_revision():
+    """Pull the latest source so a later deploy carries it."""
+    from core.vpn_provision import update_source
+    revision, error = update_source()
+    if error:
+        return jsonify({"ok": False, "error": error}), 502
+    return jsonify({"ok": True, "data": revision})

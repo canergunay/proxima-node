@@ -90,6 +90,17 @@ def init_db() -> None:
             display_name    TEXT NOT NULL,
             url             TEXT NOT NULL,
             api_token_enc   TEXT,
+            -- Provisioning: how ADM reaches the box to install or update it.
+            -- ssh_password_enc is held only until the install succeeds and is
+            -- then discarded — afterwards ADM has its key on the box and the
+            -- API token, and keeping a site's password would be a liability
+            -- with no remaining purpose.
+            ssh_host        TEXT,
+            ssh_port        INTEGER NOT NULL DEFAULT 22,
+            ssh_user        TEXT NOT NULL DEFAULT 'root',
+            ssh_password_enc TEXT,
+            server_code     TEXT,
+            callhome_ip     TEXT,
             created_at      INTEGER NOT NULL,
             updated_at      INTEGER NOT NULL
         );
@@ -290,6 +301,17 @@ def _migrate(conn: sqlite3.Connection) -> None:
     vpn_cols = {row[1] for row in conn.execute("PRAGMA table_info(vpn_servers)").fetchall()}
     if "public_url" not in vpn_cols:
         conn.execute("ALTER TABLE vpn_servers ADD COLUMN public_url TEXT DEFAULT ''")
+        conn.commit()
+    if "ssh_host" not in vpn_cols:
+        for stmt in (
+            "ALTER TABLE vpn_servers ADD COLUMN ssh_host TEXT",
+            "ALTER TABLE vpn_servers ADD COLUMN ssh_port INTEGER NOT NULL DEFAULT 22",
+            "ALTER TABLE vpn_servers ADD COLUMN ssh_user TEXT NOT NULL DEFAULT 'root'",
+            "ALTER TABLE vpn_servers ADD COLUMN ssh_password_enc TEXT",
+            "ALTER TABLE vpn_servers ADD COLUMN server_code TEXT",
+            "ALTER TABLE vpn_servers ADD COLUMN callhome_ip TEXT",
+        ):
+            conn.execute(stmt)
         conn.commit()
 
 
@@ -559,10 +581,14 @@ def create_vpn_server(data: dict) -> int:
     ts = int(time.time())
     cur = conn.execute(
         "INSERT INTO vpn_servers (name, display_name, url, public_url, api_token_enc, "
-        "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "ssh_host, ssh_port, ssh_user, ssh_password_enc, server_code, callhome_ip, "
+        "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             data["name"], data["display_name"], data["url"],
             data.get("public_url", ""), data.get("api_token_enc"),
+            data.get("ssh_host"), data.get("ssh_port", 22),
+            data.get("ssh_user", "root"), data.get("ssh_password_enc"),
+            data.get("server_code"), data.get("callhome_ip"),
             ts, ts,
         ),
     )
@@ -586,7 +612,9 @@ def get_all_vpn_servers() -> list[dict]:
 
 def update_vpn_server(vpn_server_id: int, updates: dict) -> bool:
     conn = get_conn()
-    allowed = {"name", "display_name", "url", "public_url", "api_token_enc"}
+    allowed = {"name", "display_name", "url", "public_url", "api_token_enc",
+               "ssh_host", "ssh_port", "ssh_user", "ssh_password_enc",
+               "server_code", "callhome_ip"}
     sets, vals = [], []
     for key, val in updates.items():
         if key in allowed:
@@ -607,6 +635,25 @@ def delete_vpn_server(vpn_server_id: int) -> bool:
     cur = conn.execute("DELETE FROM vpn_servers WHERE id = ?", (vpn_server_id,))
     conn.commit()
     return cur.rowcount > 0
+
+
+def next_callhome_ip(base: str = "10.13.13", first: int = 10) -> str | None:
+    """Next unused address in the management network.
+
+    Admin devices live below `first`; site servers are allocated from it
+    upwards, so the two never collide as either side grows.
+    """
+    conn = get_conn()
+    taken = {
+        r["callhome_ip"] for r in
+        conn.execute("SELECT callhome_ip FROM vpn_servers "
+                     "WHERE callhome_ip IS NOT NULL").fetchall()
+    }
+    for host in range(first, 255):
+        candidate = f"{base}.{host}"
+        if candidate not in taken:
+            return candidate
+    return None
 
 
 # ── Monitoring CRUD ────────────────────────────────────────────────────

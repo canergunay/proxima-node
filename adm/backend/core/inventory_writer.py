@@ -14,7 +14,7 @@ import yaml
 
 from core.auth import decrypt_value
 from core.config import REPO_ROOT
-from core.db import get_all_servers
+from core.db import get_all_servers, get_all_vpn_servers
 
 log = logging.getLogger("adm.inventory")
 
@@ -31,10 +31,31 @@ def _atomic_write(path: str, content: str) -> None:
     os.replace(tmp_path, path)
 
 
-def write_hosts_yml(servers: list[dict]) -> None:
-    """Generate inventory/hosts.yml from server list."""
+def write_hosts_yml(servers: list[dict], vpn_servers: list[dict] | None = None) -> None:
+    """Generate inventory/hosts.yml from the server lists.
+
+    Exit nodes and site servers are different animals and land in different
+    groups. Exit nodes are VPS images where root logs in with a password;
+    site servers are machines installed from Debian netinst, where the
+    default `PermitRootLogin prohibit-password` makes that impossible — so
+    those carry their own user and escalate with sudo.
+    """
     vpn_exit_hosts = {}
     dpi_bypass_hosts = {}
+    proxima_site_hosts = {}
+
+    for s in vpn_servers or []:
+        if not s.get("ssh_host"):
+            continue  # registered by hand, not provisioned by ADM
+        entry = {"ansible_host": s["ssh_host"]}
+        if s.get("ssh_port") and s["ssh_port"] != 22:
+            entry["ansible_port"] = s["ssh_port"]
+        entry["ansible_user"] = s.get("ssh_user") or "root"
+        if entry["ansible_user"] != "root":
+            entry["ansible_become"] = True
+        if s.get("server_code"):
+            entry["server_code"] = s["server_code"]
+        proxima_site_hosts[s["name"]] = entry
 
     for s in servers:
         if s["status"] == "decommissioned":
@@ -67,10 +88,13 @@ def write_hosts_yml(servers: list[dict]) -> None:
         inventory["all"]["children"]["vpn_exit"] = {"hosts": vpn_exit_hosts}
     if dpi_bypass_hosts:
         inventory["all"]["children"]["dpi_bypass"] = {"hosts": dpi_bypass_hosts}
+    if proxima_site_hosts:
+        inventory["all"]["children"]["proxima_sites"] = {"hosts": proxima_site_hosts}
 
     content = yaml.dump(inventory, default_flow_style=False, sort_keys=False, allow_unicode=True)
     _atomic_write(HOSTS_YML, content)
-    log.info(f"[INVENTORY] hosts.yml written ({len(vpn_exit_hosts)} vpn_exit, {len(dpi_bypass_hosts)} dpi_bypass)")
+    log.info(f"[INVENTORY] hosts.yml written ({len(vpn_exit_hosts)} vpn_exit, "
+             f"{len(dpi_bypass_hosts)} dpi_bypass, {len(proxima_site_hosts)} proxima_sites)")
 
 
 def write_host_vars(server: dict, include_ssh_pass: bool = False) -> None:
@@ -128,15 +152,50 @@ def remove_host_vars(name: str) -> None:
         log.info(f"[INVENTORY] Removed host_vars/{name}.yml")
 
 
+def write_vpn_server_host_vars(vpn_server: dict) -> None:
+    """Credentials for a site server, written just before provisioning it.
+
+    The SSH password is only present while the box is being claimed; once it
+    has ADM's key the password is discarded from the database and stops
+    appearing here.
+    """
+    os.makedirs(HOST_VARS_DIR, exist_ok=True)
+
+    data = {}
+    if vpn_server.get("server_code"):
+        data["server_code"] = vpn_server["server_code"]
+
+    enc = vpn_server.get("ssh_password_enc")
+    if enc:
+        password = decrypt_value(enc)
+        if password:
+            data["ansible_ssh_pass"] = password
+            # Same secret for sudo: these boxes are installed with a single
+            # admin account, so a separate become password would be fiction.
+            if (vpn_server.get("ssh_user") or "root") != "root":
+                data["ansible_become_password"] = password
+
+    path = os.path.join(HOST_VARS_DIR, f"{vpn_server['name']}.yml")
+    content = yaml.dump(data, default_flow_style=False, sort_keys=False, allow_unicode=True)
+    _atomic_write(path, content)
+    log.info(f"[INVENTORY] host_vars/{vpn_server['name']}.yml written (site server)")
+
+
 def regenerate_inventory() -> None:
     """Full regeneration: hosts.yml + all host_vars from DB."""
     servers = get_all_servers()
-    write_hosts_yml(servers)
+    write_hosts_yml(servers, get_all_vpn_servers())
     write_all_host_vars(servers)
 
 
 def regenerate_for_server(server: dict, include_ssh_pass: bool = False) -> None:
     """Regenerate hosts.yml + this server's host_vars."""
     servers = get_all_servers()
-    write_hosts_yml(servers)
+    write_hosts_yml(servers, get_all_vpn_servers())
     write_host_vars(server, include_ssh_pass=include_ssh_pass)
+
+
+def regenerate_for_vpn_server(vpn_server: dict) -> None:
+    """Regenerate hosts.yml + this site server's host_vars."""
+    write_hosts_yml(get_all_servers(), get_all_vpn_servers())
+    write_vpn_server_host_vars(vpn_server)

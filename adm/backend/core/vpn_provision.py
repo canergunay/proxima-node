@@ -1,0 +1,266 @@
+"""Install Proxima on a site server and claim it.
+
+The order is deliberate. The call-home tunnel is established first, so the
+box is reachable from ERG before anything else happens — a failed or
+half-finished install cannot strand it, whatever the site's router is or is
+not forwarding. Only then is Proxima installed, and only then does ADM claim
+the instance and store a token for it.
+
+Once claimed, the SSH password is discarded: ADM has its key on the box and
+an API token, so keeping a site's password would be a liability with nothing
+left to justify it.
+"""
+
+import base64
+import json
+import logging
+import os
+import subprocess
+import tempfile
+import time
+import uuid
+
+import requests
+
+from core.auth import decrypt_value, encrypt_value
+from core.db import (
+    create_operation,
+    get_vpn_server,
+    next_callhome_ip,
+    update_vpn_server,
+)
+from core.inventory_writer import regenerate_for_vpn_server
+
+log = logging.getLogger("adm.vpn_provision")
+
+# wg-easy stores its peers here; the file is mounted from the host, so ADM
+# edits it directly and applies the change live rather than restarting the
+# container and dropping everyone else's tunnel.
+WG_EASY_STORE = os.environ.get(
+    "ADM_WG_EASY_STORE", "/opt/erg/wireguard/wg-easy-data/wg0.json")
+WG_INTERFACE = os.environ.get("ADM_WG_INTERFACE", "wg0")
+WG_ENDPOINT = os.environ.get("ADM_WG_ENDPOINT", "vpn.ergunay.com:51820")
+PROXIMA_SRC = os.environ.get("ADM_PROXIMA_SRC", "/opt/erg/proxima-src")
+PROXIMA_PORT = 5050
+
+
+# ── Call-home peer ───────────────────────────────────────────────────────
+
+def _wg(*args: str, stdin: str | None = None) -> str:
+    return subprocess.run(["wg", *args], capture_output=True, text=True,
+                          input=stdin, check=True).stdout.strip()
+
+
+def ensure_callhome_peer(name: str, address: str) -> str:
+    """Register a site in the management network and return its config.
+
+    Idempotent: re-provisioning an existing site reuses its keys, so the box
+    does not lose its tunnel identity on a reinstall.
+    """
+    with open(WG_EASY_STORE) as f:
+        store = json.load(f)
+
+    peer = next((c for c in store["clients"].values()
+                 if c.get("address") == address), None)
+
+    if peer is None:
+        priv = _wg("genkey")
+        peer = {
+            "id": str(uuid.uuid4()),
+            "name": f"{name}-callhome",
+            "address": address,
+            "privateKey": priv,
+            "publicKey": _wg("pubkey", stdin=priv),
+            "preSharedKey": _wg("genpsk"),
+            "createdAt": time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime()),
+            "updatedAt": time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime()),
+            "enabled": True,
+        }
+        store["clients"][peer["id"]] = peer
+        tmp = WG_EASY_STORE + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(store, f, indent=2)
+        os.replace(tmp, WG_EASY_STORE)
+        log.info(f"[PROVISION] Registered call-home peer {address} for {name}")
+
+    # Apply live. Restarting wg-easy would rebuild the interface and drop
+    # every other peer, including the admin who is watching this run.
+    with tempfile.NamedTemporaryFile("w", delete=False) as f:
+        f.write(peer["preSharedKey"])
+        psk_path = f.name
+    try:
+        subprocess.run(
+            ["wg", "set", WG_INTERFACE, "peer", peer["publicKey"],
+             "preshared-key", psk_path, "allowed-ips", f"{address}/32"],
+            check=True, capture_output=True, text=True)
+    finally:
+        os.unlink(psk_path)
+
+    # AllowedIPs is the management network only. The site has its own LAN and
+    # routing ERG's into the tunnel would break it wherever the two overlap.
+    return (
+        "[Interface]\n"
+        f"PrivateKey = {peer['privateKey']}\n"
+        f"Address    = {address}/24\n"
+        "\n"
+        "[Peer]\n"
+        f"PublicKey    = {store['server']['publicKey']}\n"
+        f"PresharedKey = {peer['preSharedKey']}\n"
+        "AllowedIPs   = 10.13.13.0/24\n"
+        f"Endpoint     = {WG_ENDPOINT}\n"
+        "PersistentKeepalive = 25\n"
+    )
+
+
+# ── Claiming ─────────────────────────────────────────────────────────────
+
+def claim_instance(url: str, username: str, password: str) -> tuple[str | None, str | None]:
+    """Create the first admin on a fresh instance and keep its token.
+
+    Returns (token, error). An instance that already has an admin cannot be
+    claimed this way — that is reported rather than worked around, because it
+    means the box was not as fresh as the operator believed.
+    """
+    try:
+        r = requests.post(f"{url}/api/auth/setup",
+                          json={"username": username, "password": password},
+                          timeout=20, verify=True)
+    except requests.RequestException as e:
+        return None, f"Cannot reach the new instance: {e}"
+
+    try:
+        payload = r.json()
+    except ValueError:
+        return None, f"HTTP {r.status_code}: non-JSON response"
+
+    if r.status_code == 409:
+        return None, ("This instance already has an admin account — it was not "
+                      "a fresh install. Register it manually with its token.")
+    if not payload.get("ok"):
+        return None, payload.get("error") or f"HTTP {r.status_code}"
+
+    token = (payload.get("data") or {}).get("token")
+    if not token:
+        return None, "Setup succeeded but returned no token"
+    return token, None
+
+
+# ── Provisioning ─────────────────────────────────────────────────────────
+
+def start_provision(vpn_server_id: int, admin_username: str,
+                    admin_password: str,
+                    claim: bool = True) -> tuple[int | None, str | None]:
+    """Kick off the install. Returns (operation_id, error).
+
+    Runs in the background; the operation log carries the playbook output and
+    the claim result, so the caller can follow it in the UI.
+
+    claim=False re-deploys a server ADM already owns: the same playbook syncs
+    the newer source and re-runs the installer, but there is no first admin to
+    create and no token to fetch.
+    """
+    from core.ansible_runner import is_running, run_playbook
+
+    server = get_vpn_server(vpn_server_id)
+    if not server:
+        return None, "VPN server not found"
+    if not server.get("ssh_host"):
+        return None, "No SSH host recorded for this server"
+    if is_running():
+        return None, "Another Ansible operation is already running"
+
+    address = server.get("callhome_ip") or next_callhome_ip()
+    if not address:
+        return None, "No free address left in the management network"
+
+    try:
+        conf = ensure_callhome_peer(server["name"], address)
+    except (OSError, subprocess.CalledProcessError, KeyError) as e:
+        log.exception("[PROVISION] Call-home peer setup failed")
+        return None, f"Could not register the call-home peer: {e}"
+
+    update_vpn_server(vpn_server_id, {"callhome_ip": address})
+    server = get_vpn_server(vpn_server_id)
+    regenerate_for_vpn_server(server)
+
+    op_id = create_operation(None, "provision_proxima", "setup-proxima.yml")
+
+    def on_complete(success: bool, _op_id: int) -> None:
+        if not success:
+            log.warning(f"[PROVISION] Playbook failed for {server['name']}")
+            return
+        if not claim:
+            log.info(f"[PROVISION] Re-deployed {server['name']}")
+            return
+        _finish_provision(vpn_server_id, address, admin_username, admin_password, _op_id)
+
+    run_playbook(
+        op_id, "setup-proxima.yml",
+        limit=server["name"],
+        extra_vars={
+            "server_code": server.get("server_code") or server["name"].upper()[:5],
+            "callhome_conf_b64": base64.b64encode(conf.encode()).decode(),
+            "proxima_src": PROXIMA_SRC,
+        },
+        on_complete=on_complete,
+    )
+    return op_id, None
+
+
+def _finish_provision(vpn_server_id: int, address: str, username: str,
+                      password: str, op_id: int) -> None:
+    """Claim the freshly installed instance and drop the SSH password."""
+    from core.db import append_operation_output
+
+    # Reached over the management tunnel, not the site's LAN address: this is
+    # the path that keeps working once the box is at a remote site.
+    url = f"http://{address}:{PROXIMA_PORT}"
+    token, error = claim_instance(url, username, password)
+
+    if error:
+        append_operation_output(op_id, f"\n[ADM] Could not claim the instance: {error}\n")
+        log.error(f"[PROVISION] Claim failed for server {vpn_server_id}: {error}")
+        return
+
+    update_vpn_server(vpn_server_id, {
+        "url": url,
+        "api_token_enc": encrypt_value(token),
+        # The password existed to get in the first time. ADM's key is on the
+        # box now and it has a token; holding the site's password any longer
+        # is exposure without purpose.
+        "ssh_password_enc": None,
+    })
+    regenerate_for_vpn_server(get_vpn_server(vpn_server_id))
+
+    append_operation_output(
+        op_id,
+        f"\n[ADM] Instance claimed at {url}; API token stored and the SSH "
+        f"password discarded.\n")
+    log.info(f"[PROVISION] Claimed server {vpn_server_id} at {url}")
+
+
+# ── Version drift ────────────────────────────────────────────────────────
+
+def source_revision() -> dict | None:
+    """The revision ADM would deploy right now."""
+    try:
+        out = subprocess.run(
+            ["git", "-C", PROXIMA_SRC, "log", "-1", "--format=%H%n%ct"],
+            capture_output=True, text=True, check=True).stdout.split()
+        return {"commit": out[0], "short": out[0][:7], "committed_at": int(out[1])}
+    except (subprocess.CalledProcessError, OSError, IndexError, ValueError):
+        return None
+
+
+def update_source() -> tuple[dict | None, str | None]:
+    """Fetch the latest source so a later deploy carries it."""
+    try:
+        subprocess.run(["git", "-C", PROXIMA_SRC, "fetch", "--quiet", "origin"],
+                       check=True, capture_output=True, text=True)
+        subprocess.run(["git", "-C", PROXIMA_SRC, "reset", "--quiet",
+                        "--hard", "origin/main"],
+                       check=True, capture_output=True, text=True)
+    except (subprocess.CalledProcessError, OSError) as e:
+        detail = getattr(e, "stderr", "") or str(e)
+        return None, f"Could not update the source checkout: {detail.strip()}"
+    return source_revision(), None
