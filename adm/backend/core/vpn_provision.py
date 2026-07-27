@@ -131,6 +131,13 @@ def start_provision(vpn_server_id: int, admin_id: int | None = None,
             "server_code": server.get("server_code") or server["name"].upper()[:5],
             "callhome_conf_b64": base64.b64encode(conf.encode()).decode(),
             "proxima_src": PROXIMA_SRC,
+            # From the register, which has already refused anything that
+            # overlaps another site. Empty means the site has no range on
+            # record and the installer leaves ProximaVPN alone rather than
+            # inventing one.
+            "vpn_subnet": server.get("vpn_subnet") or "",
+            "vpn_endpoint": (server.get("public_url") or "").replace(
+                "https://", "").replace("http://", "").split(":")[0],
         },
         on_complete=on_complete,
     )

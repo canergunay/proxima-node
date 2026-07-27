@@ -159,11 +159,17 @@
 
     - name: Write the installer answer file
       ansible.builtin.copy:
+        # vpn_subnet comes from ADM's register, which refuses one that overlaps
+        # another site. Omitted when the site has none recorded, and the
+        # installer then skips ProximaVPN rather than guessing a range.
         content: "{{ {
             'install_path': install_path,
             'server_ip': ansible_default_ipv4.address,
             'server_code': server_code,
-          } | to_nice_json }}"
+          }
+          | combine({'vpn_subnet': vpn_subnet} if (vpn_subnet | default('')) else {})
+          | combine({'vpn_endpoint': vpn_endpoint} if (vpn_endpoint | default('')) else {})
+          | to_nice_json }}"
         dest: "{{ answers_path }}"
         owner: root
         group: root
