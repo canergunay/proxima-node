@@ -1,0 +1,192 @@
+---
+# Install Proxima on a site server, over the management tunnel or the LAN.
+#
+# Two things happen here, in this order and for a reason:
+#
+#   1. the call-home tunnel, so the box is reachable from ERG no matter what
+#      the site's router is or is not forwarding, and no matter what state
+#      Proxima ends up in;
+#   2. Proxima itself, by running the repo's own installer unattended.
+#
+# The installer is not reimplemented here. A second copy of "install Docker,
+# build the AmneziaWG module, write the config, bring the stack up" would
+# drift from the real one, and the failure would surface at a construction
+# site rather than on a desk.
+#
+# Usage:
+#   ansible-playbook playbooks/setup-proxima.yml -l svr \
+#     -e server_code=SVR \
+#     -e callhome_conf_b64=<base64 of the wg-erg.conf>
+#
+#   -e skip_callhome=true    already has a tunnel, only install Proxima
+#   -e skip_proxima=true     only establish the tunnel (kit preparation)
+
+- name: Install Proxima on a site server
+  hosts: proxima_sites
+  gather_facts: true
+  become: true
+
+  vars:
+    proxima_repo: "https://github.com/canergunay/proxima.git"
+    install_path: "/opt/proxima"
+    callhome_iface: "wg-erg"
+    skip_callhome: false
+    skip_proxima: false
+    answers_path: "/root/.proxima-install-answers.json"
+
+  pre_tasks:
+    - name: Verify host is in proxima_sites
+      ansible.builtin.assert:
+        that: "'proxima_sites' in group_names"
+        fail_msg: "This playbook is only for proxima_sites hosts"
+
+    - name: Verify Debian or Ubuntu
+      ansible.builtin.assert:
+        that: ansible_os_family == "Debian"
+        fail_msg: >-
+          Proxima installs on Debian/Ubuntu only; this host reports
+          {{ ansible_distribution }} {{ ansible_distribution_version }}.
+
+    - name: Verify required variables
+      ansible.builtin.assert:
+        that:
+          - server_code is defined and server_code | length > 0
+          - server_code | length <= 5
+        fail_msg: "server_code is required and must be at most 5 characters"
+
+    - name: Verify the call-home config was supplied
+      ansible.builtin.assert:
+        that: callhome_conf_b64 is defined and callhome_conf_b64 | length > 0
+        fail_msg: "callhome_conf_b64 is required unless skip_callhome=true"
+      when: not skip_callhome | bool
+
+  tasks:
+    # ── 1. Call-home tunnel ────────────────────────────────────────────────
+    #
+    # Plain WireGuard under systemd, deliberately not a container: Docker may
+    # start late, and Proxima's own work restarts containers. A recovery path
+    # cannot depend on the thing it recovers.
+
+    - name: Install wireguard-tools
+      ansible.builtin.apt:
+        name: wireguard-tools
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+      when: not skip_callhome | bool
+
+    - name: Write the call-home config
+      ansible.builtin.copy:
+        content: "{{ callhome_conf_b64 | b64decode }}"
+        dest: "/etc/wireguard/{{ callhome_iface }}.conf"
+        owner: root
+        group: root
+        mode: "0600"
+      when: not skip_callhome | bool
+      notify: Restart call-home tunnel
+
+    - name: Enable and start the call-home tunnel
+      ansible.builtin.systemd:
+        name: "wg-quick@{{ callhome_iface }}"
+        enabled: true
+        state: started
+        daemon_reload: true
+      when: not skip_callhome | bool
+
+    - name: Flush handlers so the tunnel is up before it is checked
+      ansible.builtin.meta: flush_handlers
+
+    - name: Wait for the tunnel to hand-shake
+      ansible.builtin.shell: >-
+        wg show {{ callhome_iface }} latest-handshakes | awk '{print $2}'
+      register: callhome_handshake
+      changed_when: false
+      retries: 6
+      delay: 5
+      until: callhome_handshake.stdout | trim | int > 0
+      when: not skip_callhome | bool
+
+    - name: Report the tunnel address
+      ansible.builtin.debug:
+        msg: >-
+          Call-home up on
+          {{ ansible_facts[callhome_iface | replace('-', '_')]['ipv4']['address']
+             | default('(address not gathered)') }}
+      when: not skip_callhome | bool
+
+    # ── 2. Proxima ─────────────────────────────────────────────────────────
+
+    - name: Install installer prerequisites
+      ansible.builtin.apt:
+        name: [git, python3, python3-pip]
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+      when: not skip_proxima | bool
+
+    - name: Clone or update the Proxima repository
+      ansible.builtin.git:
+        repo: "{{ proxima_repo }}"
+        dest: "{{ install_path }}"
+        version: main
+        # An existing checkout may carry local edits from a hand-install; the
+        # installer is the source of truth from here on.
+        force: true
+      when: not skip_proxima | bool
+
+    - name: Write the installer answer file
+      ansible.builtin.copy:
+        content: "{{ {
+            'install_path': install_path,
+            'server_ip': ansible_default_ipv4.address,
+            'server_code': server_code,
+          } | to_nice_json }}"
+        dest: "{{ answers_path }}"
+        owner: root
+        group: root
+        mode: "0600"
+      when: not skip_proxima | bool
+
+    - name: Run the installer
+      # Streams straight through to the operation log so a failure is readable
+      # without going to the box.
+      ansible.builtin.command:
+        cmd: "bash {{ install_path }}/install.sh --answers {{ answers_path }}"
+        chdir: "{{ install_path }}"
+      register: proxima_install
+      changed_when: true
+      when: not skip_proxima | bool
+
+    - name: Show installer output
+      ansible.builtin.debug:
+        var: proxima_install.stdout_lines
+      when: not skip_proxima | bool
+
+    - name: Remove the answer file
+      ansible.builtin.file:
+        path: "{{ answers_path }}"
+        state: absent
+      when: not skip_proxima | bool
+
+    - name: Wait for the Proxima API
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:5050/api/status"
+        status_code: 200
+      register: proxima_api
+      retries: 12
+      delay: 5
+      until: proxima_api.status == 200
+      when: not skip_proxima | bool
+
+    - name: Report
+      ansible.builtin.debug:
+        msg: >-
+          Proxima is up on {{ ansible_default_ipv4.address }}:5050
+          (site {{ server_code }}). ADM can now claim it via /api/auth/setup.
+      when: not skip_proxima | bool
+
+  handlers:
+    - name: Restart call-home tunnel
+      ansible.builtin.systemd:
+        name: "wg-quick@{{ callhome_iface }}"
+        state: restarted
