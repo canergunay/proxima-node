@@ -58,6 +58,7 @@ def _loop() -> None:
             _check_alerts()
             _maybe_cleanup()
             _reconcile_vpn_passwords()
+            _retry_panel_access()
         except Exception:
             log.exception("Scheduler error")
         _stop.wait(timeout=POLL_INTERVAL)
@@ -361,6 +362,26 @@ def _reconcile_vpn_passwords() -> None:
             log.info(f"Propagated {len(result['propagated'])} password change(s)")
     except Exception:
         log.exception("Password reconcile error")
+
+
+def _retry_panel_access() -> None:
+    """Push any panel grant or revocation still waiting on a site.
+
+    A site that was down when the change was made would otherwise keep the
+    old state until somebody noticed and pressed sync — and for a revocation
+    that means a login staying alive. Does nothing when the queue is empty.
+    """
+    try:
+        from core.db import get_pending_admin_access
+        if not get_pending_admin_access():
+            return
+        from core.admin_sync import sync_pending
+        result = sync_pending()
+        if result["granted"] or result["removed"]:
+            log.info(f"Panel access retry: granted={len(result['granted'])} "
+                     f"removed={len(result['removed'])} failed={len(result['failed'])}")
+    except Exception:
+        log.exception("Panel access retry error")
 
 
 def _maybe_cleanup() -> None:

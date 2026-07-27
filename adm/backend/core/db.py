@@ -76,6 +76,32 @@ def init_db() -> None:
             created_at    INTEGER NOT NULL
         );
 
+        -- Which sites an operator may sign into the Proxima panel of.
+        --
+        -- Distinct from admin_server_scope, which says whose users an
+        -- operator may edit here in ADM. Being allowed to manage a site's
+        -- accounts and being able to log into that site's own panel are
+        -- separate powers, and conflating them would hand every scoped
+        -- operator control of the boxes they were merely administering
+        -- accounts for.
+        CREATE TABLE IF NOT EXISTS admin_server_access (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            admin_id      INTEGER NOT NULL,
+            vpn_server_id INTEGER NOT NULL,
+            sync_status   TEXT NOT NULL DEFAULT 'pending',
+            sync_error    TEXT,
+            synced_at     INTEGER,
+            -- When the password this site holds was last written. Compared
+            -- against admins.password_changed_at to decide whether a push
+            -- should carry the hash.
+            password_synced_at INTEGER,
+            created_at    INTEGER NOT NULL,
+            updated_at    INTEGER NOT NULL,
+            UNIQUE (admin_id, vpn_server_id),
+            FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE CASCADE,
+            FOREIGN KEY (vpn_server_id) REFERENCES vpn_servers(id) ON DELETE CASCADE
+        );
+
         CREATE TABLE IF NOT EXISTS admin_server_scope (
             admin_id      INTEGER NOT NULL,
             vpn_server_id INTEGER NOT NULL,
@@ -226,6 +252,14 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.commit()
     if admin_cols and "enabled" not in admin_cols:
         conn.execute("ALTER TABLE admins ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1")
+        conn.commit()
+    # An operator's ADM password is also the one their panel accounts use, so
+    # a change here has to reach every site they administer. Stamped now for
+    # admins who predate this, which leaves their sites holding whatever they
+    # were last given rather than forcing a needless push.
+    if admin_cols and "password_changed_at" not in admin_cols:
+        conn.execute("ALTER TABLE admins ADD COLUMN password_changed_at INTEGER")
+        conn.execute("UPDATE admins SET password_changed_at = ?", (int(time.time()),))
         conn.commit()
 
     # Password ownership is shared: ADM sets it, and a user may change their
@@ -565,13 +599,126 @@ def admin_count() -> int:
 
 
 def update_admin_password(admin_id: int, password_hash: str) -> bool:
+    """Set an operator's password and queue it for every site they administer.
+
+    One credential is the point: the same password signs them into ADM and
+    into each panel they hold an account on. Marking their access rows here
+    means a change made in one place does not quietly leave the sites behind.
+    """
     conn = get_conn()
+    now = int(time.time())
     cur = conn.execute(
-        "UPDATE admins SET password_hash = ? WHERE id = ?",
-        (password_hash, admin_id),
+        "UPDATE admins SET password_hash = ?, password_changed_at = ? WHERE id = ?",
+        (password_hash, now, admin_id),
     )
+    if cur.rowcount:
+        conn.execute(
+            "UPDATE admin_server_access SET sync_status = 'pending', updated_at = ? "
+            "WHERE admin_id = ? AND sync_status != 'pending_delete'",
+            (now, admin_id),
+        )
     conn.commit()
     return cur.rowcount > 0
+
+
+# ── Panel access: which sites an operator can sign into ──────────────────
+
+def get_admin_access(admin_id: int) -> list[dict]:
+    conn = get_conn()
+    return [dict(r) for r in conn.execute(
+        "SELECT a.*, s.name AS server_name, s.display_name AS server_display_name "
+        "FROM admin_server_access a "
+        "JOIN vpn_servers s ON a.vpn_server_id = s.id "
+        "WHERE a.admin_id = ? ORDER BY s.name", (admin_id,)).fetchall()]
+
+
+def get_all_admin_access() -> list[dict]:
+    conn = get_conn()
+    return [dict(r) for r in conn.execute(
+        "SELECT * FROM admin_server_access ORDER BY admin_id, vpn_server_id"
+    ).fetchall()]
+
+
+def grant_admin_access(admin_id: int, vpn_server_id: int) -> None:
+    """Give an operator a panel account on a site. Idempotent."""
+    conn = get_conn()
+    now = int(time.time())
+    conn.execute(
+        "INSERT INTO admin_server_access "
+        "(admin_id, vpn_server_id, sync_status, created_at, updated_at) "
+        "VALUES (?, ?, 'pending', ?, ?) "
+        "ON CONFLICT(admin_id, vpn_server_id) DO UPDATE SET "
+        "  sync_status = 'pending', sync_error = NULL, updated_at = excluded.updated_at",
+        (admin_id, vpn_server_id, now, now))
+    conn.commit()
+
+
+def mark_admin_access_pending_delete(admin_id: int, vpn_server_id: int) -> None:
+    """Queue removal. The row survives until the site confirms it.
+
+    Dropping it here instead would lose the instruction: the account would
+    stay on a box nobody is watching, still able to log in.
+    """
+    conn = get_conn()
+    conn.execute(
+        "UPDATE admin_server_access SET sync_status = 'pending_delete', "
+        "sync_error = NULL, updated_at = ? WHERE admin_id = ? AND vpn_server_id = ?",
+        (int(time.time()), admin_id, vpn_server_id))
+    conn.commit()
+
+
+def delete_admin_access(admin_id: int, vpn_server_id: int) -> None:
+    conn = get_conn()
+    conn.execute(
+        "DELETE FROM admin_server_access WHERE admin_id = ? AND vpn_server_id = ?",
+        (admin_id, vpn_server_id))
+    conn.commit()
+
+
+def get_pending_admin_access(vpn_server_id: int | None = None) -> list[dict]:
+    conn = get_conn()
+    sql = (
+        "SELECT a.*, m.username, m.password_hash, m.enabled AS admin_enabled, "
+        "m.password_changed_at, s.name AS server_name "
+        "FROM admin_server_access a "
+        "JOIN admins m ON a.admin_id = m.id "
+        "JOIN vpn_servers s ON a.vpn_server_id = s.id "
+        "WHERE a.sync_status IN ('pending', 'pending_delete')"
+    )
+    params: tuple = ()
+    if vpn_server_id is not None:
+        sql += " AND a.vpn_server_id = ?"
+        params = (vpn_server_id,)
+    return [dict(r) for r in conn.execute(sql + " ORDER BY a.id", params).fetchall()]
+
+
+def mark_admin_access_synced(access_id: int, password_pushed: bool = False) -> None:
+    conn = get_conn()
+    now = int(time.time())
+    if password_pushed:
+        conn.execute(
+            "UPDATE admin_server_access SET sync_status = 'synced', sync_error = NULL, "
+            "synced_at = ?, password_synced_at = ?, updated_at = ? WHERE id = ?",
+            (now, now, now, access_id))
+    else:
+        conn.execute(
+            "UPDATE admin_server_access SET sync_status = 'synced', sync_error = NULL, "
+            "synced_at = ?, updated_at = ? WHERE id = ?", (now, now, access_id))
+    conn.commit()
+
+
+def mark_admin_access_error(access_id: int, error: str) -> None:
+    """Record a failure without discarding the instruction.
+
+    The row stays pending, so the next run retries it. Clearing the status
+    instead would strand a grant — or worse, a revocation, leaving an account
+    alive on a site ADM believes it removed.
+    """
+    conn = get_conn()
+    conn.execute(
+        "UPDATE admin_server_access SET sync_error = ?, updated_at = ? WHERE id = ?",
+        (error[:500], int(time.time()), access_id))
+    conn.commit()
 
 
 # ── VPN Server CRUD ─────────────────────────────────────────────────────

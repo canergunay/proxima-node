@@ -4,7 +4,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests as http_requests
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, g, jsonify, request
 
 from core.auth import encrypt_value
 from core.db import (
@@ -272,7 +272,6 @@ def provision_vpn_server():
     name = (body.get("name") or "").strip().lower()
     ssh_host = (body.get("ssh_host") or "").strip()
     ssh_password = (body.get("ssh_password") or "").strip()
-    admin_password = (body.get("admin_password") or "").strip()
 
     if not name:
         return jsonify({"ok": False, "error": "name is required"}), 400
@@ -282,10 +281,6 @@ def provision_vpn_server():
     # one being reinstalled, already carries ADM's key — demanding a password
     # there would force the operator to keep a site password around, which is
     # the exposure this whole flow exists to remove.
-    if len(admin_password) < 8:
-        return jsonify({"ok": False, "error":
-                        "admin_password must be at least 8 characters"}), 400
-
     # Ansible host names must be unique across the whole inventory, and both
     # kinds of server write host_vars/<name>.yml — a clash would have one
     # silently overwrite the other's credentials.
@@ -311,8 +306,10 @@ def provision_vpn_server():
     }
 
     server_id = create_vpn_server(data)
-    op_id, error = start_provision(server_id, body.get("admin_username") or "admin",
-                                   admin_password)
+    # Whoever is running this becomes the new panel's admin, with the password
+    # they already use here. Nothing is generated and nothing has to be
+    # written down.
+    op_id, error = start_provision(server_id, admin_id=g.admin["id"])
     if error:
         # Leave the row: the operator can retry without re-entering everything.
         return jsonify({"ok": False, "error": error, "id": server_id}), 400
@@ -337,7 +334,7 @@ def update_vpn_server_software(vpn_server_id: int):
 
     # Already installed and claimed, so nothing is created here — the same
     # playbook simply syncs the newer source and re-runs the installer.
-    op_id, error = start_provision(vpn_server_id, "", "", claim=False)
+    op_id, error = start_provision(vpn_server_id, claim=False)
     if error:
         return jsonify({"ok": False, "error": error}), 400
     return jsonify({"ok": True, "data": {"operation_id": op_id}}), 202

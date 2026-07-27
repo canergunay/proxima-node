@@ -116,5 +116,17 @@ def change_password():
         return jsonify({"ok": False, "error": "Current password is incorrect"}), 401
 
     update_admin_password(admin["id"], hash_password(new_pass))
-    log.info(f"[AUTH] Password changed: '{username}'")
-    return jsonify({"ok": True, "data": {"message": "Password changed"}})
+
+    # The same password signs them into every site panel they hold an account
+    # on, so push it now rather than leaving those on the old one until the
+    # next sweep. A site being unreachable is not a reason to fail the change:
+    # the row stays pending and gets retried.
+    from api.admins import _push_now
+    result = _push_now(admin["id"])
+
+    log.info(f"[AUTH] Password changed: '{username}' "
+             f"(panels updated: {len(result['granted'])}, failed: {len(result['failed'])})")
+    return jsonify({"ok": True, "data": {"message": "Password changed",
+                                         "panels_updated": len(result["granted"]),
+                                         "panels_failed": [f.get("target")
+                                                           for f in result["failed"]]}})

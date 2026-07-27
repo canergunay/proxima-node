@@ -114,8 +114,14 @@ def ensure_callhome_peer(name: str, address: str) -> str:
 
 # ── Claiming ─────────────────────────────────────────────────────────────
 
-def claim_instance(url: str, username: str, password: str) -> tuple[str | None, str | None]:
+def claim_instance(url: str, username: str,
+                   password_hash: str) -> tuple[str | None, str | None]:
     """Create the first admin on a fresh instance and keep its token.
+
+    The operator's existing hash is what gets planted, so setting up a server
+    invents no new credential: they sign into the new panel with the password
+    they already use for ADM. Werkzeug's pbkdf2 format is shared by both
+    sides, and ADM never holds the plaintext to send.
 
     Returns (token, error). An instance that already has an admin cannot be
     claimed this way — that is reported rather than worked around, because it
@@ -123,7 +129,7 @@ def claim_instance(url: str, username: str, password: str) -> tuple[str | None, 
     """
     try:
         r = requests.post(f"{url}/api/auth/setup",
-                          json={"username": username, "password": password},
+                          json={"username": username, "password_hash": password_hash},
                           timeout=20, verify=True)
     except requests.RequestException as e:
         return None, f"Cannot reach the new instance: {e}"
@@ -147,13 +153,16 @@ def claim_instance(url: str, username: str, password: str) -> tuple[str | None, 
 
 # ── Provisioning ─────────────────────────────────────────────────────────
 
-def start_provision(vpn_server_id: int, admin_username: str,
-                    admin_password: str,
+def start_provision(vpn_server_id: int, admin_id: int | None = None,
                     claim: bool = True) -> tuple[int | None, str | None]:
     """Kick off the install. Returns (operation_id, error).
 
     Runs in the background; the operation log carries the playbook output and
     the claim result, so the caller can follow it in the UI.
+
+    admin_id is the operator running this. They become the new instance's
+    first panel admin, using the password they already have — no credential
+    is generated, and none has to be written down or handed over.
 
     claim=False re-deploys a server ADM already owns: the same playbook syncs
     the newer source and re-runs the installer, but there is no first admin to
@@ -192,7 +201,7 @@ def start_provision(vpn_server_id: int, admin_username: str,
         if not claim:
             log.info(f"[PROVISION] Re-deployed {server['name']}")
             return
-        _finish_provision(vpn_server_id, address, admin_username, admin_password, _op_id)
+        _finish_provision(vpn_server_id, address, admin_id, _op_id)
 
     run_playbook(
         op_id, "setup-proxima.yml",
@@ -207,15 +216,22 @@ def start_provision(vpn_server_id: int, admin_username: str,
     return op_id, None
 
 
-def _finish_provision(vpn_server_id: int, address: str, username: str,
-                      password: str, op_id: int) -> None:
+def _finish_provision(vpn_server_id: int, address: str, admin_id: int | None,
+                      op_id: int) -> None:
     """Claim the freshly installed instance and drop the SSH password."""
-    from core.db import append_operation_output
+    from core.db import append_operation_output, get_admin, grant_admin_access
+
+    admin = get_admin(admin_id) if admin_id else None
+    if not admin:
+        append_operation_output(
+            op_id, "\n[ADM] Cannot claim: the operator who started this is gone.\n")
+        log.error(f"[PROVISION] No admin {admin_id} to claim server {vpn_server_id}")
+        return
 
     # Reached over the management tunnel, not the site's LAN address: this is
     # the path that keeps working once the box is at a remote site.
     url = f"http://{address}:{PROXIMA_PORT}"
-    token, error = claim_instance(url, username, password)
+    token, error = claim_instance(url, admin["username"], admin["password_hash"])
 
     if error:
         append_operation_output(op_id, f"\n[ADM] Could not claim the instance: {error}\n")
@@ -232,11 +248,23 @@ def _finish_provision(vpn_server_id: int, address: str, username: str,
     })
     regenerate_for_vpn_server(get_vpn_server(vpn_server_id))
 
+    # Record what the claim just created, so the panel-access matrix shows
+    # this operator on the new site instead of an account ADM does not know
+    # about. Already synced by definition — setup planted it.
+    grant_admin_access(admin_id, vpn_server_id)
+    from core.db import get_admin_access, mark_admin_access_synced
+    for row in get_admin_access(admin_id):
+        if row["vpn_server_id"] == vpn_server_id:
+            mark_admin_access_synced(row["id"], password_pushed=True)
+            break
+
     append_operation_output(
         op_id,
-        f"\n[ADM] Instance claimed at {url}; API token stored and the SSH "
-        f"password discarded.\n")
-    log.info(f"[PROVISION] Claimed server {vpn_server_id} at {url}")
+        f"\n[ADM] Instance claimed at {url} as '{admin['username']}' — sign in "
+        f"with your usual password. API token stored and the SSH password "
+        f"discarded.\n")
+    log.info(f"[PROVISION] Claimed server {vpn_server_id} at {url} "
+             f"as '{admin['username']}'")
 
 
 # ── Version drift ────────────────────────────────────────────────────────
