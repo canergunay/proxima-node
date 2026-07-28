@@ -860,23 +860,61 @@ def insert_metric(server_id: int, data: dict) -> None:
     conn.commit()
 
 
-def get_metrics(server_id: int | None = None, hours: int = 24) -> list[dict]:
+_METRIC_COLS = ("disk_pct", "memory_pct", "cpu_pct")
+
+
+def _fetch_metrics(
+    table: str,
+    id_col: str,
+    entity_id: int | None,
+    hours: int,
+    bucket: int,
+    extra_cols: tuple[str, ...] = (),
+) -> list[dict]:
+    """Read a metric table, optionally averaged into `bucket`-second slots.
+
+    A month of five-minute samples is ~8600 points per server, which the chart
+    cannot draw legibly and the browser cannot draw quickly. Averaging into
+    buckets fixes both. The peak of each bucket comes along as `<metric>_max`
+    so an averaged-away CPU spike is still visible in the tooltip.
+    """
     conn = get_conn()
     since = int(time.time()) - hours * 3600
-    if server_id:
+    where = f"{id_col} = ? AND timestamp >= ?" if entity_id else "timestamp >= ?"
+    id_params = [entity_id] if entity_id else []
+
+    if bucket > 1:
+        select = [id_col, "(timestamp / ?) * ? AS bucket_ts", "MIN(online) AS online"]
+        select += [f"MAX({c}) AS {c}" for c in extra_cols]
+        for col in _METRIC_COLS:
+            select.append(f"ROUND(AVG({col}), 1) AS {col}")
+            select.append(f"ROUND(MAX({col}), 1) AS {col[:-4]}_max")
         rows = conn.execute(
-            "SELECT server_id, timestamp, online, uptime, disk_pct, memory_pct, cpu_pct "
-            "FROM server_metrics WHERE server_id = ? AND timestamp >= ? "
-            "ORDER BY timestamp",
-            (server_id, since),
+            f"SELECT {', '.join(select)} FROM {table} WHERE {where} "
+            f"GROUP BY {id_col}, timestamp / ? ORDER BY bucket_ts",
+            [bucket, bucket, *id_params, since, bucket],
         ).fetchall()
-    else:
-        rows = conn.execute(
-            "SELECT server_id, timestamp, online, uptime, disk_pct, memory_pct, cpu_pct "
-            "FROM server_metrics WHERE timestamp >= ? ORDER BY timestamp",
-            (since,),
-        ).fetchall()
+        out = []
+        for r in rows:
+            point = dict(r)
+            point["timestamp"] = point.pop("bucket_ts")
+            out.append(point)
+        return out
+
+    cols = ", ".join([id_col, "timestamp", "online", *extra_cols, *_METRIC_COLS])
+    rows = conn.execute(
+        f"SELECT {cols} FROM {table} WHERE {where} ORDER BY timestamp",
+        [*id_params, since],
+    ).fetchall()
     return [dict(r) for r in rows]
+
+
+def get_metrics(
+    server_id: int | None = None, hours: int = 24, bucket: int = 0
+) -> list[dict]:
+    return _fetch_metrics(
+        "server_metrics", "server_id", server_id, hours, bucket, ("uptime",)
+    )
 
 
 def cleanup_old_metrics(days: int = 30) -> int:
@@ -907,23 +945,12 @@ def insert_vpn_metric(vpn_server_id: int, data: dict) -> None:
     conn.commit()
 
 
-def get_vpn_metrics(vpn_server_id: int | None = None, hours: int = 24) -> list[dict]:
-    conn = get_conn()
-    since = int(time.time()) - hours * 3600
-    if vpn_server_id:
-        rows = conn.execute(
-            "SELECT vpn_server_id, timestamp, online, disk_pct, memory_pct, cpu_pct "
-            "FROM vpn_server_metrics WHERE vpn_server_id = ? AND timestamp >= ? "
-            "ORDER BY timestamp",
-            (vpn_server_id, since),
-        ).fetchall()
-    else:
-        rows = conn.execute(
-            "SELECT vpn_server_id, timestamp, online, disk_pct, memory_pct, cpu_pct "
-            "FROM vpn_server_metrics WHERE timestamp >= ? ORDER BY timestamp",
-            (since,),
-        ).fetchall()
-    return [dict(r) for r in rows]
+def get_vpn_metrics(
+    vpn_server_id: int | None = None, hours: int = 24, bucket: int = 0
+) -> list[dict]:
+    return _fetch_metrics(
+        "vpn_server_metrics", "vpn_server_id", vpn_server_id, hours, bucket
+    )
 
 
 def get_alert_config() -> dict:

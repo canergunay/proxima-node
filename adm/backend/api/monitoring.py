@@ -19,14 +19,32 @@ log = logging.getLogger("adm.monitoring")
 bp = Blueprint("monitoring", __name__)
 
 
+def _bucket_for(hours: int) -> int:
+    """Seconds per chart point, so every range lands near 300 points per server.
+
+    Metrics are collected every five minutes. Handing a month of them to the
+    browser raw is ~8600 points per server per chart — unreadable, and slow
+    enough that the page stops responding. Below a day there is nothing to
+    thin out, so the samples go through as they are.
+    """
+    if hours <= 24:
+        return 0  # raw, ~288 points
+    if hours <= 72:
+        return 900  # 15 min
+    if hours <= 192:
+        return 1800  # 30 min, ~336 points over a week
+    return 7200  # 2 h, ~360 points over a month
+
+
 @bp.get("/api/monitoring/metrics")
 def metrics():
     """Time-series metrics. Params: server_id (optional), hours (default 24, max 720)."""
     server_id = request.args.get("server_id", type=int)
     hours = request.args.get("hours", 24, type=int)
     hours = min(max(hours, 1), 720)
+    bucket = _bucket_for(hours)
 
-    data = get_metrics(server_id=server_id, hours=hours)
+    data = get_metrics(server_id=server_id, hours=hours, bucket=bucket)
 
     # Build server name map
     servers = {}
@@ -41,6 +59,7 @@ def metrics():
         "data": {
             "servers": servers,
             "metrics": data,
+            "bucket": bucket,
         },
     })
 
@@ -51,8 +70,9 @@ def vpn_metrics():
     vpn_server_id = request.args.get("vpn_server_id", type=int)
     hours = request.args.get("hours", 24, type=int)
     hours = min(max(hours, 1), 720)
+    bucket = _bucket_for(hours)
 
-    data = get_vpn_metrics(vpn_server_id=vpn_server_id, hours=hours)
+    data = get_vpn_metrics(vpn_server_id=vpn_server_id, hours=hours, bucket=bucket)
 
     servers = {}
     for s in get_all_vpn_servers():
@@ -66,6 +86,7 @@ def vpn_metrics():
         "data": {
             "servers": servers,
             "metrics": data,
+            "bucket": bucket,
         },
     })
 

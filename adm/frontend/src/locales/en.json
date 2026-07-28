@@ -197,6 +197,7 @@
   "monitoring.diskUsage": "Disk Usage %",
   "monitoring.memoryUsage": "Memory Usage %",
   "monitoring.cpuUsage": "CPU Usage %",
+  "monitoring.peak": "peak",
   "monitoring.last24h": "Last 24h",
   "monitoring.last7d": "Last 7 days",
   "monitoring.last30d": "Last 30 days",

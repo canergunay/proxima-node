@@ -197,6 +197,7 @@
   "monitoring.diskUsage": "Использование диска %",
   "monitoring.memoryUsage": "Использование памяти %",
   "monitoring.cpuUsage": "Использование CPU %",
+  "monitoring.peak": "пик",
   "monitoring.last24h": "За 24 часа",
   "monitoring.last7d": "За 7 дней",
   "monitoring.last30d": "За 30 дней",

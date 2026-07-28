@@ -218,6 +218,9 @@ export interface ProximaTunnel {
 
 // ── Monitoring ────────────────────────────────────────────────────────
 
+// Over ranges longer than a day the backend averages samples into time
+// buckets: `*_pct` is the bucket average, `*_max` its peak. Both are absent
+// on raw (24h) responses.
 export interface MetricPoint {
   server_id: number;
   timestamp: number;
@@ -225,6 +228,9 @@ export interface MetricPoint {
   disk_pct: number | null;
   memory_pct: number | null;
   cpu_pct: number | null;
+  disk_max?: number | null;
+  memory_max?: number | null;
+  cpu_max?: number | null;
   uptime: number | null;
 }
 
@@ -235,6 +241,9 @@ export interface VpnMetricPoint {
   disk_pct: number | null;
   memory_pct: number | null;
   cpu_pct: number | null;
+  disk_max?: number | null;
+  memory_max?: number | null;
+  cpu_max?: number | null;
 }
 
 export interface AlertConfig {

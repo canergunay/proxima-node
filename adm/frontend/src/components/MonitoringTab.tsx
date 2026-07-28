@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Box, Typography, Chip, CircularProgress, Alert,
   Accordion, AccordionSummary, AccordionDetails,
@@ -18,6 +18,111 @@ const COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff7300", "#00C49F", "#FF8042"
 
 type TimeRange = "24h" | "7d" | "30d";
 const RANGE_HOURS: Record<TimeRange, number> = { "24h": 24, "7d": 168, "30d": 720 };
+
+type Metric = "disk" | "memory" | "cpu";
+type ChartRow = { time: number } & Record<string, number | null>;
+type Series = { id: string; name: string; color: string };
+
+/** Peak of the bucket a point summarises, kept beside its average. */
+const peakKey = (seriesId: string) => `${seriesId}:max`;
+
+/**
+ * One row per timestamp, one column per server — the shape recharts wants.
+ * Points arrive sorted by timestamp, and a Map preserves that order.
+ */
+function buildChartData<T extends { timestamp: number }>(
+  points: T[],
+  idField: keyof T,
+  metric: Metric,
+): ChartRow[] {
+  const rows = new Map<number, ChartRow>();
+  for (const p of points) {
+    let row = rows.get(p.timestamp);
+    if (!row) {
+      row = { time: p.timestamp };
+      rows.set(p.timestamp, row);
+    }
+    const sid = String(p[idField]);
+    row[sid] = (p as Record<string, unknown>)[`${metric}_pct`] as number | null;
+    const peak = (p as Record<string, unknown>)[`${metric}_max`];
+    if (typeof peak === "number") row[peakKey(sid)] = peak;
+  }
+  return [...rows.values()];
+}
+
+function buildAll<T extends { timestamp: number }>(points: T[], idField: keyof T) {
+  return {
+    disk: buildChartData(points, idField, "disk"),
+    memory: buildChartData(points, idField, "memory"),
+    cpu: buildChartData(points, idField, "cpu"),
+  };
+}
+
+type MetricChartProps = {
+  title: string;
+  data: ChartRow[];
+  series: Series[];
+  formatAxis: (ts: unknown) => string;
+  formatLabel: (ts: unknown) => string;
+  peakLabel: string;
+};
+
+/**
+ * Memoised: without this every keystroke in the alert settings below
+ * re-renders all six charts.
+ */
+const MetricChart = memo(function MetricChart({
+  title, data, series, formatAxis, formatLabel, peakLabel,
+}: MetricChartProps) {
+  return (
+    <Box sx={{ flex: 1, minWidth: { xs: "100%", sm: 300 }, minHeight: 260 }}>
+      <Typography variant="subtitle2" sx={{ mb: 1 }}>{title}</Typography>
+      <ResponsiveContainer width="100%" height={240} debounce={120}>
+        <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#444" vertical={false} />
+          <XAxis
+            dataKey="time"
+            tickFormatter={formatAxis}
+            fontSize={11}
+            stroke="#888"
+            minTickGap={44}
+            tickMargin={6}
+          />
+          <YAxis domain={[0, 100]} unit="%" fontSize={11} stroke="#888" width={40} />
+          <Tooltip
+            labelFormatter={formatLabel}
+            isAnimationActive={false}
+            contentStyle={{ backgroundColor: "#1e1e1e", border: "1px solid #555" }}
+            formatter={(value, name, item) => {
+              const row = item?.payload as ChartRow | undefined;
+              const peak = row?.[peakKey(String(item?.dataKey))];
+              const avg = typeof value === "number" ? value.toFixed(1) : String(value ?? "");
+              const shown =
+                typeof peak === "number" && typeof value === "number" && peak > value
+                  ? `${avg}% (${peakLabel} ${peak}%)`
+                  : `${avg}%`;
+              return [shown, name];
+            }}
+          />
+          <Legend wrapperStyle={{ fontSize: 11 }} />
+          {series.map((s) => (
+            <Line
+              key={s.id}
+              dataKey={s.id}
+              name={s.name}
+              stroke={s.color}
+              dot={false}
+              activeDot={{ r: 3 }}
+              strokeWidth={1.8}
+              connectNulls
+              isAnimationActive={false}
+            />
+          ))}
+        </LineChart>
+      </ResponsiveContainer>
+    </Box>
+  );
+});
 
 export default function MonitoringTab() {
   const { t } = useTranslation();
@@ -90,57 +195,43 @@ export default function MonitoringTab() {
     fetchAlerts();
   }, [fetchMetrics, fetchVpnMetrics, fetchConfig, fetchAlerts]);
 
-  // Build chart data: group metrics by timestamp, one entry per timestamp
-  const serverIds = Object.keys(servers);
+  const exitSeries = useMemo<Series[]>(
+    () => Object.keys(servers).map((id, i) => ({
+      id,
+      name: servers[id]?.display_name || id,
+      color: COLORS[i % COLORS.length],
+    })),
+    [servers],
+  );
+  const vpnSeries = useMemo<Series[]>(
+    () => Object.keys(vpnServers).map((id, i) => ({
+      id,
+      name: vpnServers[id]?.display_name || id,
+      color: COLORS[i % COLORS.length],
+    })),
+    [vpnServers],
+  );
 
-  const buildChartData = (field: "disk_pct" | "memory_pct" | "cpu_pct") => {
-    const grouped: Record<number, Record<string, number | null>> = {};
-    for (const m of metrics) {
-      const ts = m.timestamp;
-      if (!grouped[ts]) grouped[ts] = {};
-      grouped[ts][String(m.server_id)] = m[field];
-    }
-    return Object.entries(grouped)
-      .sort(([a], [b]) => Number(a) - Number(b))
-      .map(([ts, vals]) => ({
-        time: Number(ts),
-        ...vals,
-      }));
-  };
+  const exitData = useMemo(() => buildAll(metrics, "server_id"), [metrics]);
+  const vpnData = useMemo(() => buildAll(vpnMetrics, "vpn_server_id"), [vpnMetrics]);
 
-  const diskData = buildChartData("disk_pct");
-  const memoryData = buildChartData("memory_pct");
-  const cpuData = buildChartData("cpu_pct");
-
-  // VPN server chart data
-  const vpnServerIds = Object.keys(vpnServers);
-
-  const buildVpnChartData = (field: "disk_pct" | "memory_pct" | "cpu_pct") => {
-    const grouped: Record<number, Record<string, number | null>> = {};
-    for (const m of vpnMetrics) {
-      const ts = m.timestamp;
-      if (!grouped[ts]) grouped[ts] = {};
-      grouped[ts][String(m.vpn_server_id)] = m[field];
-    }
-    return Object.entries(grouped)
-      .sort(([a], [b]) => Number(a) - Number(b))
-      .map(([ts, vals]) => ({
-        time: Number(ts),
-        ...vals,
-      }));
-  };
-
-  const vpnDiskData = buildVpnChartData("disk_pct");
-  const vpnMemoryData = buildVpnChartData("memory_pct");
-  const vpnCpuData = buildVpnChartData("cpu_pct");
-
-  const formatTime = (ts: unknown) => {
+  // The axis carries only what changes across the visible span; the full
+  // date and time stay in the tooltip.
+  const formatAxis = useCallback((ts: unknown) => {
     if (typeof ts !== "number") return String(ts);
     const d = new Date(ts * 1000);
     if (range === "24h") return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleDateString([], { month: "short", day: "numeric" });
+  }, [range]);
+
+  const formatLabel = useCallback((ts: unknown) => {
+    if (typeof ts !== "number") return String(ts);
+    const d = new Date(ts * 1000);
     return d.toLocaleDateString([], { month: "short", day: "numeric" }) + " " +
       d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  };
+  }, []);
+
+  const peakLabel = t("monitoring.peak");
 
   const handleSaveConfig = async () => {
     setConfigSaving(true);
@@ -207,36 +298,19 @@ export default function MonitoringTab() {
       ) : (
         <Box sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap" }}>
           {[
-            { label: t("monitoring.diskUsage"), data: diskData },
-            { label: t("monitoring.memoryUsage"), data: memoryData },
-            { label: t("monitoring.cpuUsage"), data: cpuData },
+            { label: t("monitoring.diskUsage"), data: exitData.disk },
+            { label: t("monitoring.memoryUsage"), data: exitData.memory },
+            { label: t("monitoring.cpuUsage"), data: exitData.cpu },
           ].map((chart) => (
-            <Box key={chart.label} sx={{ flex: 1, minWidth: { xs: "100%", sm: 300 }, minHeight: 250 }}>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>{chart.label}</Typography>
-              <ResponsiveContainer width="100%" height={220}>
-                <LineChart data={chart.data}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-                  <XAxis dataKey="time" tickFormatter={formatTime} fontSize={11} stroke="#888" />
-                  <YAxis domain={[0, 100]} unit="%" fontSize={11} stroke="#888" width={40} />
-                  <Tooltip
-                    labelFormatter={formatTime}
-                    contentStyle={{ backgroundColor: "#1e1e1e", border: "1px solid #555" }}
-                  />
-                  <Legend />
-                  {serverIds.map((sid, i) => (
-                    <Line
-                      key={sid}
-                      dataKey={sid}
-                      name={servers[sid]?.display_name || sid}
-                      stroke={COLORS[i % COLORS.length]}
-                      dot={false}
-                      strokeWidth={2}
-                      connectNulls
-                    />
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
-            </Box>
+            <MetricChart
+              key={chart.label}
+              title={chart.label}
+              data={chart.data}
+              series={exitSeries}
+              formatAxis={formatAxis}
+              formatLabel={formatLabel}
+              peakLabel={peakLabel}
+            />
           ))}
         </Box>
       )}
@@ -252,36 +326,19 @@ export default function MonitoringTab() {
       ) : (
         <Box sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap" }}>
           {[
-            { label: t("monitoring.diskUsage"), data: vpnDiskData },
-            { label: t("monitoring.memoryUsage"), data: vpnMemoryData },
-            { label: t("monitoring.cpuUsage"), data: vpnCpuData },
+            { label: t("monitoring.diskUsage"), data: vpnData.disk },
+            { label: t("monitoring.memoryUsage"), data: vpnData.memory },
+            { label: t("monitoring.cpuUsage"), data: vpnData.cpu },
           ].map((chart) => (
-            <Box key={chart.label} sx={{ flex: 1, minWidth: { xs: "100%", sm: 300 }, minHeight: 250 }}>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>{chart.label}</Typography>
-              <ResponsiveContainer width="100%" height={220}>
-                <LineChart data={chart.data}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-                  <XAxis dataKey="time" tickFormatter={formatTime} fontSize={11} stroke="#888" />
-                  <YAxis domain={[0, 100]} unit="%" fontSize={11} stroke="#888" width={40} />
-                  <Tooltip
-                    labelFormatter={formatTime}
-                    contentStyle={{ backgroundColor: "#1e1e1e", border: "1px solid #555" }}
-                  />
-                  <Legend />
-                  {vpnServerIds.map((sid, i) => (
-                    <Line
-                      key={sid}
-                      dataKey={sid}
-                      name={vpnServers[sid]?.display_name || sid}
-                      stroke={COLORS[i % COLORS.length]}
-                      dot={false}
-                      strokeWidth={2}
-                      connectNulls
-                    />
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
-            </Box>
+            <MetricChart
+              key={chart.label}
+              title={chart.label}
+              data={chart.data}
+              series={vpnSeries}
+              formatAxis={formatAxis}
+              formatLabel={formatLabel}
+              peakLabel={peakLabel}
+            />
           ))}
         </Box>
       )}

@@ -197,6 +197,7 @@
   "monitoring.diskUsage": "Disk Kullanımı %",
   "monitoring.memoryUsage": "Bellek Kullanımı %",
   "monitoring.cpuUsage": "CPU Kullanımı %",
+  "monitoring.peak": "tepe",
   "monitoring.last24h": "Son 24 saat",
   "monitoring.last7d": "Son 7 gün",
   "monitoring.last30d": "Son 30 gün",
