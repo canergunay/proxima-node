@@ -254,6 +254,61 @@ the connection blocks outbound UDP 51820.
 
 ---
 
+## 6a. Stage 6 — the site interconnect
+
+This is the tunnel that lets people at this site reach the other sites'
+NAS boxes without running a VPN client on their laptop. It is separate
+from stage 3: that one is for *managing* the router, this one is for
+*users*. Neither depends on the other.
+
+**Two sides, and the other side comes first.** The office router (the
+hub) has to be told about this router before this file will do anything.
+Send Can the public key created by the first command below, wait for
+confirmation, then continue.
+
+```
+/import svr-06-interconnect.rsc
+```
+
+Now read out the public key and send it to Can:
+
+```
+/interface wireguard print detail where name=bc-shv
+```
+
+### Check it worked
+
+First, and this is the one people skip:
+
+```
+/ip route print where static
+```
+
+Both routes must show **A** for active. An **I** means inactive — the
+route is listed, looks correct, and does nothing. Stop and tell Can if
+you see one.
+
+```
+/interface wireguard peers print detail where name=shv-hub
+```
+
+`last-handshake` should be a few seconds old.
+
+```
+/ping 192.168.2.91 src-address=192.168.78.1 count=3
+```
+
+Three replies means a machine on this site's network can reach the
+server at the Moscow house. That is the real test.
+
+**What this does not prove, while the router is still in the office:**
+pinging anything on `192.168.77.x` from here tells you nothing. This
+router's WAN cable is plugged into that same network, so the traffic
+goes out the WAN and never touches the tunnel. It answers, and it
+answers for the wrong reason.
+
+---
+
 ## 7. Stage 4 — Wi-Fi
 
 Only if this site has MikroTik cAP access points.

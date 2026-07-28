@@ -112,7 +112,23 @@ Tek donanım standardı = tek yedek parça mantığı, tek öğrenme eğrisi.
 ### Ağ
 
 **MikroTik RB4011** (RouterOS 7.x) — tüm şantiyelerde standart.
-CAPsMAN ile yönetilen cAP ax erişim noktaları.
+CAPsMAN ile yönetilen **cAP ac (RBcAPGi-5acD2nD)** erişim noktaları.
+
+> Bu madde 2026-07-27'de düzeltildi. Önceki hâli "cAP **ax**" diyordu; SVR için
+> satın alınan donanım cAP **ac**'dir. Fark kozmetik değildir:
+>
+> - **Sürücü yığını:** cAP ac legacy `wireless` sürücüsünü kullanır, yani
+>   `/caps-man`. Yeni `/interface wifi capsman` (wifi-qcom) yalnızca ax
+>   donanımında çalışır. İki yığın birbirinin yerine geçmez; komutları ortak değil.
+> - **Şifreleme:** legacy yığın **yalnızca WPA2-PSK**'dir. WPA3 yoktur.
+>   (SHV'nin ax üniteleri `wpa2-psk,wpa3-psk` kullanıyor — yeni şantiyeler bu
+>   seviyeye ancak ax donanımla çıkabilir.)
+> - **Kural:** bir şantiyede **tek yığın** çalışır. SHV bugün ikisini birden
+>   çalıştırıyor (14 legacy cap arayüzü + 4 yeni wifi arayüzü); bu, config'inin
+>   en kafa karıştırıcı yanıdır ve tekrarlanmaz.
+>
+> Yeni alımlarda cAP ax tercih edilir (WPA3 + tek modern yığın). Elde cAP ac
+> varsa kullanılır; karıştırılmaz — bir şantiye ya hep ac ya hep ax olur.
 
 ## 5. Debian Kurulum Standardı
 
@@ -269,10 +285,21 @@ Envanter (2026-07-19, `ip addr` + `wg show` ile doğrulandı):
 | Yeni şantiye | `10.18.x`+ | `10.N.N.0/24` | `10.N.(N+1).0/24` | `10.N.0.0/24` |
 
 **Rezerve bloklar (tahsis edilemez):**
-- `10.10.x` — site-to-site interconnect: OFC MikroTik `bc-wireguard`
-  (port 13231, host adresi `10.10.10.0` — nonstandart .0, çalışıyor,
-  dokunulmaz) ↔ ERG `wg-bcshv` (`10.10.10.2`); kişisel erişim peer'ı
-  `10.10.10.3`. OFC LAN 192.168.77.0/24'ü de taşır.
+- `10.10.x` — **şantiyeler arası interconnect** (hub-and-spoke, hub =
+  SHV MikroTik `bc-wireguard`, port 13231). Bölüm 12. Adres defteri:
+
+  | Adres | Kime |
+  |---|---|
+  | `10.10.10.0` | SHV — hub (nonstandart .0, çalışıyor, **dokunulmaz**) |
+  | `10.10.10.2` | ERG `wg-bcshv` |
+  | `10.10.10.3` | kişisel erişim peer'ı |
+  | `10.10.10.10+` | **şantiye router'ları** (SVR `.10`) |
+
+  Hub'ın `.0` adresi bir yan etki üretir: RouterOS bir ağ adresini
+  next-hop olarak çözmeyi reddeder, dolayısıyla spoke tarafında
+  `gateway=10.10.10.0` yazılan rotalar **sessizce Inactive** kalır —
+  kabul edilir, listelenir, işlemez. Spoke'lar `gateway=<wg-arayüzü>`
+  kullanır. Hub tarafında `gateway=10.10.10.<N>` sorunsuzdur.
 - `10.13.x` — **acil durum yönetim ağı** (`10.13.13.0/24`). Bu blok
   2026-07-19 envanterinde "ERG wg0 legacy yedek tüneli (ERG↔OFC)" olarak
   kaydedilmişti; **kayıt yanlıştı**. 2026-07-27'de doğrulandı: ERG'de
@@ -454,7 +481,115 @@ sitelerin yönetimi kesilir. Bilinçli kabul edildi (ADM zaten ERG'de).
 Karar geri dönülebilir: ikinci bir hedef eklemek, site başına bir peer
 eklemektir — yeniden tasarım değil.
 
-Ayrıca bu ağda **yalnızca Proxima sunucuları** vardır. MikroTik'ler dahil
-edilmedi; dolayısıyla **kutu ölürse siteye ulaşılamaz.** MikroTik'i de
-peer yapmak bu boşluğu kapatır (RouterOS'ta WireGuard client vardır) ve
-"kutu ölürse router'a, router ölürse kutuya" ilkesini geri getirir.
+Bu ağın üyeliği 2026-07-27'de genişletildi: MikroTik'ler de peer olabilir
+ve SVR router'ı `10.13.13.11` olarak dahil edildi (aşama dosyası
+`site-router/svr-03-wireguard.rsc`). Böylece "kutu ölürse router'a,
+router ölürse kutuya" ilkesi geri geldi. Yeni bir şantiyede **her ikisi
+de** peer yapılır; yalnızca biri yapılırsa o cihaz öldüğünde saha kör
+kalır.
+
+Not: Proxima kutularının call-home'u 2026-07-27'de `wg-adm`'e
+(`10.12.12.0/24`, port 51822) taşındı — bu ağ artık insanlar ve
+MikroTik'ler içindir. SVR kutusu `10.12.12.10`.
+
+---
+
+## 12. Şantiyeler Arası Interconnect — `10.10.10.0/24`
+
+Amaç tek cümleyle: **şirket ağındaki bir kişi, hangi şantiyede olursa
+olsun, VPN istemcisi açmadan diğer şantiyelerin NAS'larına ulaşabilmeli.**
+Yetkilendirme ağın işi değil — Synology kimin neyi göreceğine kendi karar
+verir. Router yalnızca hangi *makinelerin* erişilebilir olduğunu belirler:
+NAS evet, yazıcı hayır.
+
+### Topoloji: hub-and-spoke, hub = SHV
+
+Siteler birbirine değil, **yalnızca hub'a** bağlanır. N. şantiyeyi
+eklemek = hub'a bir peer + yeni router'da bir aşama dosyası. Mevcut
+hiçbir cihaza dokunulmaz. İkili bağlarla (mesh) her yeni saha N-1 ayrı
+düzenleme demek olurdu ve unutulan biri "yarısı çalışan, kimsenin
+açıklayamadığı" bir ağ üretirdi.
+
+**Hub neden SHV, neden ERG değil:** yedekleme akışı zaten
+`Şantiye NAS → Merkez Buro NAS`, yani trafiğin ağırlık merkezi ofiste.
+ERG bir ev hattıdır; her sahanın birbirine erişimi ev upload'ına ve ev
+internetinin ayakta olmasına bağlanmamalı. **ERG yönetim hub'ı olarak
+kalır** (Bölüm 11) ve interconnect üzerinden her yere ulaşır. İki düzlem
+ayrıdır ve ayrı kalmalıdır: yönetim ağının tek işi "her şey bozulduğunda
+ayakta olmak", veri yolu politikasıyla iç içe geçerse o özelliğini
+kaybeder.
+
+### Adresleme kuralı
+
+Cihazlara **kendi yerel adreslerinden** erişilir — `192.168.77.10`,
+`192.168.78.1`, `192.168.2.91`. Tünel adresleri günlük kullanımda
+görünmez. Bölünme şudur: **`10.x` acil durum yolu, `192.168.x` günlük
+yol.**
+
+Spoke'ların hub peer'ında tek tek LAN değil **supernet** yazılır:
+
+```
+allowed-address = 10.10.10.0/24, 192.168.2.0/24, 192.168.64.0/18
+```
+
+`192.168.64.0/18` bloğu 192.168.64–127'yi kapsar, yani gelecekteki her
+şantiye (79, 80, …) baştan izinlidir. Spoke'un kendi LAN'ı da bu /18'in
+içindedir; zararsız, çünkü connected route daha spesifiktir ve yerel
+trafik tünele girmez.
+
+**Şantiye LAN'ları bu /18 içinden seçilir** (OFC 77, SVR 78, sıradaki
+79…). Blok dışına çıkan bir LAN, supernet'in verdiği "tek cihaza dokun"
+özelliğini bozar.
+
+### Politika — hedefe göre, kullanıcıya göre değil
+
+Kurallar **hedef sitenin kendi router'ında** durur; kaynakta değil. Ofis
+için SHV, şantiye için o şantiyenin router'ı karar verir — kural ile
+koruduğu şey aynı yerde kalır.
+
+| Kaynak | Erişim |
+|---|---|
+| `10.10.10.0/29` (hub, ERG, yönetici peer'ı) | tam LAN |
+| `192.168.2.0/24` (ERG LAN) | tam LAN |
+| Şantiye LAN'ları | yalnızca NAS (`192.168.77.10`), gerisi drop |
+| Şantiye LAN'ları → ERG | yalnızca kutu (`192.168.2.91`), ev LAN'ı drop |
+
+Şantiye router'ları `.10+` aralığında ve `/29`'un **dışında** — yönetici
+ile saha kullanıcısını ayıran şey bu.
+
+### Aşama dosyaları
+
+- `site-router/shv-hub-interconnect.rsc` — hub politikası, yeniden
+  çalıştırılabilir (kendi kurallarını silip yeniden kurar). Peer'lar
+  içinde **değildir**: politika tazelemek bir sahanın tünelini
+  düşürmemeli.
+- `site-router/svr-06-interconnect.rsc` — spoke tarafı, şantiye başına.
+
+### Yakalanan tuzaklar (2026-07-28)
+
+- **`gateway=10.10.10.0` sessizce ölü.** Bkz. Bölüm 9. Rotalar `Inactive`
+  kalır, trafik başka bir yolu bulur ve her şey çalışıyor görünür.
+  Bayraklara bakılmadan hiçbir şey doğrulanmış sayılmaz.
+- **RouterOS kural sıralaması üç denemeden ikisinde sessizce çalışmıyor.**
+  `place-before=0,1,2,3,4` kuralları mevcutların *arasına* serper (her N o
+  anki listeye göre çözülür). `move [find …] destination=N` ve
+  `move numbers=[find …] destination=N` hiçbir şey yapmaz. Çalışan tek
+  yol: tek bir sabit çapaya karşı `add … place-before=[find comment="…"]`.
+- **Çapa seçerken yorumda `/` olmamalı** — tırnaksız slash `find`
+  ifadesini keser (netwatch failsafe'inde kayıtlı aynı tuzak).
+- **Ping tek başına politikayı ispatlamaz.** Ofis zincirinde koşulsuz bir
+  ICMP accept var; interconnect bloğu onun altında kalırsa engellenmesi
+  gereken hedefler ping'e cevap verir ve kurallar tek tek doğru görünür.
+  Doğrulama drop kuralının **paket sayacıyla** yapılır.
+
+### Bilinen sınır
+
+Şantiyeden ofise giden trafik hub'ın `forward` zincirinden geçer ve o
+zincirde matcher'sız bir `action=accept` vardır — altındaki her kural,
+kendi son drop'u dâhil, ölüdür. Interconnect kuralları bu yüzden zincirin
+**en tepesine** konur. Temizlik ayrı bir bakım penceresinin işidir;
+o güne kadar buraya kural *eklenir*, mevcut kural kaldırılmaz.
+
+Kalıntı: `Allow Turkcell VoWiFi` kuralı (udp 500/4500, any→any) blokun
+üstünde kalır, yani bir şantiye herhangi bir ofis makinesine o iki porttan
+ulaşabilir. IKE trafiği; çıplak accept temizliğiyle birlikte kalkar.
