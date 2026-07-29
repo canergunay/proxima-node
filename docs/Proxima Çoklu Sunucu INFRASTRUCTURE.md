@@ -247,6 +247,29 @@ tablosuna, ufw üzerinden konur** (`ufw route allow ...` +
 `/etc/ufw/before.rules` içindeki `*nat` bloğu). Böylece `ufw reload`
 sonrasında da yaşarlar.
 
+**Doğru yazılmış ve hiçbir şey yapmayan kural.** Bu ailenin kendi başlığı
+olmayı hak edecek kadar örneği birikti. Ortak deseni şu: **yapılandırma
+doğru, etki yok.** Hata yok, log yok, uyarı yok; `print` çıktısı kuralı
+olması gerektiği gibi gösterir.
+
+| Yazılan | Neden işlemedi |
+|---|---|
+| Script içinde `[find address=192.168.78.0/24]` | `/` komut yolu başlatır, değer kesilir, boş listeye `set` sessiz no-op — ama `:log` yine çalışır |
+| Netwatch + `dont-require-permissions=no` | script hiç başlamaz; hata yok, log yok, `run-count` artmaz |
+| Spoke'ta `src-address=10.10.10.2/32` | hub maskeliyor, paket `10.10.10.0` olarak varıyor (Bölüm 12) |
+| SHV'de `Priority-Web` mangle | sonraki kural üzerine yazıyor; `passthrough` varsayılanı `yes` |
+| `place-before=0,1,2,3,4` | her N o anki listeye göre çözülür, kurallar mevcutların arasına serpilir |
+| `move [find …] destination=N` | sessiz no-op; `numbers=` ile de |
+
+**Doğrulama config okunarak değil, sayaçla yapılır:**
+`/ip firewall filter print stats`, `/system script print` (`run-count`),
+`/system scheduler print detail` (`last-started`),
+`/ip route print` (`A` mı `I` mi).
+
+Ve en pahalıya mal olan sonuç: **"elle denedim, çalıştı" hiçbir şey
+ispatlamaz.** Yukarıdaki `[find]` ve izin hatalarının ikisi de terminalde
+elle kusursuz çalışıyordu; yalnızca script bağlamında ölüydüler.
+
 ---
 
 ## 9. IP ve Subnet Planı

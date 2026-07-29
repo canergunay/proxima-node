@@ -422,6 +422,33 @@ Run it on site, once the line is installed and measured.
 
 ---
 
+## 8a-pre. Remove the temporary interconnect rule
+
+Added during the bench build so the access points could be configured remotely
+from ERG. It has no purpose once the kit ships, and it widens the interconnect
+beyond the NAS — which is the exposure that was deliberately narrowed.
+
+```
+/ip firewall filter remove [find comment~"TEMPORARY - ERG manages cAPs"]
+```
+
+Confirm the forward chain is back to NAS-only:
+
+```
+/ip firewall filter print where chain=forward
+```
+
+Expected afterwards: `interconnect - the NAS, and nothing else`
+(`dst-address=192.168.78.122`) and no rule matching a range.
+
+Note the rule is scoped by **destination** (`192.168.78.10-39`), not source.
+Source-based rules cannot work on a spoke: the hub masquerades everything
+leaving the tunnel, so ERG arrives as `10.10.10.0` rather than its own address.
+A `src-address=10.10.10.2/32` rule reads correctly, lists correctly, and matches
+nothing. Verify by counter, never by reading — see "Verifying rules" below.
+
+---
+
 ## 8a. Switch to the real SSIDs — last step before boxing
 
 Only when the kit is finished and about to be powered down. While the router is
@@ -556,6 +583,40 @@ anything external is set up:
 **The VPN has no name and must not be given one.** A DNS record would tell
 anyone examining the domain that a VPN exists here and where it is. Clients use
 the site's bare IP. This is a deliberate decision, not an oversight.
+
+---
+
+## Verifying rules — read the counters, not the config
+
+This subsystem has produced **four** separate rules that were syntactically
+valid, listed correctly, and did absolutely nothing. Each looked healthy:
+
+| What was written | Why it did nothing |
+|---|---|
+| `[find address=192.168.78.0/24]` inside a script | `/` starts a command path, value cut at `192.168.78.0`, empty match, `set` is a silent no-op — while the `:log` after it still runs |
+| netwatch script with `dont-require-permissions=no` | netwatch calls it, it never starts: no error, no log, `run-count` unchanged |
+| `src-address=10.10.10.2/32` on a spoke | the hub masquerades the tunnel, so ERG arrives as `10.10.10.0` |
+| SHV's `Priority-Web` mangle rule | overwritten by the next rule, `passthrough` defaults to yes |
+
+The pattern is always the same: **the configuration is correct and the effect is
+absent.** Reading it back tells you nothing, because reading it back is what
+convinced you the first time.
+
+So verify by effect:
+
+```
+/ip firewall filter print stats          # bytes and packets per rule
+/queue tree print stats                  # a queue at 0 never matched
+/system script print detail              # run-count and last-started
+/ip dhcp-server network print            # the values, not the script that sets them
+```
+
+A rule at zero packets while the drop below it counts is not a working rule.
+A script whose log line appears but whose `run-count` is 0 did not run.
+
+And a corollary learned the hard way: **"I tested it manually and it worked"
+proves nothing.** Both the `[find]` bug and the netwatch permission bug ran
+perfectly by hand and failed in production.
 
 ---
 
