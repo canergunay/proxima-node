@@ -663,3 +663,47 @@ o güne kadar buraya kural *eklenir*, mevcut kural kaldırılmaz.
 Kalıntı: `Allow Turkcell VoWiFi` kuralı (udp 500/4500, any→any) blokun
 üstünde kalır, yani bir şantiye herhangi bir ofis makinesine o iki porttan
 ulaşabilir. IKE trafiği; çıplak accept temizliğiyle birlikte kalkar.
+
+---
+
+## 13. Saha Sırları — ERG'de Nerede Durur
+
+Aşama dosyaları git'te durur ve **hiçbir sır içermez**; yerlerinde yer
+tutucu vardır. Değerler yalnızca ERG'de, `root`'a ait `0600` dosyalarda:
+
+| Dosya | İçerik | Kullanıldığı yer |
+|---|---|---|
+| `/root/svr-mikrotik-keys.txt` | `wg-erg` PrivateKey + PresharedKey; `bc-shv` PrivateKey + PublicKey | Aşama 3 (yönetim tüneli), aşama 6 (interconnect) |
+| `/root/svr-wifi-psk.txt` | Ofis Wi-Fi parolası | Aşama 4 (CAPsMAN) |
+
+Bölünme kasıtlı: şablonlar her sahaya kopyalanır, sırlar kopyalanmaz. Bir
+sır dosyaya gömülürse tüm sahalara dağılır ve git geçmişinden çıkarılamaz.
+
+**Neden ERG'de.** Sıfırlama sonrası aşama 4'ü ya da 6'yı yeniden uygulamak
+için değerin bir yerde durması gerekir; aksi hâlde her sıfırlama bir insanı
+bekler. `bc-shv` anahtarının yazılı olmasının ayrı bir sebebi var: aynı
+anahtar geri gelmezse hub sessizce el sıkışmayı bırakır (Bölüm 12).
+
+**Dosyaya parola yazarken kabuk geçmişine düşürme.** `printf '%s' 'PAROLA' |
+sudo tee …` biçimi parolayı `~/.bash_history`'ye ve argüman listesine
+yazar — dosyanın kendisinden kötü bir yer, çünkü `0600` mantığıyla
+korunmuyor. Doğrusu stdin'den okumak:
+
+```bash
+umask 077
+sudo sh -c 'cat > /root/svr-wifi-psk.txt && chmod 600 /root/svr-wifi-psk.txt'
+# parolayı yaz, Enter, sonra Ctrl-D
+sudo wc -c /root/svr-wifi-psk.txt   # karakter sayısı + 1 olmalı
+```
+
+`cat` girdiyi harfi harfine alır; parolada tırnak, `$`, `!` olsa bile
+bozulmaz — `printf '...'` biçiminin bozulacağı yer tam burasıdır.
+
+### Bakım borcu: bu kopyalar bayatlayabilir
+
+**Ofis Wi-Fi parolası değişirse `/root/svr-wifi-psk.txt` sessizce
+bayatlar.** Aşama 4 eski parolayı kurar, belirtisi de "cAP'ler adopt oldu
+ama telefonlar bağlanmıyor" olur — sebebi aramak zaman alır. Wi-Fi parolası
+her değiştiğinde bu dosya da güncellenir. Aynı şey SSID standardı için de
+geçerli: `Buro` / `Buro_5G` her sahada aynıdır ve **aynı ad aynı parolayı
+zorunlu kılar**, o yüzden sahaya özel parola üretilmez.
