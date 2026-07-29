@@ -24,6 +24,17 @@
 /interface wireguard
 add name=bc-shv listen-port=13231 mtu=1280 comment="site interconnect to SHV hub"
 
+# THE PRIVATE KEY IS SET EXPLICITLY, not left for RouterOS to generate.
+# Get it from ERG (`sudo cat /root/svr-mikrotik-keys.txt`) and paste it in,
+# keeping the quotes - same handling as stage 3.
+#
+# Why it matters: if the router is reset, re-importing this file restores the
+# SAME key and the hub needs no change. Let RouterOS generate its own and a
+# reset silently rotates it - the interface comes up, the hub still lists the
+# peer, and no handshake ever happens. Nothing reports it. That exact failure
+# already cost an evening once.
+set [find name=bc-shv] private-key="<bc-shv PrivateKey from svr-mikrotik-keys.txt>"
+
 /ip address
 add address=10.10.10.10/24 interface=bc-shv comment="SVR on site interconnect"
 
@@ -75,14 +86,23 @@ add chain=input action=accept in-interface=bc-shv src-address=192.168.2.0/24 \
 # Destination filtering, not user filtering. Who may open which share is
 # the NAS's decision; the router only decides which MACHINES are reachable
 # at all. A site user has no business reaching this site's printers.
-add chain=forward action=accept in-interface=bc-shv src-address=10.10.10.0/29 \
-    comment="forward: interconnect - admin, full LAN" \
-    place-before=[find comment="forward: drop everything else"]
-add chain=forward action=accept in-interface=bc-shv src-address=192.168.2.0/24 \
-    comment="forward: interconnect - ERG LAN, full" \
-    place-before=[find comment="forward: drop everything else"]
+#
+# The NAS is the ONLY thing the interconnect reaches on this LAN. The router
+# itself stays reachable through the input rules above - traffic addressed to
+# the router is input, not forward, so it needs no rule here.
+#
+# An earlier draft also carried `src-address=10.10.10.0/29 -> full LAN` and
+# the same for ERG's LAN. Both were removed deliberately. The management
+# network was scoped to 10.13.13.0/24 on purpose, and a blanket rule here
+# quietly opened a second, wider route to the same place - including the
+# cAPs at .31-.39, which are documented as NOT reachable from ERG. Two
+# overlapping paths where one is narrow by design and the other wide by
+# accident is worse than either, because the wide one is the one nobody
+# audits. If remote access to the cAPs is wanted, add it as ONE rule scoped
+# to a single host and say so in its comment - deliberate and auditable,
+# rather than convenient and invisible.
 add chain=forward action=accept in-interface=bc-shv dst-address=192.168.78.122 \
-    comment="forward: interconnect - other sites reach the NAS only" \
+    comment="forward: interconnect - the NAS, and nothing else" \
     place-before=[find comment="forward: drop everything else"]
 # Anything else arriving on bc-shv falls through to the chain's own final
 # drop. No extra drop rule needed here.

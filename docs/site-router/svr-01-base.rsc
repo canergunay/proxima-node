@@ -53,11 +53,15 @@ add address=10.13.13.11/24 interface=wg-erg network=10.13.13.0 comment="SVR Mikr
 # 46.39.245.211/24 with flag D. The address is static contractually but arrives
 # as a DHCP reservation. Expect the same at SVR - this is likely the FINAL
 # config, not bench scaffolding.
+#
+# No name= here: /ip dhcp-client takes no name parameter on this firmware, and
+# it does not need one - the entry is identified by its interface. SHV's export
+# carries name=client1 because it runs a newer RouterOS where that field exists.
 /ip dhcp-client
-add interface=ether5 name=wan1 disabled=no use-peer-dns=no add-default-route=yes check-gateway=arp comment="WAN - Seven Sky"
+add interface=ether5 disabled=no use-peer-dns=no add-default-route=yes check-gateway=arp comment="WAN - Seven Sky"
 
 ### Only if Seven Sky hands over a manually-configured static block instead:
-# /ip dhcp-client remove [find name=wan1]
+# /ip dhcp-client remove [find interface=ether5]
 # /ip address add address=<WAN_IP>/<PREFIX> interface=ether5 comment="WAN - Seven Sky static"
 # /ip route add dst-address=0.0.0.0/0 gateway=<WAN_GW> check-gateway=ping
 
@@ -87,17 +91,30 @@ add address=192.168.78.0/24 gateway=192.168.78.121 dns-server=192.168.78.121 com
 # /ip dhcp-server lease add address=192.168.78.121 mac-address=<M70Q_MAC> server=dhcp1 comment="Proxima box"
 
 # ---------- Netwatch failsafe ----------
-# Scripts carry explicit policy; netwatch only calls them. Inline netwatch
-# scripts hit permission errors on some ROS7 builds.
+# Scripts carry explicit policy AND dont-require-permissions=yes; netwatch only
+# calls them. Both are needed: with dont-require-permissions=no, netwatch calls
+# the script and nothing happens - no error, no log line, no change. Verified
+# on the bench 2026-07-28: running the same script by hand worked, netwatch
+# firing it did not. "It works when I run it manually" proves nothing here.
 #
 # SHV has nothing equivalent: its netwatch pings 192.168.77.1 - the router
 # pinging itself, permanently up - and logs "Queue Tree Load High". It can
 # never fire.
+#
+# [find] carries NO address filter, and that is deliberate. Written as
+# [find address=192.168.78.0/24] the scripts run, log their message, and change
+# nothing: inside a script body "/" starts a command path, so the value is cut
+# at 192.168.78.0, the filter matches no record, and `set` on an empty list is
+# a silent no-op. Caught on the bench 2026-07-28 - the failsafe looked healthy
+# (netwatch status=down, log line present) while doing absolutely nothing.
+# There is only ever one DHCP network on this router, so no filter is needed.
+# If a second one is ever added, filter by comment - never by an unquoted
+# address prefix.
 /system script
-add name=proxima-dhcp-failover dont-require-permissions=no policy=read,write,test,policy \
-    source="/ip dhcp-server network set [find address=192.168.78.0/24] gateway=192.168.78.1 dns-server=192.168.78.1; :log warning \"PROXIMA DOWN - DHCP handed back to router\";"
-add name=proxima-dhcp-restore dont-require-permissions=no policy=read,write,test,policy \
-    source="/ip dhcp-server network set [find address=192.168.78.0/24] gateway=192.168.78.121 dns-server=192.168.78.121; :log warning \"PROXIMA UP - DHCP restored to Proxima\";"
+add name=proxima-dhcp-failover dont-require-permissions=yes policy=read,write,test,policy \
+    source="/ip dhcp-server network set [find] gateway=192.168.78.1 dns-server=192.168.78.1; :log warning \"PROXIMA DOWN - DHCP handed back to router\";"
+add name=proxima-dhcp-restore dont-require-permissions=yes policy=read,write,test,policy \
+    source="/ip dhcp-server network set [find] gateway=192.168.78.121 dns-server=192.168.78.121; :log warning \"PROXIMA UP - DHCP restored to Proxima\";"
 
 /tool netwatch
 add comment=proxima-failsafe host=192.168.78.121 interval=30s timeout=3s type=simple disabled=no \
@@ -122,8 +139,12 @@ add name=svr-p.fs-bc.net address=192.168.78.121 type=A
 add name=svr-d.fs-bc.net address=192.168.78.121 type=A
 add name=svr-n.fs-bc.net address=192.168.78.122 type=A
 
+# update-time is a second, independent path to a correct clock. The RB4011 has
+# no battery-backed RTC: every power loss drops it back to the firmware build
+# date until something corrects it. If NTP is blocked or DNS is not up yet, the
+# cloud service still sets the time.
 /ip cloud
-set ddns-enabled=yes ddns-update-interval=10m
+set ddns-enabled=yes ddns-update-interval=10m update-time=yes
 
 # Longer UDP timeouts keep WireGuard/AWG sessions alive (carried from SHV)
 /ip firewall connection tracking

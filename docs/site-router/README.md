@@ -101,19 +101,57 @@ of its commands exist on the new one.
 
 ---
 
+## 2b. Unlock device-mode
+
+RouterOS 7 locks some subsystems at the hardware level. On a fresh RB4011,
+`/system scheduler add` is **refused** — which means stage 1 fails partway
+through unless this is done first.
+
+```
+/system device-mode update scheduler=yes romon=yes
+```
+
+RouterOS prints a challenge and gives you a few minutes to confirm
+**physically**: pull the power and plug it back in, or press the reset button.
+There is no way to automate this and no way to do it remotely — that is the
+whole point of the feature.
+
+- `scheduler=yes` — the weekly backup job needs it
+- `romon=yes` — lets WinBox reach the access points by MAC *through* the router,
+  which saves a lot of cable-swapping later
+
+Verify afterwards:
+
+```
+/system device-mode print
+```
+
+Both must read `yes`.
+
+---
+
 ## 3. Wipe the router
 
 This removes everything, including the default configuration MikroTik ships
 with — which would otherwise fight every setting you are about to apply.
 
 ```
-/system reset-configuration no-defaults=yes skip-backup=yes
+/system reset-configuration no-defaults=yes skip-backup=yes keep-users=yes
 ```
+
+`keep-users=yes` preserves the accounts and their passwords. Without it the
+router comes back with only `admin` and no password, and you have to create
+your account again. The configuration is still wiped completely either way —
+only the user database survives.
+
+Drop `keep-users=yes` if this is a second-hand router whose accounts you do not
+control, or if you want a genuinely factory-clean starting point.
 
 The router reboots and your connection drops. **This is expected.**
 
 Wait a minute, then reconnect: **Neighbors → click the MAC address → Connect**.
-Username `admin`, no password.
+Log in with your existing account (or `admin` with no password, if you did not
+keep users).
 
 The router now has no IP address at all. Only the MAC connection works.
 
@@ -248,33 +286,65 @@ resetting. Then:
 
 Four replies means the tunnel is up and the router is remotely manageable.
 
-**No handshake?** Almost always one of three things, in this order: a character
-lost while pasting the keys; the router has no internet yet (`/ping 8.8.8.8`);
-the connection blocks outbound UDP 51820.
+**No handshake?** Work through these in order:
+
+1. **DNS.** `:put [:resolve vpn.ergunay.com]` must return `46.138.254.119`. The
+   peer endpoint is a hostname, and if DNS was not configured when the peer was
+   created, RouterOS caches the failed lookup and never retries. Fix DNS, then
+   force a retry:
+   ```
+   /interface wireguard peers disable [find name=erg-wg-easy]
+   /interface wireguard peers enable [find name=erg-wg-easy]
+   ```
+2. **The clock.** `/system clock print`. The RB4011 has no battery-backed clock,
+   so after any power loss it returns to the firmware build date. WireGuard
+   stamps each handshake and ERG rejects one older than the newest it has seen
+   from this peer — so a backwards clock kills the tunnel until NTP corrects it.
+   Normally self-healing within a minute of the WAN coming up.
+3. **Internet.** `/ping 8.8.8.8`.
+4. **The address.** `/ip address print` must show `10.13.13.11/24` on `wg-erg`.
+   A handshake is pure crypto and succeeds with no address at all — so "peer
+   connected, nothing reachable" means this line is missing.
+5. The upstream connection blocks outbound UDP 51820.
+
+**Netwatch has a 5-minute startup delay after boot.** Right after a reboot the
+failsafe reports `status=unknown` and does nothing. That is normal — it avoids
+flapping while the network settles.
 
 ---
 
 ## 6a. Stage 6 — the site interconnect
 
-This is the tunnel that lets people at this site reach the other sites'
-NAS boxes without running a VPN client on their laptop. It is separate
-from stage 3: that one is for *managing* the router, this one is for
-*users*. Neither depends on the other.
+This is the tunnel that lets people at this site reach the other sites' NAS
+boxes without running a VPN client on their laptop. It is separate from stage
+3: that one is for *managing* the router, this one is for *users*. Neither
+depends on the other.
 
-**Two sides, and the other side comes first.** The office router (the
-hub) has to be told about this router before this file will do anything.
-Send Can the public key created by the first command below, wait for
-confirmation, then continue.
+**Two sides, and the other side comes first.** The office router (the hub) has
+to be told about this router before this file will do anything. Send Can the
+public key created by the first command below, wait for confirmation, then
+continue.
+
+The file needs the private key filled in before you upload it — same as stage
+3, and for the same reason. Get it from ERG:
+
+```
+ssh erg
+sudo cat /root/svr-mikrotik-keys.txt
+```
+
+Replace `<bc-shv PrivateKey from svr-mikrotik-keys.txt>` in
+`svr-06-interconnect.rsc`, keep the quotation marks, upload, then:
 
 ```
 /import svr-06-interconnect.rsc
 ```
 
-Now read out the public key and send it to Can:
-
-```
-/interface wireguard print detail where name=bc-shv
-```
+**Why the key is written down rather than generated here.** If the router is
+ever reset, re-importing this file brings back the *same* key, so the hub keeps
+working untouched. Let RouterOS generate its own and a reset silently changes
+it: the tunnel looks configured, the hub shows a peer, and no handshake ever
+happens. That failure has already cost us an evening.
 
 ### Check it worked
 
@@ -284,9 +354,8 @@ First, and this is the one people skip:
 /ip route print where static
 ```
 
-Both routes must show **A** for active. An **I** means inactive — the
-route is listed, looks correct, and does nothing. Stop and tell Can if
-you see one.
+Both routes must show **A** for active. An **I** means inactive — the route is
+listed, looks correct, and does nothing. Stop and tell Can if you see one.
 
 ```
 /interface wireguard peers print detail where name=shv-hub
@@ -298,20 +367,29 @@ you see one.
 /ping 192.168.2.91 src-address=192.168.78.1 count=3
 ```
 
-Three replies means a machine on this site's network can reach the
-server at the Moscow house. That is the real test.
+Three replies means a machine on this site's network can reach the server at
+the Moscow house. That is the real test.
 
-**What this does not prove, while the router is still in the office:**
-pinging anything on `192.168.77.x` from here tells you nothing. This
-router's WAN cable is plugged into that same network, so the traffic
-goes out the WAN and never touches the tunnel. It answers, and it
-answers for the wrong reason.
+**What this does not prove, while the router is still in the office:** pinging
+anything on `192.168.77.x` from here tells you nothing. This router's WAN cable
+is plugged into that same network, so the traffic goes out the WAN and never
+touches the tunnel. It answers, and it answers for the wrong reason.
 
 ---
 
 ## 7. Stage 4 — Wi-Fi
 
 Only if this site has MikroTik cAP access points.
+
+**The bench uses temporary SSIDs — `Buro-BENCH` and `Buro-BENCH-5G`.** The
+router is being built inside the office, where `Buro` and `Buro_5G` are the live
+networks. Broadcasting those names here would pull office phones and laptops
+onto a network that routes nowhere. The temporary names still prove everything
+that matters: the access points adopt, provision, take the channel plan, and a
+phone can associate with the real passphrase.
+
+**Switching to the real names is the last thing you do before boxing the kit** —
+see step 8a. Do not skip it, and do not do it early.
 
 Edit `svr-04-capsman.rsc`, replace `<TODO_WIFI_PSK>` with the Wi-Fi password,
 save, upload again, then:
@@ -333,34 +411,62 @@ Each access point should be listed.
 
 ## 8. Stage 5 — traffic shaping
 
-This is set for the site's 200 Mbit line, the same product the other office
-runs, so you can run it on the bench:
+**Do not run this yet.**
+
+It needs the measured speed of the site's real internet line. A wrong number is
+worse than not running it: set the ceiling to 95 Mbit on a 200 Mbit line and
+half the connection is gone permanently, and it will surface months later as
+"the internet is slow at the site".
+
+Run it on site, once the line is installed and measured.
+
+---
+
+## 8a. Switch to the real SSIDs — last step before boxing
+
+Only when the kit is finished and about to be powered down. While the router is
+still running inside the office, these names collide with the live network.
 
 ```
-/import svr-05-qos.rsc
+/caps-man configuration set [find name=svr-2ghz] ssid=Buro
+/caps-man configuration set [find name=svr-5ghz] ssid=Buro_5G
 ```
 
-Ends with `STAGE 5 COMPLETE`.
-
-**Confirm the line on site anyway.** The number comes from the contract, not
-from a measurement. If the line turns out slower, the ceiling has to come down
-— and if upload is not also 200 Mbit, its ceiling is a separate number. Both
-are two lines at the top of the queue section.
-
-Getting it wrong is not symmetrical. Too low and you lose bandwidth, which
-somebody notices. Too high and the shaper never engages at all: the queue
-never fills, priority is never consulted, and QoS looks configured while doing
-nothing. That is the one to be careful about.
-
-Once the site is live, check every queue is actually being used:
+Check, then power the kit down:
 
 ```
-/queue tree print stats
+/caps-man configuration print where name~"svr-"
 ```
 
-A queue sitting at zero bytes means its rule never matches anything — which is
-exactly the state two of the other office's queues have been in since they
-were written.
+Nothing else changes — passphrase, channels and provisioning were all proven on
+the bench under the temporary names.
+
+If you forget this step, the site comes up broadcasting `Buro-BENCH` and every
+phone has to be told the new network by hand. Recoverable, but annoying, and
+over the management tunnel rather than in person.
+
+---
+
+## 8b. Set a password
+
+None of the stage files does this — a password does not belong in a file that
+gets copied between machines. Check what actually exists:
+
+```
+/user print
+```
+
+If you used `keep-users=yes` in step 3, your account is still there and this is
+just a verification. If not, the router has one account — `admin`, no password.
+
+```
+/user add name=can group=full password="<choose one>"
+/user disable admin
+```
+
+Log out and back in as the new account **before** disabling `admin`, so you
+find out immediately if it does not work. Record the password wherever site
+credentials are kept — the router is about to leave the building.
 
 ---
 
@@ -393,8 +499,7 @@ separate short guide, [npm-setup.md](npm-setup.md).
 
 These need the real internet line and cannot be done on the bench:
 
-- **Confirming the line rate**, and correcting stage 5's two ceilings if the
-  200 Mbit does not hold.
+- **Stage 5**, after measuring the line rate.
 - **Hairpin NAT** — the commented block at the end of stage 2. Without it a
   phone *inside* the site cannot reach the VPN on the site's public address.
   VPN profiles use a bare IP by design, so DNS cannot paper over it.

@@ -547,15 +547,31 @@ Kurallar **hedef sitenin kendi router'ında** durur; kaynakta değil. Ofis
 için SHV, şantiye için o şantiyenin router'ı karar verir — kural ile
 koruduğu şey aynı yerde kalır.
 
+**Ofis (SHV, hub):**
+
 | Kaynak | Erişim |
 |---|---|
-| `10.10.10.0/29` (hub, ERG, yönetici peer'ı) | tam LAN |
-| `192.168.2.0/24` (ERG LAN) | tam LAN |
-| Şantiye LAN'ları | yalnızca NAS (`192.168.77.10`), gerisi drop |
-| Şantiye LAN'ları → ERG | yalnızca kutu (`192.168.2.91`), ev LAN'ı drop |
+| `10.10.10.2-.3` (ERG kutusu, yönetici peer'ı) | tam ofis LAN'ı — deploy yolu |
+| `192.168.2.0/24` (ERG LAN) | tam ofis LAN'ı |
+| Şantiye LAN'ları | yalnızca NAS `192.168.77.10`, gerisi drop |
+| Şantiye LAN'ları → ERG | yalnızca kutu `192.168.2.91`, ev LAN'ı drop |
 
-Şantiye router'ları `.10+` aralığında ve `/29`'un **dışında** — yönetici
-ile saha kullanıcısını ayıran şey bu.
+**Şantiye router'ları:** interconnect'ten gelen trafik **yalnızca NAS'a**
+ulaşır, başka hiçbir şeye. Router'ın kendisi input zinciriyle erişilebilir
+kalır — kendisine giden paket forward'a hiç uğramaz, kural gerekmez.
+
+**Blanket kural yazılmaz.** İlk taslakta şantiye router'larında
+`src=10.10.10.0/29 → tam LAN` vardı. Kaldırıldı: yönetim ağı bilinçli
+olarak `10.13.13.0/24` ile sınırlanmışken, o kural aynı yere **ikinci ve
+daha geniş** bir yol açıyordu — `.31–.39`'daki cAP'ler dâhil, ki onlar
+"ERG'den erişilemez" diye kayıtlıydı. Biri tasarımla dar, diğeri kazayla
+geniş iki örtüşen yol, ikisinden de kötüdür; çünkü denetlenmeyen hep
+geniş olanıdır. Bir yeteneğe ihtiyaç varsa **tek hosta indirgenmiş tek
+kural** olarak, yorumunda gerekçesiyle yazılır.
+
+Aynı sebeple hub'daki kural `/29` değil `10.10.10.2/31` — yalnızca var
+olan iki cihaz. Şantiye router'ları `.10+`'da ve bu aralığın dışında;
+yöneticiyle saha kullanıcısını ayıran şey bu.
 
 ### Aşama dosyaları
 
@@ -564,6 +580,19 @@ ile saha kullanıcısını ayıran şey bu.
   içinde **değildir**: politika tazelemek bir sahanın tünelini
   düşürmemeli.
 - `site-router/svr-06-interconnect.rsc` — spoke tarafı, şantiye başına.
+
+**Spoke'un özel anahtarı dosyada açıkça set edilir**, RouterOS'un kendi
+üretmesine bırakılmaz; anahtar ERG'de `/root/svr-mikrotik-keys.txt`
+içinde durur ve dosyaya yer tutucu girer (aşama 3 ile aynı desen). Sebep:
+router sıfırlanırsa dosyayı yeniden import etmek **aynı** anahtarı geri
+getirir ve hub'a dokunulmaz. Aksi hâlde sıfırlama anahtarı sessizce
+değiştirir — arayüz kalkar, hub peer'ı hâlâ listeler, el sıkışma hiç
+olmaz ve bunu raporlayan hiçbir şey yoktur. Bu tam olarak bir kez yaşandı.
+
+**Aşama sırası 1→2→3→4→(5)→6, istisnasız.** Hem aşama 2 hem aşama 6
+`/ip service ssh|winbox address` listelerini **üzerine yazar**, eklemez.
+Aşama 2'yi 6'dan sonra çalıştırmak interconnect'i o listelerden sessizce
+düşürür ve router `10.10.10.x`'ten cevap vermeyi bırakır.
 
 ### Yakalanan tuzaklar (2026-07-28)
 

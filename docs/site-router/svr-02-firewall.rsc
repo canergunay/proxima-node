@@ -4,6 +4,12 @@
 #
 # WARNING: this stage closes the input chain with a default drop. Apply it
 # from the LAN side (bridge1), never from a WAN-side connection.
+#
+# WARNING: the /ip service block at the end OVERWRITES the ssh and winbox
+# address lists - it does not append. Stage 6 widens those same lists, so
+# re-running this file after stage 6 silently removes the interconnect from
+# them and the router stops answering from 10.10.10.x. If you ever re-run
+# this stage, re-run stage 6 afterwards. Order is always 1-2-3-4-(5)-6.
 # =============================================================
 
 # ---------- NAT ----------
@@ -21,6 +27,13 @@ add chain=dstnat action=dst-nat protocol=tcp dst-port=80 in-interface=ether5 \
     to-addresses=192.168.78.121 to-ports=80 comment="NPM HTTP / ACME http-01"
 add chain=dstnat action=dst-nat protocol=tcp dst-port=443 in-interface=ether5 \
     to-addresses=192.168.78.121 to-ports=443 comment="NPM HTTPS"
+
+# sing-box. SHV forwards 8443 the same way. Harmless if sing-box is never
+# installed - the packets simply arrive at a box with nothing listening.
+add chain=dstnat action=dst-nat protocol=udp dst-port=5556 in-interface=ether5 \
+    to-addresses=192.168.78.121 to-ports=5556 comment="sing-box wg2"
+add chain=dstnat action=dst-nat protocol=tcp dst-port=8443 in-interface=ether5 \
+    to-addresses=192.168.78.121 to-ports=8443 comment="sing-box VLESS/Reality"
 
 ### TODO SEVEN SKY - hairpin NAT, needs the public IP.
 # Mandatory: VPN profiles are bare-IP by design, so a phone on the SVR LAN
