@@ -85,9 +85,11 @@ Reconnect, and check the version:
 /system resource print
 ```
 
-**Target: 7.22.1** — what the other sites run. A different version is not
-fatal, but tell Can before continuing. Matching versions is what stops one site
-behaving differently from another for no visible reason.
+**Target: 7.22.2** — what SVR was built on. SHV runs 7.22.1, one patch behind;
+that difference is harmless. A larger gap is not fatal either, but tell Can
+before continuing. Matching versions is what stops one site behaving differently
+from another for no visible reason — the `/ip dhcp-client name=` field, for
+instance, exists on some builds and not others.
 
 While you are here, check the wireless driver:
 
@@ -182,8 +184,9 @@ fine — everything below is local.
 
 ### Upload the files
 
-In WinBox, click **Files** in the left menu. Drag all five `.rsc` files from
-your laptop into that window. They appear in the list.
+In WinBox, click **Files** in the left menu. Drag all six `svr-*.rsc` files from
+your laptop into that window. They appear in the list. Leave `caps/` alone for
+now — those come later, when the access points are adopted.
 
 ### Stage 1 — addresses, DHCP, DNS, clock, failsafe
 
@@ -441,11 +444,20 @@ Confirm the forward chain is back to NAS-only:
 Expected afterwards: `interconnect - the NAS, and nothing else`
 (`dst-address=192.168.78.122`) and no rule matching a range.
 
-Note the rule is scoped by **destination** (`192.168.78.10-39`), not source.
-Source-based rules cannot work on a spoke: the hub masquerades everything
-leaving the tunnel, so ERG arrives as `10.10.10.0` rather than its own address.
-A `src-address=10.10.10.2/32` rule reads correctly, lists correctly, and matches
-nothing. Verify by counter, never by reading — see "Verifying rules" below.
+The rule is scoped by **both** source (`10.10.10.2`, the ERG box) and
+destination (`192.168.78.10-39`, the DHCP pool a factory access point lands in
+plus the range it ends up on once adopted).
+
+It did not start that way. Source-based rules could not match on a spoke at
+first, because the hub masqueraded everything leaving the tunnel and every
+packet arrived from `10.10.10.0` whoever sent it. That has been **fixed** at
+the hub — site-bound traffic keeps its real source now — and the same fix
+repaired something worse: while it was in place, nothing *behind* a site router
+was reachable from the hub at all. Requests arrived and were accepted, replies
+addressed back to `10.10.10.0` could not cross the tunnel, and no drop counter
+moved anywhere. See `shv-hub-interconnect.rsc`.
+
+Verify by counter, never by reading — see "Verifying rules" below.
 
 ---
 
@@ -588,14 +600,16 @@ the site's bare IP. This is a deliberate decision, not an oversight.
 
 ## Verifying rules — read the counters, not the config
 
-This subsystem has produced **four** separate rules that were syntactically
+This subsystem has produced **six** separate rules that were syntactically
 valid, listed correctly, and did absolutely nothing. Each looked healthy:
 
 | What was written | Why it did nothing |
 |---|---|
 | `[find address=192.168.78.0/24]` inside a script | `/` starts a command path, value cut at `192.168.78.0`, empty match, `set` is a silent no-op — while the `:log` after it still runs |
 | netwatch script with `dont-require-permissions=no` | netwatch calls it, it never starts: no error, no log, `run-count` unchanged |
-| `src-address=10.10.10.2/32` on a spoke | the hub masquerades the tunnel, so ERG arrives as `10.10.10.0` |
+| `src-address=10.10.10.2/32` on a spoke | the hub masqueraded the tunnel, so ERG arrived as `10.10.10.0` — **fixed at the hub** |
+| reaching anything *behind* a site router from the hub | same masquerade: the request arrived and was accepted, the reply could not be addressed back across the tunnel, and **no drop counter moved anywhere** — the hardest one on this list to see |
+| `place-before=[find out-interface=…]` in the NAT chain | `find` matches nothing there, `place-before` gets an empty value, the `add` fails with "no such item" — anchor on a comment instead |
 | SHV's `Priority-Web` mangle rule | overwritten by the next rule, `passthrough` defaults to yes |
 
 The pattern is always the same: **the configuration is correct and the effect is

@@ -256,7 +256,9 @@ olması gerektiği gibi gösterir.
 |---|---|
 | Script içinde `[find address=192.168.78.0/24]` | `/` komut yolu başlatır, değer kesilir, boş listeye `set` sessiz no-op — ama `:log` yine çalışır |
 | Netwatch + `dont-require-permissions=no` | script hiç başlamaz; hata yok, log yok, `run-count` artmaz |
-| Spoke'ta `src-address=10.10.10.2/32` | hub maskeliyor, paket `10.10.10.0` olarak varıyor (Bölüm 12) |
+| Spoke'ta `src-address=10.10.10.2/32` | hub maskeliyordu, paket `10.10.10.0` olarak varıyordu — **düzeltildi**, Bölüm 12 |
+| Hub'dan spoke'un *arkasındaki* cihaza erişim | aynı maskeleme; istek varıyor, cevap `10.10.10.0`'a adreslendiği için tünele geri dönemiyor, **hiçbir yerde drop sayacı artmıyor** |
+| NAT'ta `place-before=[find out-interface=…]` | `find` boş döner, `place-before` boş değer alır, `add` "no such item" ile düşer — çapa olarak yorum kullanılır |
 | SHV'de `Priority-Web` mangle | sonraki kural üzerine yazıyor; `passthrough` varsayılanı `yes` |
 | `place-before=0,1,2,3,4` | her N o anki listeye göre çözülür, kurallar mevcutların arasına serpilir |
 | `move [find …] destination=N` | sessiz no-op; `numbers=` ile de |
@@ -583,23 +585,40 @@ koruduğu şey aynı yerde kalır.
 ulaşır, başka hiçbir şeye. Router'ın kendisi input zinciriyle erişilebilir
 kalır — kendisine giden paket forward'a hiç uğramaz, kural gerekmez.
 
-**Hub maskeliyor — spoke'ta kaynak-tabanlı kural yazılamaz.** SHV'de
-`chain=srcnat action=masquerade out-interface=bc-wireguard` kuralı var,
-yani tünelden çıkan her paket şantiyeye **`10.10.10.0` olarak** varır;
-kim gönderdiyse göndersin. Sonuçları:
+**Hub'ın örtülü maskelemesi kapatıldı — ve bu bir kolaylık değil, bir
+arıza düzeltmesiydi.** SHV'de matcher'sız bir
+`srcnat masquerade out-interface=bc-wireguard` kuralı vardı; tünelden çıkan
+**her** paketi router'ın kendi `10.10.10.0` adresine çeviriyordu. İki sonucu
+oldu, biri can sıkıcı biri ölümcül:
 
-- **Hub'da** kaynak-tabanlı kural çalışır (paket srcnat'tan önce, gerçek
-  adresiyle giriş zincirine düşer).
-- **Spoke'ta çalışmaz.** `src-address=10.10.10.2/32` hiçbir zaman
-  eşleşmez; kural kabul edilir, listelenir, sayacı sıfırda kalır ve
-  trafik zincirin son drop'una düşer. Eski `/29` kuralının çalışıyor
-  görünmesinin tek sebebi `.0`'ı kapsamasıydı. **Şantiye router'ında
-  politika hedefe göre yazılır.**
-- Yan etki: şantiye NAS'ının loglarında her uzak kullanıcı `10.10.10.0`
-  görünür. "Maskeleme yerine açık yönlendirme, ki loglar cihazı adıyla
-  yazsın" ilkesi bu tünelde fiilen geçerli değil. Maskelemeyi kaldırmak
-  mümkün (dönüş rotaları zaten var) ama ofisin çalışan NAT'ına dokunmak
-  ayrı bir karar — **açık madde**.
+- Spoke'ta kaynak-tabanlı kural hiç eşleşmiyordu, çünkü kim gönderirse
+  göndersin paket aynı adresten geliyordu. `src-address=10.10.10.2/32`
+  kabul edilir, listelenir, sayacı sıfırda kalır.
+- **`10.10.10.0`'a adreslenen bir cevap, spoke tarafından tünele geri
+  iletilemiyordu.** Sonuç: bir şantiye router'ının *arkasındaki* hiçbir
+  cihaza hub'dan ulaşılamıyordu. İstekler varıyor ve kabul ediliyor,
+  cevaplar kayboluyor, hiçbir yerde drop sayacı artmıyor. Hub şantiyenin
+  **router'ına** ulaşıyor, arkasındaki hiçbir şeye ulaşamıyor.
+
+Bu, bu router'ın eski `.0` adresinin sessizce yol açtığı **dördüncü**
+arızaydı. Kalıcı çözüm ona normal bir host adresi vermektir; şimdilik
+uygulanan dar düzeltme, çalışan bir üretim adresine dokunmayan şu kuraldır
+(`shv-hub-interconnect.rsc` içinde):
+
+```
+/ip firewall nat
+add chain=srcnat action=accept dst-address=192.168.64.0/18 \
+    out-interface=bc-wireguard   # blanket masquerade'in ÜSTÜNE
+```
+
+Şantiye aralığına kapsandığı için ofis→internet (`out ether5`) ve
+ofis→ERG (`192.168.2.x`, /18 dışında) eskisi gibi maskelenmeye devam eder.
+
+Sonuç olarak **kaynak adresleri artık tünelde korunuyor**: spoke'ta
+kaynak-tabanlı kural yazılabilir, şantiye NAS'ının logları uzak cihazı
+gerçek adresiyle görür ve "maskeleme yerine açık yönlendirme" ilkesi bu
+tünelde de geçerlidir. Yalnızca **hedefi ofis LAN'ı olan** trafik hâlâ
+maskelenir (NAT kuralı 0, `out bridge1`).
 
 **Blanket kural yazılmaz.** İlk taslakta şantiye router'larında
 `src=10.10.10.0/29 → tam LAN` vardı. Kaldırıldı: yönetim ağı bilinçli

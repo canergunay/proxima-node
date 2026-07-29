@@ -99,6 +99,38 @@ add chain=forward action=drop in-interface=bc-wireguard \
 # itself. One place per destination, so the rule and the thing it
 # protects stay together.
 
+# ---------- NAT: site-bound traffic keeps its real source ----------
+# This chain ends in a matcher-less `masquerade out-interface=bc-wireguard`,
+# which rewrote EVERY packet leaving the tunnel to this router's own
+# 10.10.10.0. Two things followed from that, one merely annoying and one fatal:
+#
+#   - source-based rules on a spoke could never match, because every packet
+#     arrived from the same address whoever sent it
+#   - a reply addressed BACK to 10.10.10.0 could not be forwarded across the
+#     tunnel by the spoke, so nothing behind a site router was reachable from
+#     here at all. Requests arrived and were accepted; replies vanished with no
+#     drop counter anywhere. The hub could reach a site's ROUTER and nothing
+#     behind it.
+#
+# The fourth time this router's legacy .0 address caused a silent failure. The
+# proper fix is to give it a normal host address; this rule is the narrow one
+# that does not touch a working production address.
+#
+# Scoped to the site range, so office->internet (out ether5) and office->ERG
+# (192.168.2.x, outside the /18) keep masquerading exactly as before.
+/ip firewall nat
+remove [find comment~"sites keep their real source"]
+add chain=srcnat action=accept dst-address=192.168.64.0/18 \
+    out-interface=bc-wireguard \
+    comment="srcnat: sites keep their real source - must precede the blanket masquerade" \
+    place-before=[find comment~"blanket masquerade"]
+
+# The anchor exists because `[find out-interface=bc-wireguard]` returns nothing
+# in the NAT chain - it is accepted and matches no rule, so place-before gets an
+# empty value and the add fails with "no such item". The blanket masquerade was
+# given a comment once, by index, purely so this file never has to guess an
+# index again.
+
 # ---------- Adding site number N ----------
 # Not part of this file - run it once, by hand, when the site's router is
 # built. Everything else already permits 192.168.64.0/18, so no existing
