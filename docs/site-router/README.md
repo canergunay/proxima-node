@@ -18,8 +18,8 @@ behind you, and the order is what keeps you from being locked out.
 | A laptop | Windows, with an Ethernet port or a USB-Ethernet adapter |
 | One Ethernet cable | Laptop to router. Not Wi-Fi. Not through a switch. |
 | WinBox | Download from https://mikrotik.com/download |
-| The five `.rsc` files | The ones sitting next to this file |
-| Two secrets from ERG | See step 6. Get them before you begin. |
+| The six `svr-*.rsc` files | The ones sitting next to this file. `caps/` is for later, once the access points are being adopted. |
+| Three secrets from ERG | Two in step 6, one in step 6a. Get them before you begin. |
 | The Wi-Fi password | Your choice. You will type it into a file in step 7. |
 
 **Why the direct cable matters.** Step 3 wipes the router completely: no IP
