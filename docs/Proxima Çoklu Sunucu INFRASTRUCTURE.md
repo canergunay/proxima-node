@@ -560,6 +560,24 @@ koruduğu şey aynı yerde kalır.
 ulaşır, başka hiçbir şeye. Router'ın kendisi input zinciriyle erişilebilir
 kalır — kendisine giden paket forward'a hiç uğramaz, kural gerekmez.
 
+**Hub maskeliyor — spoke'ta kaynak-tabanlı kural yazılamaz.** SHV'de
+`chain=srcnat action=masquerade out-interface=bc-wireguard` kuralı var,
+yani tünelden çıkan her paket şantiyeye **`10.10.10.0` olarak** varır;
+kim gönderdiyse göndersin. Sonuçları:
+
+- **Hub'da** kaynak-tabanlı kural çalışır (paket srcnat'tan önce, gerçek
+  adresiyle giriş zincirine düşer).
+- **Spoke'ta çalışmaz.** `src-address=10.10.10.2/32` hiçbir zaman
+  eşleşmez; kural kabul edilir, listelenir, sayacı sıfırda kalır ve
+  trafik zincirin son drop'una düşer. Eski `/29` kuralının çalışıyor
+  görünmesinin tek sebebi `.0`'ı kapsamasıydı. **Şantiye router'ında
+  politika hedefe göre yazılır.**
+- Yan etki: şantiye NAS'ının loglarında her uzak kullanıcı `10.10.10.0`
+  görünür. "Maskeleme yerine açık yönlendirme, ki loglar cihazı adıyla
+  yazsın" ilkesi bu tünelde fiilen geçerli değil. Maskelemeyi kaldırmak
+  mümkün (dönüş rotaları zaten var) ama ofisin çalışan NAT'ına dokunmak
+  ayrı bir karar — **açık madde**.
+
 **Blanket kural yazılmaz.** İlk taslakta şantiye router'larında
 `src=10.10.10.0/29 → tam LAN` vardı. Kaldırıldı: yönetim ağı bilinçli
 olarak `10.13.13.0/24` ile sınırlanmışken, o kural aynı yere **ikinci ve
