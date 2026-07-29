@@ -44,19 +44,24 @@
 # ports. IKE only, and it goes away with the bare-accept cleanup.
 
 /ip firewall filter
-remove [find comment~"interconnect"]
+# Anchored with ^ on purpose. A bare ~"interconnect" also matches the audit
+# rule commented "audit: office to interconnect", so re-running this file -
+# the one thing it advertises as safe - would silently delete part of a
+# different rule set.
+remove [find comment~"^interconnect: "]
 
 add chain=forward action=accept in-interface=bc-wireguard \
     connection-state=established,related \
     comment="interconnect: established" \
     place-before=[find comment="Allow ICMP Forward"]
 
-# .0 hub, .2 ERG box, .3 the admin's own peer. Site routers live at .10+
-# and are deliberately outside this /29. Without this rule ERG loses the
-# office Proxima box at 192.168.77.121 and the deploy path closes.
+# The ERG box (.2) and the admin's own peer (.3), named as a range rather
+# than a /29 with room for four more addresses nobody would notice being
+# added. Site routers live at .10+ and are outside it. Without this rule ERG
+# loses the office Proxima box at 192.168.77.121 and the deploy path closes.
 add chain=forward action=accept in-interface=bc-wireguard \
-    src-address=10.10.10.0/29 \
-    comment="interconnect: admin and ERG, full LAN" \
+    src-address=10.10.10.2-10.10.10.3 \
+    comment="interconnect: ERG box and admin peer - deploy path, named hosts only" \
     place-before=[find comment="Allow ICMP Forward"]
 
 add chain=forward action=accept in-interface=bc-wireguard \

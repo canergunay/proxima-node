@@ -284,11 +284,18 @@ Site başına üçüncü oktet: OFC=77, SVR=78, yeni şantiyeler sırayla 79+.
 |---|---|
 | `.1` | MikroTik router |
 | `.2 – .9` | Pool dışı rezerv (acil manuel IP ihtiyacı) |
-| `.10 – .250` | DHCP pool (≈240 adres) |
-| `.121` | Proxima sunucusu (static lease, pool içinde) |
-| `.122` | Synology NAS (static lease, pool içinde) |
+| `.10 – .30` | DHCP pool |
+| `.31 – .39` | Erişim noktaları (cAP), sabit lease |
+| `.121` | Proxima sunucusu (sabit lease) |
+| `.122` | Synology NAS (sabit lease) |
 
-MikroTik'te static lease pool içinde tanımlanır — lease'li adres başka
+**Havuz `.30`'da biter, `.250`'de değil.** Bu tablo 2026-07-19'da
+`.10 – .250` yazıyordu ve havuz `.121` ile `.122`'yi kapsıyordu — yani bir
+dizüstü, sahanın tamamının bağlı olduğu adresi kapabilirdi. Aşama
+dosyalarında 2026-07-28'de düzeltildi, bu tablo **2026-07-30'da**. Havuzun
+üstündeki her şey rezervedir.
+
+MikroTik'te static lease pool içinde de tanımlanabilir — lease'li adres başka
 cihaza dağıtılmaz. Yazıcı gibi sabit IP isteyen cihazlar geldikçe
 **make-static** ile sabitlenir; Debian/cihaz tarafında statik IP yazılmaz.
 
