@@ -671,13 +671,37 @@ düşürür ve router `10.10.10.x`'ten cevap vermeyi bırakır.
   gereken hedefler ping'e cevap verir ve kurallar tek tek doğru görünür.
   Doğrulama drop kuralının **paket sayacıyla** yapılır.
 
-### Bilinen sınır
+### Bilinen sınır — hub'ın çıplak `accept`'i (ölçüldü 2026-07-30)
 
-Şantiyeden ofise giden trafik hub'ın `forward` zincirinden geçer ve o
-zincirde matcher'sız bir `action=accept` vardır — altındaki her kural,
-kendi son drop'u dâhil, ölüdür. Interconnect kuralları bu yüzden zincirin
-**en tepesine** konur. Temizlik ayrı bir bakım penceresinin işidir;
-o güne kadar buraya kural *eklenir*, mevcut kural kaldırılmaz.
+Hub'ın `forward` zincirinde matcher'sız bir `action=accept` vardır ve
+altındaki her kural, **kendi son drop'u dâhil**, ölüdür (o drop bugüne
+kadar sıfır paket saydı). Interconnect kuralları bu yüzden zincirin
+**en tepesine** konur; o güne kadar buraya kural *eklenir*, mevcut kural
+kaldırılmaz.
+
+Temizliğin riski "ne kesileceğini bilmemek"ti. Artık bilmiyor değiliz:
+çıplak kuralın **üstüne**, meşru kategorileri sayan `accept` kuralları
+konuldu (accept'in üstüne accept — hiçbir paketin kaderi değişmez, yalnızca
+sayaçlar yerine oturur). Sonuç:
+
+| Kural | ~50 sn'de paket |
+|---|---|
+| `established, related, untracked` | 76.648 |
+| LAN → internet (`new`) | 2.144 |
+| yayınlanan servisler (`new`) | 16 |
+| ofis → interconnect (`new`) | 0 |
+| **çıplak accept (artık)** | **2** |
+
+Yani dört kategori trafiğin %99,99'unu kapsıyor ve çıplak kural neredeyse
+boş. **Belirleyici kelime `untracked`:** ilk denemede yalnızca
+`established,related` yazılmıştı ve artık 45 saniyede 143.855 pakette
+kalmıştı. Bu kelime SVR'nin standart şablonunda zaten var; SHV elle
+kurulduğu için eksikti. Raw chain boş, yani `notrack` kaynaklı değil.
+
+Kalan artığı adlandırmak için çıplak kuralın üstüne bir `action=log`
+kuralı eklendi (hacim buna elverecek kadar küçük). **Bu enstrüman henüz
+doğrulanmadı** — 40 saniyede sayacı sıfır kalırken çıplak kural iki paket
+saydı. Uzun bir örnekle teyit edilmeden çıktısına güvenilmez.
 
 Kalıntı: `Allow Turkcell VoWiFi` kuralı (udp 500/4500, any→any) blokun
 üstünde kalır, yani bir şantiye herhangi bir ofis makinesine o iki porttan
