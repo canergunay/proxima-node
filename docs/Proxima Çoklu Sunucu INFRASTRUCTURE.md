@@ -262,6 +262,8 @@ olması gerektiği gibi gösterir.
 | SHV'de `Priority-Web` mangle | sonraki kural üzerine yazıyor; `passthrough` varsayılanı `yes` |
 | `place-before=0,1,2,3,4` | her N o anki listeye göre çözülür, kurallar mevcutların arasına serpilir |
 | `move [find …] destination=N` | sessiz no-op; `numbers=` ile de |
+| Bir arayüzü silip yeniden yaratmak | ateş duvarı kuralları arayüze **isimle değil dahili ID ile** bağlanır; eski ID'ye bakan her kural `I` (invalid) olur, listede neredeyse normal görünür, tek işaret gözden kaçan bir `;;; no interface` satırıdır |
+| Arayüzü silmek peer'ını **silmez** | peer hayatta kalır, sonraki `add` "entry with this name already exists" ile düşer, `/import` orada durur ve dosyanın geri kalanı hiç çalışmaz |
 
 **Doğrulama config okunarak değil, sayaçla yapılır:**
 `/ip firewall filter print stats`, `/system script print` (`run-count`),

@@ -16,13 +16,54 @@
 # in its input chain, whatever interface it arrived on - no dstnat, no
 # hairpin rule involved. So this exact line works on the bench today and
 # keeps working after the router ships. Nothing to edit at handover.
+#
+# RE-RUNNABLE. It deletes its own objects first and rebuilds them, so running
+# it on a router that is already configured leaves one of each rather than two
+# - or, as it did before this was fixed, aborting on the very first line
+# ("interface with such name already exists") and applying nothing at all after
+# it. An `/import` stops at the first error, so a file that is not idempotent is
+# a file you can only ever run once.
+#
+# THE INTERFACE IS NEVER RECREATED - only created if absent. Everything else is
+# removed and rebuilt, but not this. RouterOS firewall rules bind to an
+# interface by INTERNAL ID, not by name: delete `bc-shv` and recreate it and
+# every rule that referenced it - including rules this file does not manage -
+# is left pointing at an ID that no longer exists. Such a rule stays in the
+# list looking almost normal; the only sign is an `I` flag and a `;;; no
+# interface` line that is easy to read past. Making this file re-runnable by
+# remove-and-add did exactly that to the temporary cAP rule, and the access
+# points went unreachable while the chain still "looked right".
+#
+# Keeping the interface also means no tunnel drop at all.
+#
+# The removals are anchored (`^input: site interconnect`, `^forward: interconnect`)
+# so they cannot reach the temporary cAP rule or anything else that happens to
+# contain the word. An unanchored `~"interconnect"` already deleted an unrelated
+# rule set once, in the file that advertised itself as safe to repeat.
 # =============================================================
 
-# MTU matches the hub's bc-wireguard (1280). Deliberately conservative:
-# once this router is on a real site line the path is unknown, and a
-# too-large MTU surfaces as "big files hang, ping works".
+/ip firewall filter
+remove [find comment~"^input: site interconnect"]
+remove [find comment~"^forward: interconnect"]
+/ip route
+remove [find comment~"via SHV hub"]
+# The peer is removed explicitly. Deleting a WireGuard interface does NOT
+# delete its peers - they survive, and the next `add` fails with "entry with
+# this name already exists". `/import` stops at the first error, so everything
+# after that line silently never runs.
+/interface wireguard peers
+remove [find name=shv-hub]
+/ip address
+remove [find comment="SVR on site interconnect"]
+
+# Created only when missing. MTU matches the hub's bc-wireguard (1280),
+# deliberately conservative: once this router is on a real site line the path
+# is unknown, and a too-large MTU surfaces as "big files hang, ping works".
+# The `set` after it enforces the parameters whether the interface was just
+# created or was already there.
 /interface wireguard
-add name=bc-shv listen-port=13231 mtu=1280 comment="site interconnect to SHV hub"
+:if ([:len [find name=bc-shv]] = 0) do={ add name=bc-shv comment="site interconnect to SHV hub" }
+set [find name=bc-shv] listen-port=13231 mtu=1280
 
 # THE PRIVATE KEY IS SET EXPLICITLY, not left for RouterOS to generate.
 # Get it from ERG (`sudo cat /root/svr-mikrotik-keys.txt`) and paste it in,
