@@ -813,3 +813,76 @@ ama telefonlar bağlanmıyor" olur — sebebi aramak zaman alır. Wi-Fi parolas�
 her değiştiğinde bu dosya da güncellenir. Aynı şey SSID standardı için de
 geçerli: `Buro` / `Buro_5G` her sahada aynıdır ve **aynı ad aynı parolayı
 zorunlu kılar**, o yüzden sahaya özel parola üretilmez.
+
+---
+
+## 14. Erişim Matrisi — kim nereden nereye
+
+Ölçüm tarihi **2026-07-30**. Her satır ya cihazdan okundu ya trafikle sınandı;
+hangisi olduğu işaretli. **Hafızadan yazılmış hiçbir satır yok** — bu bölümün
+ilk hâli wg-easy peer isimlerini eski bir nottan almıştı ve silinmiş bir
+kullanıcıyı listede gösteriyordu.
+
+### Yönetim ağı — wg-easy, `10.13.13.0/24`
+
+Üyelik **ölçüldü** (`wg show wg0` ve `wg0.json` birebir):
+
+| Adres | Kim |
+|---|---|
+| `.2` | CE-Laptop |
+| `.3` | CE-IPhone |
+| `.11` | SVR-Mikrotik (router, kişi değil) |
+
+Bugün itibarıyla **üyelik yetkinin kendisidir**: bu ağdaki bir cihaz her
+sahanın her cihazına ulaşır. İkinci bir kapı yok — peer eklemek yetki
+vermektir.
+
+| Hedef | Erişim | Nasıl doğrulandı |
+|---|---|---|
+| ERG sunucusu + ERG LAN | tam | trafikle |
+| Tüm ofis LAN'ı | tam | trafikle |
+| Tüm SVR LAN'ı | tam | trafikle |
+| SVR kutusu (`10.12.12.10`) | tam | trafikle |
+
+Yol: ERG bu trafiği interconnect'e sokarken `10.10.10.2`'ye çevirir (Bölüm 12).
+
+### Diğer aktörler
+
+| Kaynak | Erişim | Doğrulama |
+|---|---|---|
+| ERG kutusu `10.10.10.2` | tüm ofis LAN'ı, tüm SVR LAN'ı | trafikle |
+| Kişisel peer `10.10.10.3` | tüm ofis LAN'ı; **SVR LAN'ına erişemez** | kuraldan |
+| Ofis LAN `192.168.77.x` | SVR sahasında yalnızca NAS `192.168.78.122` | kuraldan |
+| Şantiye LAN `192.168.78.x` | ofiste yalnızca NAS `192.168.77.10`; ERG'de yalnızca kutu `192.168.2.91` | trafikle + drop sayacıyla |
+
+**Ofis LAN'ından ERG'ye erişim düzgün bir sınır değil.** Ölçüldü: ERG kutusu
+`.91` ✓, SVR kutusu `.96` ✓, Keenetic `.1` ✗. ufw'de `wg-bcshv → enp3s0` kuralı
+yok, yani bu bir ateş duvarı sınırı değil. Muhtemel açıklama (**çıkarım,
+ölçülmedi**): ofis trafiği ERG'ye `10.10.10.1` olarak varıyor ve yalnızca o
+adrese dönüş rotasını bilen cihazlar cevap verebiliyor.
+
+### İnternetten
+
+| Saha | Açık |
+|---|---|
+| SHV | `2210/tcp` (input'ta, her yerden), `13231/udp`; DSTNAT → NAS `.10`: 5000, 5001, 22022, 1194, 5005, 5006, 21115-21119 · NVR `.3`: 8000 · Proxima `.121`: 5555 |
+| SVR | 5555 (ProximaVPN), 80/443 (NPM), 5556 + 8443 (sing-box) |
+| ERG | ufw'de 22, 80, 443, 53, 5050, 5555, 8443, 51820, 51821, 51822, 8086, 8090, 7878, 8989, 9696, 19999, 12345, 3478, 5349, 20000-20100, 49152-49252 — hepsi `Anywhere` |
+
+**ERG'nin ufw listesi perimetre değildir.** "Keenetic bir portu yönlendirirse
+kim girebilir"i anlatır. Gerçek perimetre Keenetic'tir ve yönlendirme tablosu
+buradan görülemez — bu listeye bakıp "şu port açık" demek yanlıştır.
+
+### Kapsanmayan
+
+**ProximaVPN istemcilerinin (wg1/wg2) erişimi bu turda haritalanmadı.** O
+erişimi MikroTik değil, sahanın Proxima kutusundaki kurallar belirler.
+
+### Bilinen tutarsızlıklar
+
+- `10.10.10.3` ofise tam, SVR'ye hiç erişiyor — ya yönetim ağına taşınmalı ya
+  da saha kuralına eklenmeli.
+- Şantiyeler ERG'de yalnızca kutuya ulaşabilirken ofis LAN'ı için böyle bir
+  sınır yok. Bilinçli bir karar değil, eski bir kuraldan geliyor.
+- SHV'nin input zincirinde default drop yok ve `2210/tcp` her yerden açık;
+  SVR'de input kapalı. İki saha aynı standartta değil.
