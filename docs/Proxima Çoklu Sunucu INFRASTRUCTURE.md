@@ -779,7 +779,7 @@ tutucu vardır. Değerler yalnızca ERG'de, `root`'a ait `0600` dosyalarda:
 
 | Dosya | İçerik | Kullanıldığı yer |
 |---|---|---|
-| `/root/svr-mikrotik-keys.txt` | `wg-erg` PrivateKey + PresharedKey; `bc-shv` PrivateKey + PublicKey | Aşama 3 (yönetim tüneli), aşama 6 (interconnect) |
+| `/root/svr-mikrotik-keys.txt` | `wg-erg` PrivateKey + PresharedKey; `bc-shv` PrivateKey + PublicKey; **acil durum tüneli** (`10.10.10.3`) PrivateKey + PublicKey | Aşama 3 (yönetim tüneli), aşama 6 (interconnect), yöneticinin acil durum yolu |
 | `/root/svr-wifi-psk.txt` | Ofis Wi-Fi parolası | Aşama 4 (CAPsMAN) |
 
 Bölünme kasıtlı: şablonlar her sahaya kopyalanır, sırlar kopyalanmaz. Bir
