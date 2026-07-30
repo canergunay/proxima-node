@@ -706,9 +706,32 @@ kalmıştı. Bu kelime SVR'nin standart şablonunda zaten var; SHV elle
 kurulduğu için eksikti. Raw chain boş, yani `notrack` kaynaklı değil.
 
 Kalan artığı adlandırmak için çıplak kuralın üstüne bir `action=log`
-kuralı eklendi (hacim buna elverecek kadar küçük). **Bu enstrüman henüz
-doğrulanmadı** — 40 saniyede sayacı sıfır kalırken çıplak kural iki paket
-saydı. Uzun bir örnekle teyit edilmeden çıktısına güvenilmez.
+kuralı eklendi. (Bir gece boyunca "doğrulanmamış" diye kayıtlıydı: 40
+saniyede sayacı sıfır kalmıştı. Enstrüman sağlammış, **örnek kısaymış** —
+6,5 saatte 7.050 paket yazdı. Aynı kapsam hatası, bu sefer ölçüm tarafında.)
+
+### Çözüldü — 2026-07-30
+
+Log 906 paketlik bir örnekte artığı ikiye ayırdı:
+
+- **%99 `connection-state:invalid`** — LAN→internet, conntrack bağlantıyı
+  kapattıktan sonra gelen TCP FIN/RST. Düşürülmesi zaten doğru olan trafik;
+  saha şablonunda ikinci kural olarak var, bu router eski olduğu için yoktu.
+- **%1 `new,dnat`, `bridge1→bridge1`** — **hairpin NAT**. Ofis içinden
+  sitenin kendi public adresine vuran cihazlar. Küçük, meşru ve bir
+  default-drop'un sessizce öldüreceği tam da bu. Denetimin var olma sebebi
+  bu kuralı bulmaktı.
+
+İkisi de kapsandıktan sonra çıplak kural **sıfır paket** almaya başladı
+(50 sn arayla üç ölçüm: 6111 / 6111 / 6111 — donmuş; o 6111 de dosyanın
+kuralları silip yeniden eklediği birkaç saniyenin artığıydı).
+
+Ardından çıplak kural **devre dışı bırakıldı** (silinmedi — geri alması
+`disabled=no`). Zincir ilk kez kendi son drop'uyla kapanıyor. Ofisten,
+VPN kapalı telefonla doğrulandı: Wi-Fi'dan hairpin, LTE'den aynı servis,
+sıradan gezinme — üçü de çalışıyor; son drop sıfır paket, logda tek satır
+yok. **Silme işlemi bir hafta geçtikten sonra** yapılacak: eldeki kanıt bir
+gece ve bir sabah, pazar 03:00 yedeğini kapsamıyor.
 
 Kalıntı: `Allow Turkcell VoWiFi` kuralı (udp 500/4500, any→any) blokun
 üstünde kalır, yani bir şantiye herhangi bir ofis makinesine o iki porttan

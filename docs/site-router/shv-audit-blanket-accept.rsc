@@ -1,5 +1,16 @@
 # =============================================================
-# SHV - measuring what the blanket accept carries. NOT the cleanup.
+# SHV - the forward chain's actual policy, and the measurement that justified
+# it. Started as an audit; the audit finished and this is now the rule set the
+# router runs on.
+#
+# STATE 2026-07-30 09:5x: the blanket accept is DISABLED (not deleted) and the
+# chain closes on its own final drop for the first time. Verified from the
+# office with the VPN off: hairpin over Wi-Fi, the same service over LTE, and
+# ordinary browsing all work; the final drop has counted zero and logged
+# nothing. Left disabled rather than removed so a single `disabled=no` reverts
+# it. Delete it, and the dead rules under it, after a full week has passed
+# through the chain - the evidence so far covers one night and one morning,
+# which does not include a Sunday 03:00 backup.
 #
 # This router's forward chain contains `action=accept` with no matchers. Every
 # rule below it is dead, including the chain's own final drop, which has counted
@@ -49,6 +60,24 @@ add chain=forward action=accept connection-state=new \
     comment="audit: office to interconnect" \
     place-before=[find comment~"BLANKET ACCEPT"]
 
+# Hairpin: a device on the office LAN reaching a service on the office's own
+# public address, dst-nat'ed straight back in. bridge1 to bridge1, so it is
+# easy to forget it is routed at all. Nine packets in a 906-sample window -
+# small, legitimate, and exactly the kind of thing a default-drop kills
+# quietly. This is the rule the whole audit existed to find.
+add chain=forward action=accept connection-state=new connection-nat-state=dstnat \
+    in-interface=bridge1 out-interface=bridge1 \
+    comment="audit: hairpin - LAN reaching the site's own public address" \
+    place-before=[find comment~"BLANKET ACCEPT"]
+
+# The other 897 of those 906: TCP FIN/RST arriving after conntrack has already
+# torn the connection down. Dropping invalid is correct, standard, and already
+# the second rule in the site template - this router is older and never had it.
+# This is the first rule here that changes behaviour rather than just counting.
+add chain=forward action=drop connection-state=invalid \
+    comment="audit: invalid - teardown packets after conntrack expiry" \
+    place-before=[find comment~"BLANKET ACCEPT"]
+
 # Names the remainder. Only safe because the four rules above shrank it to a
 # couple of packets a minute; at the original volume this would have flooded
 # the log.
@@ -60,6 +89,14 @@ add chain=forward action=accept connection-state=new \
 add chain=forward action=log log-prefix=RESIDUE \
     comment="audit: log whatever still reaches the blanket accept" \
     place-before=[find comment~"BLANKET ACCEPT"]
+
+# ---------- The cleanup itself ----------
+# Once the rules above account for everything, this is the whole change. It is
+# a disable rather than a remove on purpose: reverting is one command, and the
+# evidence behind it is a night and a morning, not a full week.
+#
+#   revert:  /ip firewall filter set [find comment~"BLANKET ACCEPT"] disabled=no
+set [find comment~"BLANKET ACCEPT"] disabled=yes
 
 # ---------- Reading it ----------
 #   /ip firewall filter print stats where chain=forward
