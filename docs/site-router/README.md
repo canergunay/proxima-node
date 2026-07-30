@@ -188,7 +188,17 @@ In WinBox, click **Files** in the left menu. Drag all six `svr-*.rsc` files from
 your laptop into that window. They appear in the list. Leave `caps/` alone for
 now — those come later, when the access points are adopted.
 
-### Stage 1 — addresses, DHCP, DNS, clock, failsafe
+### Stage 1 — addresses, DHCP, DNS, clock
+
+**LAN clients do not go through Proxima.** DHCP hands out the router as gateway
+and resolver. Only ProximaVPN (wg1) clients are proxied at a site; ERG is the
+only location where the whole network runs through DNS Mode, and ERG is not
+built from these files.
+
+Stage 1 carries a commented-out DHCP failsafe for a site that *does* want the
+ERG model. Leave it commented unless that is a deliberate choice — it is not
+neutral. Enabled, it switches the entire LAN onto Proxima the moment a box
+answers at `.121`, and logs a line that reads like correct operation.
 
 Open **New Terminal** and paste:
 
@@ -310,9 +320,9 @@ Four replies means the tunnel is up and the router is remotely manageable.
    connected, nothing reachable" means this line is missing.
 5. The upstream connection blocks outbound UDP 51820.
 
-**Netwatch has a 5-minute startup delay after boot.** Right after a reboot the
-failsafe reports `status=unknown` and does nothing. That is normal — it avoids
-flapping while the network settles.
+**Netwatch has a 5-minute startup delay after boot.** Right after a reboot it
+reports `status=unknown` and does nothing. That is normal — it avoids flapping
+while the network settles.
 
 ---
 

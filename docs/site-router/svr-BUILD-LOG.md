@@ -35,12 +35,12 @@ Captured live from the router 2026-07-29 19:00, over the management tunnel.
 
 - **Call-home tunnel** — handshake confirmed from both sides; ERG pings
   `10.13.13.11` at ~6.5 ms. Survived a cold reboot unaided.
-- **Netwatch failsafe, both directions** — verified by test *and* in production:
-  after the reboot, `proxima-dhcp-failover` fired on its own
-  (`run-count=1`, `18:59:11`) and DHCP now hands out `.1` because `.121` does
-  not exist yet. The restore direction was proven earlier by temporarily adding
-  `192.168.78.121` to the router: netwatch went `up`, `proxima-dhcp-restore`
-  ran, DHCP returned to `.121`.
+- **Netwatch failsafe, both directions** — verified by test *and* in production
+  (failover fired on its own after the reboot, `run-count=1` at `18:59:11`;
+  restore proven by temporarily adding `192.168.78.121` to the router).
+  **Since removed from the active config — see "Reversed decision" below.** The
+  verification still stands, and is why the commented block in stage 1 can be
+  trusted if a site ever needs it.
 - **Reboot survival** — cold power cycle: NTP corrected the clock within a
   minute, the WireGuard tunnel re-established itself, all config persisted.
 - **CAPsMAN with a real access point** — `svr-cap-01` adopted, both radios
@@ -49,6 +49,42 @@ Captured live from the router 2026-07-29 19:00, over the management tunnel.
   DNS Mode handoff SHV never actually implemented.
 
 ---
+
+## Reversed decision — LAN clients do not go through Proxima
+
+**2026-07-30, confirmed with Can.** Stage 1 originally handed out
+`gateway=192.168.78.121 dns-server=192.168.78.121`, putting every LAN device at
+the site through the Proxima box. That was wrong.
+
+Only ProximaVPN (wg1) clients are proxied at a site; the LAN reaches the
+internet directly. **ERG is the only location that runs its whole network
+through DNS Mode**, and ERG is not built from these files.
+
+The mistake was a reading error, and worth recording because it is an easy one
+to repeat: Section 10 of the infrastructure standard specifies DHCP options 3
+and 6 pointing at `.121`, and SHV does not do that — which was recorded here as
+SHV failing to implement the standard. It was a deliberate choice at SHV, not
+an omission, and the same choice applies at SVR. The document was read as
+authoritative over the deployed reality; it should have been the other way
+round, or the contradiction raised rather than resolved by assumption.
+
+What changed:
+
+- DHCP hands out `192.168.78.1` for gateway and DNS
+- The `proxima-failsafe` netwatch entry and both its scripts were removed from
+  the router and commented out in stage 1
+- `internet-monitor` stays — it watches the WAN and is unrelated to Proxima
+
+**Why the failsafe had to be removed rather than left in place.** It is not
+inert. The moment a Proxima box answers at `.121`, the up-script fires, DHCP
+switches to `.121`, and the whole LAN silently starts routing through it —
+reversing the decision with nobody touching anything. The log line reads
+`PROXIMA UP - DHCP restored to Proxima`, which looks like correct operation.
+Dead configuration is harmless; configuration that reactivates itself is not.
+
+The evening spent validating the failsafe was not wasted: it is what surfaced
+the `[find address=]` and `dont-require-permissions` traps below, both of which
+now sit in the stage files and in the README's verification table.
 
 ## Bugs found and fixed
 

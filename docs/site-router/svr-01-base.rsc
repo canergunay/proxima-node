@@ -77,12 +77,18 @@ add name=dhcp_pool0 ranges=192.168.78.10-192.168.78.30
 /ip dhcp-server
 add address-pool=dhcp_pool0 interface=bridge1 name=dhcp1 lease-time=15m authoritative=yes disabled=no
 
-# Proxima is gateway (opt 3) AND resolver (opt 6) - this is what puts LAN
-# clients into DNS Mode. SHV never did this: it defines a dns-ofc-proxima
-# option and never attaches it, so its LAN bypasses Proxima entirely.
-# Short lease so the netwatch failover below actually reaches clients.
+# The router is gateway and resolver. LAN clients do NOT go through Proxima.
+#
+# This is a decision, not an omission. Only ProximaVPN (wg1) clients are
+# proxied at a site; the LAN reaches the internet directly. ERG is the only
+# location where the whole network runs through DNS Mode, and ERG is not built
+# from these files.
+#
+# Earlier revisions of this file handed out 192.168.78.121 here, on the reading
+# that Section 10's "DHCP option 3/6 -> .121" applied to every site. It does
+# not. Confirmed with Can 2026-07-30. Do not "fix" this back.
 /ip dhcp-server network
-add address=192.168.78.0/24 gateway=192.168.78.121 dns-server=192.168.78.121 comment="LAN via Proxima (netwatch failsafe -> .1)"
+add address=192.168.78.0/24 gateway=192.168.78.1 dns-server=192.168.78.1 comment="LAN via router - Proxima is NOT the default path"
 
 ### Static leases - fill in as hardware arrives
 # NAS candidate from the SHV lease table: host "FS-SVR", 90:09:D0:91:62:DD
@@ -90,42 +96,54 @@ add address=192.168.78.0/24 gateway=192.168.78.121 dns-server=192.168.78.121 com
 # /ip dhcp-server lease add address=192.168.78.122 mac-address=90:09:D0:91:62:DD server=dhcp1 comment="Synology DS725+"
 # /ip dhcp-server lease add address=192.168.78.121 mac-address=<M70Q_MAC> server=dhcp1 comment="Proxima box"
 
-# ---------- Netwatch failsafe ----------
-# Scripts carry explicit policy AND dont-require-permissions=yes; netwatch only
-# calls them. Both are needed: with dont-require-permissions=no, netwatch calls
-# the script and nothing happens - no error, no log line, no change. Verified
-# on the bench 2026-07-28: running the same script by hand worked, netwatch
-# firing it did not. "It works when I run it manually" proves nothing here.
-#
-# SHV has nothing equivalent: its netwatch pings 192.168.77.1 - the router
-# pinging itself, permanently up - and logs "Queue Tree Load High". It can
-# never fire.
-#
-# [find] carries NO address filter, and that is deliberate. Written as
-# [find address=192.168.78.0/24] the scripts run, log their message, and change
-# nothing: inside a script body "/" starts a command path, so the value is cut
-# at 192.168.78.0, the filter matches no record, and `set` on an empty list is
-# a silent no-op. Caught on the bench 2026-07-28 - the failsafe looked healthy
-# (netwatch status=down, log line present) while doing absolutely nothing.
-# There is only ever one DHCP network on this router, so no filter is needed.
-# If a second one is ever added, filter by comment - never by an unquoted
-# address prefix.
-/system script
-add name=proxima-dhcp-failover dont-require-permissions=yes policy=read,write,test,policy \
-    source="/ip dhcp-server network set [find] gateway=192.168.78.1 dns-server=192.168.78.1; :log warning \"PROXIMA DOWN - DHCP handed back to router\";"
-add name=proxima-dhcp-restore dont-require-permissions=yes policy=read,write,test,policy \
-    source="/ip dhcp-server network set [find] gateway=192.168.78.121 dns-server=192.168.78.121; :log warning \"PROXIMA UP - DHCP restored to Proxima\";"
-
+# ---------- Netwatch ----------
 /tool netwatch
-add comment=proxima-failsafe host=192.168.78.121 interval=30s timeout=3s type=simple disabled=no \
-    down-script="/system script run proxima-dhcp-failover" \
-    up-script="/system script run proxima-dhcp-restore"
 add comment=internet-monitor host=8.8.8.8 interval=30s type=simple disabled=no \
     down-script=":log warning \"WAN DOWN detected\"" \
     up-script=":log warning \"WAN UP recovered\""
 
-# Known limit: this is an ICMP test. If the box is alive but dnsmasq is dead,
-# it will not fire. It catches a dead box, not a sick one.
+# =============================================================
+# OPTIONAL - Proxima DHCP failsafe. NOT enabled, and not a default.
+#
+# Only for a site that deliberately routes its WHOLE LAN through Proxima, the
+# way ERG does. It hands DHCP to .121 while the Proxima box answers and back to
+# the router when it stops. Enabling it changes the site's default data path.
+#
+# DO NOT enable it "just in case". It is not neutral: the moment a Proxima box
+# appears at .121 the up-script fires, DHCP switches to .121, and the entire
+# LAN silently starts routing through it. The log says
+# "PROXIMA UP - DHCP restored to Proxima" and looks like correct operation.
+#
+# If you do enable it, the DHCP network above must also start at .121, or the
+# two disagree and the first netwatch transition decides which one wins.
+#
+# Two RouterOS traps are baked into what follows. Both cost an evening to find
+# and both are invisible - see the README's "rule that reads correctly and does
+# nothing" table:
+#
+#  1. dont-require-permissions=yes is REQUIRED. With =no, netwatch calls the
+#     script and nothing happens: no error, no log, run-count stays 0. The same
+#     script run by hand works perfectly, so manual testing proves nothing.
+#  2. [find] carries NO address filter, deliberately. Written as
+#     [find address=192.168.78.0/24] the scripts run, log their message and
+#     change nothing - inside a script body "/" starts a command path, the
+#     value is cut at 192.168.78.0, and `set` on an empty list is a silent
+#     no-op. Filter by comment if a second DHCP network ever exists.
+#
+# /system script
+# add name=proxima-dhcp-failover dont-require-permissions=yes policy=read,write,test,policy \
+#     source="/ip dhcp-server network set [find] gateway=192.168.78.1 dns-server=192.168.78.1; :log warning \"PROXIMA DOWN - DHCP handed back to router\";"
+# add name=proxima-dhcp-restore dont-require-permissions=yes policy=read,write,test,policy \
+#     source="/ip dhcp-server network set [find] gateway=192.168.78.121 dns-server=192.168.78.121; :log warning \"PROXIMA UP - DHCP restored to Proxima\";"
+#
+# /tool netwatch
+# add comment=proxima-failsafe host=192.168.78.121 interval=30s timeout=3s type=simple disabled=no \
+#     down-script="/system script run proxima-dhcp-failover" \
+#     up-script="/system script run proxima-dhcp-restore"
+#
+# Known limit if enabled: it is an ICMP test. A box that is alive but whose
+# dnsmasq is dead will not trigger it. It catches a dead box, not a sick one.
+# =============================================================
 
 # ---------- DNS ----------
 # LAN clients resolve at .121 (Proxima dnsmasq). These entries serve the router
