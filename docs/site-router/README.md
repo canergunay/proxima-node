@@ -435,37 +435,37 @@ Run it on site, once the line is installed and measured.
 
 ---
 
-## 8a-pre. Remove the temporary interconnect rule
-
-Added during the bench build so the access points could be configured remotely
-from ERG. It has no purpose once the kit ships, and it widens the interconnect
-beyond the NAS — which is the exposure that was deliberately narrowed.
-
-```
-/ip firewall filter remove [find comment~"TEMPORARY - ERG manages cAPs"]
-```
-
-Confirm the forward chain is back to NAS-only:
+## 8a-pre. Confirm the management plane rule — it stays
 
 ```
 /ip firewall filter print where chain=forward
 ```
 
-Expected afterwards: `interconnect - the NAS, and nothing else`
-(`dst-address=192.168.78.122`) and no rule matching a range.
+Two interconnect rules should be present, and both are intended to ship:
 
-The rule is scoped by **both** source (`10.10.10.2`, the ERG box) and
-destination (`192.168.78.10-39`, the DHCP pool a factory access point lands in
-plus the range it ends up on once adopted).
+| Comment | Matches | Purpose |
+|---|---|---|
+| `interconnect - the NAS, and nothing else` | `dst-address=192.168.78.122` | other sites reach this site's NAS |
+| `management plane via ERG - full access to this site` | `src-address=10.10.10.2` | ERG manages every device here |
 
-It did not start that way. Source-based rules could not match on a spoke at
-first, because the hub masqueraded everything leaving the tunnel and every
-packet arrived from `10.10.10.0` whoever sent it. That has been **fixed** at
-the hub — site-bound traffic keeps its real source now — and the same fix
-repaired something worse: while it was in place, nothing *behind* a site router
-was reachable from the hub at all. Requests arrived and were accepted, replies
-addressed back to `10.10.10.0` could not cross the tunnel, and no drop counter
-moved anywhere. See `shv-hub-interconnect.rsc`.
+**The second rule is permanent — do not remove it.** It began as a temporary
+bench rule scoped to the access-point range, and was deliberately widened and
+made permanent (decision confirmed 2026-07-31). ERG can reach every device at
+the site by its local address: access points, the NAS, the Proxima box, and
+anything a user plugs in.
+
+That is a real exposure and worth stating plainly: anyone who controls ERG
+controls this site's LAN. It is accepted because ERG is already the management
+hub and because central site management needs it. Narrowing it later means
+adding a `dst-address` back — a one-line change, not a redesign.
+
+Source matching works here only because the hub was fixed. It masqueraded
+everything leaving the tunnel, so every packet arrived from `10.10.10.0`
+whoever sent it, and a `src-address=10.10.10.2` rule matched nothing. The same
+masquerade also broke something worse: nothing *behind* a site router was
+reachable from the hub at all — requests arrived and were accepted, replies
+addressed to `10.10.10.0` could not cross the tunnel, and no drop counter moved
+anywhere. See `shv-hub-interconnect.rsc`.
 
 Verify by counter, never by reading — see "Verifying rules" below.
 
