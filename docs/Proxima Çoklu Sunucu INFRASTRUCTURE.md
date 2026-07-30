@@ -264,6 +264,7 @@ olması gerektiği gibi gösterir.
 | `move [find …] destination=N` | sessiz no-op; `numbers=` ile de |
 | Bir arayüzü silip yeniden yaratmak | ateş duvarı kuralları arayüze **isimle değil dahili ID ile** bağlanır; eski ID'ye bakan her kural `I` (invalid) olur, listede neredeyse normal görünür, tek işaret gözden kaçan bir `;;; no interface` satırıdır |
 | Arayüzü silmek peer'ını **silmez** | peer hayatta kalır, sonraki `add` "entry with this name already exists" ile düşer, `/import` orada durur ve dosyanın geri kalanı hiç çalışmaz |
+| Çapasız `remove [find comment~"..."]` | desen beklenenden fazlasına uyar. `~"management network"` ifadesi **`input: emergency management network`** kuralını da sildi ve sahanın acil erişimi kapandı. Bu, aynı hatanın **ikinci** tekrarı (ilki `~"interconnect"`). Kural: kaldırma desenleri daima `^` ile çapalanır ve silinecek liste **önce `print` ile görülür** |
 
 **Doğrulama config okunarak değil, sayaçla yapılır:**
 `/ip firewall filter print stats`, `/system script print` (`run-count`),
@@ -597,9 +598,32 @@ koruduğu şey aynı yerde kalır.
 | Şantiye LAN'ları | yalnızca NAS `192.168.77.10`, gerisi drop |
 | Şantiye LAN'ları → ERG | yalnızca kutu `192.168.2.91`, ev LAN'ı drop |
 
-**Şantiye router'ları:** interconnect'ten gelen trafik **yalnızca NAS'a**
-ulaşır, başka hiçbir şeye. Router'ın kendisi input zinciriyle erişilebilir
-kalır — kendisine giden paket forward'a hiç uğramaz, kural gerekmez.
+**Şantiye router'ları:** şantiye *kullanıcılarından* gelen trafik **yalnızca
+NAS'a** ulaşır. Router'ın kendisi input zinciriyle erişilebilir kalır —
+kendisine giden paket forward'a hiç uğramaz.
+
+### Yönetim düzlemi — `10.13.13.0/24` her sahanın her cihazına
+
+Karar (2026-07-30): **yönetim ağında olmak yetkinin kendisidir.** O ağdaki
+bir cihaz, her şantiyenin her cihazına, cihazın **kendi yerel adresiyle**
+erişir — `192.168.78.1` router, `192.168.78.121` Linux sunucu,
+`192.168.78.30` erişim noktası. Yönetici ayrı bir adres uzayı öğrenmez.
+ERG kapsam dışıdır (Keenetic'in arkasında, ayrı iş).
+
+**ERG, bu trafiği interconnect'e sokarken `10.10.10.2`'ye çevirir**
+(`/etc/ufw/before.rules` içindeki `*nat` bloğunda kalıcı SNAT). Zorunlu,
+çünkü saha `10.13.13.0/24`'e dönemez: şantiye router'ı o ağı **kendi
+call-home tünelinden connected rota** olarak bilir ve hiçbir statik rota
+onu yenemez; ERG de o peer'da yalnızca `10.13.13.11` kaynağını kabul eder.
+Dönüş paketleri WireGuard tarafından, hiçbir yere log düşmeden düşerdi.
+
+Bunun doğrudan sonucu: **saha router'ındaki yönetim kuralı `10.10.10.2`'yi
+eşleştirir, `10.13.13.0/24`'ü değil.** İkincisi yazılırsa kural sonsuza
+kadar sıfırda kalır. Bir saat boyunca öyle kaldı.
+
+Bedeli: saha logları yöneticiyi tek tek değil `10.10.10.2` olarak görür.
+Yönetim düzlemi küçük ve zaten tek bir güvenilen kaynak olarak tanımlı
+olduğu için kabul edildi.
 
 **Hub'ın örtülü maskelemesi kapatıldı — ve bu bir kolaylık değil, bir
 arıza düzeltmesiydi.** SHV'de matcher'sız bir

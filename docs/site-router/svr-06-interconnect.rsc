@@ -45,6 +45,7 @@
 /ip firewall filter
 remove [find comment~"^input: site interconnect"]
 remove [find comment~"^forward: interconnect"]
+remove [find comment~"^forward: management plane"]
 /ip route
 remove [find comment~"via SHV hub"]
 # The peer is removed explicitly. Deleting a WireGuard interface does NOT
@@ -144,6 +145,21 @@ add chain=input action=accept in-interface=bc-shv src-address=192.168.2.0/24 \
 # audits. If remote access to the cAPs is wanted, add it as ONE rule scoped
 # to a single host and say so in its comment - deliberate and auditable,
 # rather than convenient and invisible.
+# The management plane: every device on this site, by its own local address,
+# for whoever is on the management VPN. Membership of that VPN is the
+# authorisation - that is the decision, so this is not a per-host list.
+#
+# It matches 10.10.10.2 rather than 10.13.13.0/24 because ERG rewrites the
+# source as the traffic enters the interconnect, and it has to: a site cannot
+# route 10.13.13.0/24 back. This router reaches that network over its OWN
+# call-home tunnel as a connected route, which no static route can beat, and
+# ERG only accepts 10.13.13.11 as a source on that peer - so replies would be
+# dropped by WireGuard with nothing logged anywhere. A rule written against
+# 10.13.13.0/24 here sits at zero forever. One was, for an hour.
+add chain=forward action=accept in-interface=bc-shv src-address=10.10.10.2 \
+    comment="forward: management plane via ERG - full access to this site" \
+    place-before=[find comment="forward: drop everything else"]
+
 add chain=forward action=accept in-interface=bc-shv dst-address=192.168.78.122 \
     comment="forward: interconnect - the NAS, and nothing else" \
     place-before=[find comment="forward: drop everything else"]
