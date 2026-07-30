@@ -324,16 +324,23 @@ Envanter (2026-07-19, `ip addr` + `wg show` ile doğrulandı):
 
   | Adres | Kime |
   |---|---|
-  | `10.10.10.0` | SHV — hub (nonstandart .0, çalışıyor, **dokunulmaz**) |
+  | `10.10.10.1` | SHV — hub |
   | `10.10.10.2` | ERG `wg-bcshv` |
   | `10.10.10.3` | kişisel erişim peer'ı |
   | `10.10.10.10+` | **şantiye router'ları** (SVR `.10`) |
 
-  Hub'ın `.0` adresi bir yan etki üretir: RouterOS bir ağ adresini
-  next-hop olarak çözmeyi reddeder, dolayısıyla spoke tarafında
-  `gateway=10.10.10.0` yazılan rotalar **sessizce Inactive** kalır —
-  kabul edilir, listelenir, işlemez. Spoke'lar `gateway=<wg-arayüzü>`
-  kullanır. Hub tarafında `gateway=10.10.10.<N>` sorunsuzdur.
+  **Hub 2026-07-30'da `.0`'dan `.1`'e taşındı.** Eski adres bir ağ
+  adresiydi ve dört ayrı sessiz arızanın ortak sebebi oldu: spoke'ta
+  `gateway=10.10.10.0` yazılan rotalar kabul edilip **Inactive** kalıyordu;
+  hub o adrese maskelediği için spoke'ta kaynak-tabanlı kural hiç
+  eşleşmiyordu; ve o adrese dönen cevaplar tünele geri geçemediği için
+  şantiye router'ının arkasındaki hiçbir cihaza ulaşılamıyordu.
+
+  Taşıma tek taraflıydı: ERG ve SVR'nin peer'ları zaten `10.10.10.0/24`
+  aralığını taşıdığı için **hiçbirine dokunulmadı.** Önce `.1` eklendi,
+  doğrulandı, sonra `.0` kaldırıldı. Rotalarda hâlâ `gateway=<wg-arayüzü>`
+  kullanılır — WireGuard için zaten doğru deyim, ve artık `.1` ile
+  `gateway=10.10.10.1` de çalışır.
 - `10.13.x` — **acil durum yönetim ağı** (`10.13.13.0/24`). Bu blok
   2026-07-19 envanterinde "ERG wg0 legacy yedek tüneli (ERG↔OFC)" olarak
   kaydedilmişti; **kayıt yanlıştı**. 2026-07-27'de doğrulandı: ERG'de

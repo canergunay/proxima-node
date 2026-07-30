@@ -99,12 +99,14 @@ add interface=bc-shv name=shv-hub \
 # (192.168.2.91) rather than a tunnel address. Deploying to ERG from a
 # site must not require opening a VPN client.
 #
-# gateway IS THE INTERFACE, not the hub's address. The hub sits on
-# 10.10.10.0 - a legacy choice that works for it but is a network address,
-# and RouterOS refuses to resolve a next-hop to one. Written as
-# gateway=10.10.10.0 these two routes are accepted, printed, and marked
-# Inactive, so traffic quietly takes whatever other path exists and
-# everything looks fine until you check the flags. Pointing at the
+# gateway IS THE INTERFACE, not the hub's address - the right idiom for a
+# WireGuard link, and it stays correct whatever the hub is numbered.
+#
+# It used to be the only thing that worked. The hub sat on 10.10.10.0 until
+# 2026-07-30, a network address, and RouterOS refuses to resolve a next-hop to
+# one: written as gateway=10.10.10.0 these two routes were accepted, printed,
+# and marked Inactive, so traffic quietly took whatever other path existed and
+# everything looked fine until you checked the flags. Pointing at the
 # interface sidesteps it entirely and is the right idiom for WireGuard
 # anyway. From the hub side, gateway=10.10.10.<N> is fine - the asymmetry
 # is only about that one .0 address.

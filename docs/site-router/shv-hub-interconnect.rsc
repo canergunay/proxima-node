@@ -154,9 +154,11 @@ add chain=srcnat action=accept dst-address=192.168.64.0/18 \
 # reverse. That is what makes a site behind CGNAT or a renumbering ISP
 # work with no DSTNAT and nothing to update when its address changes.
 #
-# Note the asymmetry with the site side, which must use gateway=bc-shv
-# rather than the hub's address: this hub sits on 10.10.10.0, and RouterOS
-# refuses a network address as a next-hop, leaving such routes Inactive
-# without complaint. From here, pointing at 10.10.10.<N> is fine.
+# The site side uses gateway=bc-shv rather than this hub's address. That is
+# the right idiom for a WireGuard link regardless, but it also used to be the
+# only thing that worked: this hub sat on 10.10.10.0 until 2026-07-30, and
+# RouterOS refuses a network address as a next-hop, leaving such routes
+# Inactive without complaint. The hub is 10.10.10.1 now. From here, pointing
+# at 10.10.10.<N> is fine and always was.
 
 :log warning "HUB INTERCONNECT POLICY applied"
