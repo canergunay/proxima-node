@@ -156,7 +156,12 @@ add chain=input action=accept in-interface=bc-shv src-address=192.168.2.0/24 \
 # ERG only accepts 10.13.13.11 as a source on that peer - so replies would be
 # dropped by WireGuard with nothing logged anywhere. A rule written against
 # 10.13.13.0/24 here sits at zero forever. One was, for an hour.
-add chain=forward action=accept in-interface=bc-shv src-address=10.10.10.2 \
+# The range covers the ERG box (.2) and the admin's own interconnect peer (.3).
+# The second one is not redundant: wg-easy's rendezvous is ERG, so if ERG is
+# down the management VPN is down with it - and .3 still reaches the office and,
+# through the hub, this site, because the interconnect does not involve ERG at
+# all. It is the break-glass path, and it only works if it is complete.
+add chain=forward action=accept in-interface=bc-shv src-address=10.10.10.2-10.10.10.3 \
     comment="forward: management plane via ERG - full access to this site" \
     place-before=[find comment="forward: drop everything else"]
 

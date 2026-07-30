@@ -851,7 +851,7 @@ Yol: ERG bu trafiği interconnect'e sokarken `10.10.10.2`'ye çevirir (Bölüm 1
 | Kaynak | Erişim | Doğrulama |
 |---|---|---|
 | ERG kutusu `10.10.10.2` | tüm ofis LAN'ı, tüm SVR LAN'ı | trafikle |
-| Kişisel peer `10.10.10.3` | tüm ofis LAN'ı; **SVR LAN'ına erişemez** | kuraldan |
+| Kişisel peer `10.10.10.3` | tüm ofis LAN'ı **ve** tüm saha LAN'ları | kuraldan |
 | Ofis LAN `192.168.77.x` | SVR sahasında yalnızca NAS `192.168.78.122` | kuraldan |
 | Şantiye LAN `192.168.78.x` | ofiste yalnızca NAS `192.168.77.10`; ERG'de yalnızca kutu `192.168.2.91` | trafikle + drop sayacıyla |
 
@@ -880,8 +880,11 @@ erişimi MikroTik değil, sahanın Proxima kutusundaki kurallar belirler.
 
 ### Bilinen tutarsızlıklar
 
-- `10.10.10.3` ofise tam, SVR'ye hiç erişiyor — ya yönetim ağına taşınmalı ya
-  da saha kuralına eklenmeli.
+- ~~`10.10.10.3` ofise tam, SVR'ye hiç erişiyor~~ — **kapatıldı 2026-07-31.**
+  Saha kuralı `10.10.10.2/31` oldu. Silmek yerine tamamlandı, çünkü wg-easy'nin
+  buluşma noktası ERG: **ERG düşerse yönetim VPN'i de düşer** ve o anda
+  interconnect üzerinden giren tek yol bu peer kalır. Acil durum yolu, ancak
+  eksiksizse acil durum yoludur.
 - Şantiyeler ERG'de yalnızca kutuya ulaşabilirken ofis LAN'ı için böyle bir
   sınır yok. Bilinçli bir karar değil, eski bir kuraldan geliyor.
 - SHV'nin input zincirinde default drop yok ve `2210/tcp` her yerden açık;
