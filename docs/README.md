@@ -18,7 +18,8 @@ The Bureau Construction site infrastructure — the standard, the subnet
 registry, the MikroTik build runbook and its `.rsc` stage files, the
 interconnect and the access matrix — **left this repository on 2026-07-31**.
 
-It is now at **[canergunay/bc-network](https://github.com/canergunay/bc-network)**,
+It is now at
+**[bureau-construction/bc-network](https://github.com/bureau-construction/bc-network)**,
 with its commit history.
 
 | Was | Now |
