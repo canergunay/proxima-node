@@ -8,6 +8,7 @@ import LanIcon from "@mui/icons-material/Lan";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import SystemUpdateAltIcon from "@mui/icons-material/SystemUpdateAlt";
 import { useTranslation } from "react-i18next";
 import type { VpnServer, ProximaSlotSummary, ServiceStatus } from "../api/types";
 
@@ -73,6 +74,7 @@ interface Props {
   server: VpnServer;
   /** Revision ADM would deploy now; null while unknown. */
   sourceRevision?: { commit: string; short: string } | null;
+  onUpdate?: () => void;
   onClick: () => void;
   onEdit: () => void;
   onServices: () => void;
@@ -106,7 +108,7 @@ function slotDotColor(ipOk: boolean | null | undefined): string {
   return "#616161";
 }
 
-export default function VpnServerCard({ server, sourceRevision, onClick, onEdit, onServices, onDelete }: Props) {
+export default function VpnServerCard({ server, sourceRevision, onClick, onEdit, onServices, onDelete, onUpdate }: Props) {
   const { t } = useTranslation();
   const status = server.proxima_status;
   const isOnline = server.online;
@@ -315,8 +317,24 @@ export default function VpnServerCard({ server, sourceRevision, onClick, onEdit,
                 {!status.version ? (
                   <Chip size="small" variant="outlined" label={t("vpnServer.unmanaged")} />
                 ) : sourceRevision && status.version.commit !== sourceRevision.commit ? (
-                  <Tooltip title={t("vpnServer.revision", { short: status.version.short })}>
-                    <Chip size="small" color="warning" label={t("vpnServer.updateAvailable")} />
+                  // Clickable, because a badge that only announces a problem
+                  // leaves no way to act on it: the deploy endpoint existed
+                  // with nothing in the UI calling it, so "Update available"
+                  // was a dead end.
+                  <Tooltip
+                    title={t("vpnServer.updateTo", {
+                      from: status.version.short,
+                      to: sourceRevision.short,
+                    })}
+                  >
+                    <Chip
+                      size="small"
+                      color="warning"
+                      clickable={!!onUpdate}
+                      icon={<SystemUpdateAltIcon />}
+                      label={t("vpnServer.updateAvailable")}
+                      onClick={onUpdate ? (e) => { e.stopPropagation(); onUpdate(); } : undefined}
+                    />
                   </Tooltip>
                 ) : (
                   <Tooltip title={t("vpnServer.revision", { short: status.version.short })}>

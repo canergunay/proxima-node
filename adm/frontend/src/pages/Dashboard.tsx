@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Box, Button, Grid2 as Grid, Typography, CircularProgress, Tabs, Tab,
+  Dialog, DialogTitle, DialogContent, DialogActions, Alert,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -17,6 +18,7 @@ import ServiceInventoryDialog from "../components/ServiceInventoryDialog";
 import VpnServerDetailDialog from "../components/VpnServerDetailDialog";
 import MonitoringTab from "../components/MonitoringTab";
 import VpnUsersTab from "../components/VpnUsersTab";
+import OutputViewer from "../components/OutputViewer";
 
 export default function Dashboard({ role }: { role: AdminRole }) {
   const { t } = useTranslation();
@@ -43,6 +45,10 @@ export default function Dashboard({ role }: { role: AdminRole }) {
   const [servicesFor, setServicesFor] = useState<VpnServer | null>(null);
   const [sourceRevision, setSourceRevision] = useState<SourceRevision | null>(null);
   const [selectedVpn, setSelectedVpn] = useState<VpnServer | null>(null);
+  const [updatingVpn, setUpdatingVpn] = useState<VpnServer | null>(null);
+  const [updateOpId, setUpdateOpId] = useState<number | null>(null);
+  const [updateOp, setUpdateOp] = useState<{ status: string; output?: string } | null>(null);
+  const [updateError, setUpdateError] = useState("");
 
   const fetchServers = useCallback(async () => {
     try {
@@ -64,6 +70,44 @@ export default function Dashboard({ role }: { role: AdminRole }) {
     } catch { /* handled by interceptor */ }
     setVpnLoading(false);
   }, [isSuperadmin]);
+
+  // Deploy the current source onto a server the badge says is behind. The
+  // endpoint has existed all along; nothing in the UI called it, so "update
+  // available" was a statement with no matching action and sites stayed behind.
+  const startVpnUpdate = useCallback(async (server: VpnServer) => {
+    setUpdatingVpn(server);
+    setUpdateOp(null);
+    setUpdateOpId(null);
+    setUpdateError("");
+    try {
+      const { data } = await api.post(`/vpn-servers/${server.id}/update`, {});
+      if (data.ok) setUpdateOpId(data.data.operation_id);
+      else setUpdateError(data.error || t("common.error"));
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })
+        ?.response?.data?.error;
+      setUpdateError(msg || t("common.error"));
+    }
+  }, [t]);
+
+  // Poll until the deploy stops running, then re-read the servers so the badge
+  // shows what actually landed rather than what was asked for.
+  useEffect(() => {
+    if (!updateOpId) return;
+    const interval = setInterval(async () => {
+      try {
+        const { data } = await api.get(`/operations/${updateOpId}`);
+        if (data.ok) {
+          setUpdateOp(data.data);
+          if (data.data.status !== "running") {
+            clearInterval(interval);
+            fetchVpnServers();
+          }
+        }
+      } catch { /* ignore */ }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [updateOpId, fetchVpnServers]);
 
   // Fetch exit servers on mount + polling
   useEffect(() => {
@@ -214,11 +258,57 @@ export default function Dashboard({ role }: { role: AdminRole }) {
                     onEdit={() => setSelectedVpn(server)}
                     onServices={() => setServicesFor(server)}
                     onDelete={() => setSelectedVpn(server)}
+                    onUpdate={isSuperadmin ? () => startVpnUpdate(server) : undefined}
                   />
                 </Grid>
               ))}
             </Grid>
           )}
+
+          <Dialog
+            open={!!updatingVpn}
+            onClose={() => {
+              // Closing mid-deploy would only hide it: the operation keeps
+              // running on the server either way, so say so rather than
+              // pretending the dialog is the deploy.
+              if (updateOp?.status === "running") return;
+              setUpdatingVpn(null);
+              setUpdateOpId(null);
+              setUpdateOp(null);
+              setUpdateError("");
+            }}
+            fullWidth
+            maxWidth="md"
+          >
+            <DialogTitle>
+              {t("vpnServer.updateTitle", { name: updatingVpn?.display_name ?? "" })}
+            </DialogTitle>
+            <DialogContent>
+              {updateError && <Alert severity="error" sx={{ mb: 2 }}>{updateError}</Alert>}
+              {!updateError && !updateOp && (
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 2 }}>
+                  <CircularProgress size={18} />
+                  <Typography variant="body2">{t("vpnServer.updateStarting")}</Typography>
+                </Box>
+              )}
+              {updateOp && (
+                <OutputViewer output={updateOp.output || ""} status={updateOp.status} />
+              )}
+            </DialogContent>
+            <DialogActions>
+              <Button
+                disabled={updateOp?.status === "running"}
+                onClick={() => {
+                  setUpdatingVpn(null);
+                  setUpdateOpId(null);
+                  setUpdateOp(null);
+                  setUpdateError("");
+                }}
+              >
+                {t("common.close")}
+              </Button>
+            </DialogActions>
+          </Dialog>
 
           <ServiceInventoryDialog
         open={!!servicesFor}

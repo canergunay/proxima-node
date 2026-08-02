@@ -26,10 +26,12 @@ _stop = threading.Event()
 _cooldowns: dict[tuple[int, str], float] = {}  # (server_id, alert_type) -> last_sent_ts
 _active_alerts: set[tuple[int, str]] = set()  # alerts currently firing
 _last_cleanup: float = 0.0
+_last_source_refresh: float = 0.0
 
 POLL_INTERVAL = 300  # 5 minutes
 COOLDOWN_SECONDS = 3600  # 1 hour between same alerts
 CLEANUP_INTERVAL = 86400  # daily cleanup
+SOURCE_REFRESH_INTERVAL = 3600  # hourly: keep the drift comparison honest
 
 # A metric must fall this far below its threshold before we call it recovered,
 # otherwise a value hovering on the threshold alternates alert/recovery forever.
@@ -59,9 +61,40 @@ def _loop() -> None:
             _maybe_cleanup()
             _reconcile_vpn_passwords()
             _retry_panel_access()
+            _maybe_refresh_source()
         except Exception:
             log.exception("Scheduler error")
         _stop.wait(timeout=POLL_INTERVAL)
+
+
+def _maybe_refresh_source() -> None:
+    """Keep the checkout ADM compares sites against up to date.
+
+    Every site's "up to date / update available" badge is decided by comparing
+    its reported revision with this checkout. Nothing else advanced it: the
+    refresh endpoint existed but had no caller anywhere — not the UI, not here
+    — so the checkout stayed wherever it was last left and the badge could only
+    ever read "up to date". Sites then froze silently, which is exactly what a
+    drift indicator is supposed to prevent. Found 2026-08-03 with SVR eight
+    commits behind and ADM reporting it current.
+
+    Failure is logged and otherwise ignored: a missed fetch means the badge is
+    briefly stale, which is the state this whole function exists to shorten,
+    and it must never take the metrics loop down with it.
+    """
+    global _last_source_refresh
+    now = time.time()
+    if now - _last_source_refresh < SOURCE_REFRESH_INTERVAL:
+        return
+    _last_source_refresh = now
+
+    from core.vpn_provision import update_source
+
+    revision, error = update_source()
+    if error:
+        log.warning(f"Source refresh failed: {error}")
+    elif revision:
+        log.info(f"Source refreshed to {revision['short']}")
 
 
 def _agent_url(server: dict) -> str:
