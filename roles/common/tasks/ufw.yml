@@ -45,6 +45,17 @@
   loop: "{{ proxima_ips | default([]) }}"
   when: proxima_ips | default([]) | length > 0
 
+# scripts/01-harden.sh used to open 3000/tcp unconditionally for an AdGuard
+# Home setup wizard that nothing installs any more. Removing the line only
+# helps new nodes, so delete the rule here too and let a re-run converge the
+# ones that already carry it.
+- name: Remove stale AdGuard web port rule
+  community.general.ufw:
+    rule: allow
+    port: "3000"
+    proto: tcp
+    delete: true
+
 - name: Enable UFW
   community.general.ufw:
     state: enabled

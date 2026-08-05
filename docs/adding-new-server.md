@@ -67,7 +67,6 @@ ss_password: "<generated>"
 ssconf_token: "<generated>"       # VPN exit only
 speedtest_api_key: "<generated>"  # VPN exit only
 agent_api_key: "<generated>"
-install_adguard: false
 ```
 
 ## Step 3: Run the Playbook

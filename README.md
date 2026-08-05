@@ -59,8 +59,7 @@ proxima-node/
 │   ├── ssconf/              # SS config distribution server
 │   ├── speedtest/           # Speed test server
 │   ├── zapret/              # Zapret DPI bypass (nfqws2)
-│   ├── proxima-agent/       # Universal management agent
-│   └── adguard/             # AdGuard Home (Docker)
+│   └── proxima-agent/       # Universal management agent
 │
 ├── playbooks/
 │   ├── site.yml             # Full site setup (all servers)
@@ -130,7 +129,6 @@ Auto-detects server type (VPN exit vs DPI bypass) and exposes type-specific endp
 │ speedtest  │  │ speedtest   │   │ proxima-agent │
 │ prx-agent  │  │ prx-agent   │   │ watchdog      │
 │ [AWG/Xray] │  │ [AWG/Xray]  │   └───────────────┘
-│ [AdGuard]  │  │             │
 └────────────┘  └─────────────┘
 ```
 

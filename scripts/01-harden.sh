@@ -73,8 +73,9 @@ SYSCTL
     ufw allow 80/udp comment "AmneziaWG" > /dev/null 2>&1
     # Xray VLESS+Reality (managed by AmneziaVPN client, default port 443/tcp)
     ufw allow 443/tcp comment "Xray VLESS Reality" > /dev/null 2>&1
-    # AdGuard Home admin panel (restricted to VPN clients later)
-    ufw allow 3000/tcp comment "AdGuard Home setup" > /dev/null 2>&1
+    # Earlier versions opened 3000/tcp for an AdGuard setup wizard that is no
+    # longer installed. Drop it so re-running this script closes the hole.
+    ufw delete allow 3000/tcp > /dev/null 2>&1
 
     ufw --force enable > /dev/null 2>&1
     log_info "UFW enabled with rules:"

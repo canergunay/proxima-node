@@ -1,7 +1,6 @@
 ---
 # Setup a VPN Exit Node
 # Roles: common → outline-ss → ssconf → proxima-agent → xray-reality
-# Optional: adguard (when install_adguard=true)
 #
 # Usage:
 #   ansible-playbook playbooks/setup-vpn-exit.yml -l erg-pl
@@ -44,10 +43,6 @@
     - role: xray-reality
       tags: [xray-reality]
 
-    - role: adguard
-      when: install_adguard | default(false) | bool
-      tags: [adguard]
-
   post_tasks:
     - name: Display setup summary
       ansible.builtin.debug:
@@ -60,7 +55,6 @@
           SS Cipher:    {{ ss_cipher }}
           ssconf URL:   https://{{ server_ip }}:{{ ssconf_port }}/{{ ssconf_token }}
           Agent URL:    https://{{ server_ip }}:{{ agent_port }}/api/info
-          AdGuard:      {{ 'installed' if (install_adguard | default(false) | bool) else 'not installed' }}
           ─────────────────────────────────────────
           Next: Install AWG/Xray via AmneziaVPN app (optional)
       tags: [always]

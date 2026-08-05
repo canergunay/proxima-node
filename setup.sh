@@ -7,7 +7,6 @@
 #   or:
 #   git clone https://github.com/canergunay/proxima-node.git && cd proxima-node && bash setup.sh
 #   or with component selection:
-#   bash setup.sh --no-adguard
 #   bash setup.sh --only harden
 #
 # Components installed:
@@ -15,9 +14,8 @@
 #   2. Outline Shadowsocks server (port 8388)
 #   3. ssconf HTTPS server (port 8390)
 #   4. Proxima speed test server (port 8999)
-#   5. AdGuard Home via Docker (port 53, 3000)
-#   6. Zapret agent (management API, port 5050)
-#   7. Zapret nfqws2 (DPI bypass, --zapret flag)
+#   5. Zapret agent (management API, port 5050)
+#   6. Zapret nfqws2 (DPI bypass, --zapret flag)
 #
 # AmneziaWG + Xray are NOT installed by this script.
 # Use the AmneziaVPN client app to set up AWG + Xray on the server.
@@ -43,7 +41,6 @@ INSTALL_HARDEN=1
 INSTALL_OUTLINE=1
 INSTALL_SSCONF=1
 INSTALL_SPEEDTEST=1
-INSTALL_ADGUARD=1
 INSTALL_ZAPRET=0
 INSTALL_ZAPRET_AGENT=0
 
@@ -64,8 +61,6 @@ banner() {
 parse_args() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --no-adguard)
-                INSTALL_ADGUARD=0; shift ;;
             --no-outline)
                 INSTALL_OUTLINE=0; INSTALL_SSCONF=0; shift ;;
             --no-speedtest)
@@ -75,13 +70,12 @@ parse_args() {
             --only)
                 # Reset all, then enable only the specified component
                 INSTALL_HARDEN=0; INSTALL_OUTLINE=0; INSTALL_SSCONF=0
-                INSTALL_SPEEDTEST=0; INSTALL_ADGUARD=0
+                INSTALL_SPEEDTEST=0
                 INSTALL_ZAPRET=0; INSTALL_ZAPRET_AGENT=0
                 case "${2:-}" in
                     harden)        INSTALL_HARDEN=1 ;;
                     outline)       INSTALL_OUTLINE=1; INSTALL_SSCONF=1 ;;
                     speedtest)     INSTALL_SPEEDTEST=1 ;;
-                    adguard)       INSTALL_ADGUARD=1 ;;
                     zapret)        INSTALL_ZAPRET=1 ;;
                     zapret-agent)  INSTALL_ZAPRET_AGENT=1 ;;
                     zapret-all)    INSTALL_ZAPRET=1; INSTALL_ZAPRET_AGENT=1 ;;
@@ -92,11 +86,10 @@ parse_args() {
                 echo "Usage: bash setup.sh [OPTIONS]"
                 echo ""
                 echo "Options:"
-                echo "  --no-adguard     Skip AdGuard Home installation"
                 echo "  --no-outline     Skip Outline SS + ssconf"
                 echo "  --no-speedtest   Skip speed test server"
                 echo "  --zapret         Include zapret (nfqws2) + agent"
-                echo "  --only <comp>    Install only: harden, outline, speedtest, adguard,"
+                echo "  --only <comp>    Install only: harden, outline, speedtest,"
                 echo "                   zapret, zapret-agent, zapret-all"
                 echo "  -h, --help       Show this help"
                 exit 0 ;;
@@ -196,13 +189,6 @@ run_setup() {
         echo ""
     fi
 
-    if [[ "${INSTALL_ADGUARD}" -eq 1 ]]; then
-        # shellcheck disable=SC1091
-        source "$INSTALL_DIR/scripts/05-adguard.sh"
-        setup_adguard
-        echo ""
-    fi
-
     if [[ "${INSTALL_ZAPRET}" -eq 1 ]]; then
         # shellcheck disable=SC1091
         source "$INSTALL_DIR/scripts/07-zapret.sh"
@@ -269,13 +255,6 @@ print_summary() {
         echo ""
     fi
 
-    if [[ "${INSTALL_ADGUARD}" -eq 1 ]]; then
-        echo -e "${BOLD}── AdGuard Home ────────────────────────────────────────${NC}"
-        echo -e "  Admin: http://${server_ip}:3000"
-        echo -e "  DNS:   ${server_ip}:53"
-        echo ""
-    fi
-
     if [[ "${INSTALL_ZAPRET}" -eq 1 ]]; then
         echo -e "${BOLD}── Zapret (nfqws2) ─────────────────────────────────────${NC}"
         echo -e "  Binary:   /opt/zapret/bin/nfqws2"
@@ -297,9 +276,6 @@ print_summary() {
     echo -e "${YELLOW}── Next Steps ──────────────────────────────────────────${NC}"
     echo -e "  1. Use AmneziaVPN client to set up AWG + Xray on this server"
     echo -e "  2. Add the SS key and speedtest credentials to your Proxima instance"
-    if [[ "${INSTALL_ADGUARD}" -eq 1 ]]; then
-        echo -e "  3. Open http://${server_ip}:3000 to complete AdGuard Home setup"
-    fi
     echo ""
     echo -e "${CYAN}  Config saved to: /opt/proxima-node/config.env${NC}"
     echo -e "${CYAN}════════════════════════════════════════════════════════════${NC}"

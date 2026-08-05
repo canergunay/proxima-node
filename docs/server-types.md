@@ -15,7 +15,6 @@ Proxima manages two types of server nodes. Each type has a dedicated Ansible pla
 | ssconf | `proxima-ssconf` | 8390/tcp | HTTPS server distributing SS config to clients |
 | speedtest | `proxima-speedtest` | 8999/tcp | HTTPS speed test (download/upload/latency) |
 | proxima-agent | `proxima-agent` | 5051/tcp | Universal management agent (HTTPS + API key) |
-| AdGuard Home | Docker `adguardhome` | 53, 3000 | DNS-level ad blocking (optional) |
 | AmneziaWG | Docker `amnezia-wg` | 80/udp | WireGuard-based VPN (installed via AmneziaVPN app) |
 | Xray VLESS | Docker `xray` | 443/tcp | VLESS proxy (installed via AmneziaVPN app) |
 
@@ -24,7 +23,7 @@ Proxima manages two types of server nodes. Each type has a dedicated Ansible pla
 ansible-playbook playbooks/setup-vpn-exit.yml -l <hostname>
 ```
 
-**Role chain:** `common` → `outline-ss` → `ssconf` → `speedtest` → `proxima-agent` → `adguard` (optional)
+**Role chain:** `common` → `outline-ss` → `ssconf` → `speedtest` → `proxima-agent` → `xray-reality`
 
 ---
 
