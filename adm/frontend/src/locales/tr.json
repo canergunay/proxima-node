@@ -383,5 +383,14 @@
   "services.missing": "Yapılandırılmış ama dinlemiyor: {{list}}. Bunlara bağlanacak istemciler başarısız olur.",
   "services.unexpected": "Dinliyor ama Proxima'nın parçası değil: {{list}}. Kutu sahaya gitmeden bilinmesi gerekir.",
   "services.notObserved": "Soket listesi okunamadı; bu yüzden burada yalnızca yapılandırmanın beklediği görünüyor, gerçekte çalışan değil.",
-  "services.unreachable": "Bu sunucuya ulaşılamadı."
+  "services.unreachable": "Bu sunucuya ulaşılamadı.",
+  "mgmt.title": "Yönetim tüneli",
+  "mgmt.explainer": "Node ADM'e dışarı doğru bağlanır; böylece yönetim, public adresine erişilebilmesine bağlı kalmaz.",
+  "mgmt.notEnrolled": "Yönetim ağında değil",
+  "mgmt.address": "Tünel adresi",
+  "mgmt.enroll": "Node'u kaydet",
+  "mgmt.reissue": "Kurulum komutunu göster",
+  "mgmt.installHint": "Bunu node üzerinde çalıştır. SSH çalışmasa bile sağlayıcı konsolu çalışır.",
+  "mgmt.installCommand": "Kurulum komutu",
+  "mgmt.failed": "Node kaydedilemedi"
 }

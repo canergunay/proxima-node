@@ -383,5 +383,14 @@
   "services.missing": "Configured but not listening: {{list}}. Clients relying on these will fail.",
   "services.unexpected": "Listening but not part of Proxima: {{list}}. Worth knowing before the box ships.",
   "services.notObserved": "The socket list could not be read, so this shows only what the configuration expects — not what is actually running.",
-  "services.unreachable": "Could not reach this server."
+  "services.unreachable": "Could not reach this server.",
+  "mgmt.title": "Management tunnel",
+  "mgmt.explainer": "The node dials out to ADM, so management no longer depends on its public address being reachable.",
+  "mgmt.notEnrolled": "Not on the management network",
+  "mgmt.address": "Tunnel address",
+  "mgmt.enroll": "Enrol node",
+  "mgmt.reissue": "Show install command",
+  "mgmt.installHint": "Run this on the node. Its provider console works even when SSH does not.",
+  "mgmt.installCommand": "Install command",
+  "mgmt.failed": "Could not enrol the node"
 }

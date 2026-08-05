@@ -15,7 +15,9 @@ import ErrorIcon from "@mui/icons-material/Error";
 import InfoIcon from "@mui/icons-material/Info";
 import { useTranslation } from "react-i18next";
 import api from "../api/client";
-import type { ServerDetail, Operation, PreflightData, VlessKeyData } from "../api/types";
+import type {
+  ServerDetail, Operation, PreflightData, VlessKeyData, MgmtTunnelData,
+} from "../api/types";
 import OutputViewer from "./OutputViewer";
 
 interface Props {
@@ -94,6 +96,9 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
   const [publicIp, setPublicIp] = useState("");
   const [publicIpSaving, setPublicIpSaving] = useState(false);
   const [publicIpSaved, setPublicIpSaved] = useState(false);
+  const [mgmt, setMgmt] = useState<MgmtTunnelData | null>(null);
+  const [mgmtLoading, setMgmtLoading] = useState(false);
+  const [mgmtError, setMgmtError] = useState("");
 
   const fetchDetail = useCallback(async () => {
     try {
@@ -111,6 +116,10 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
       setVlessKey(null);
       setVlessKeyError(false);
       setPublicIpSaved(false);
+      // The install block carries a private key — it should not still be on
+      // screen the next time this dialog is opened for another server.
+      setMgmt(null);
+      setMgmtError("");
       fetchDetail();
     }
   }, [open, fetchDetail]);
@@ -164,6 +173,28 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
     }, 2000);
     return () => clearInterval(interval);
   }, [operationId, fetchDetail, onRefresh]);
+
+  const enrollMgmtTunnel = async () => {
+    setMgmtError("");
+    setMgmtLoading(true);
+    try {
+      const { data } = await api.post(`/servers/${serverId}/mgmt-tunnel`);
+      if (data.ok) {
+        setMgmt(data.data);
+        // The address is new on first enrolment, so the chip needs the
+        // reloaded row rather than the one this dialog opened with.
+        await fetchDetail();
+      } else {
+        setMgmtError(data.error || t("mgmt.failed"));
+      }
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })
+        ?.response?.data?.error;
+      setMgmtError(msg || t("mgmt.failed"));
+    } finally {
+      setMgmtLoading(false);
+    }
+  };
 
   const runPreflight = async () => {
     if (!server) return;
@@ -527,6 +558,42 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
             </Button>
           </Box>
         </Box>
+
+        {/* Management tunnel */}
+        <Divider sx={{ my: 2 }} />
+        <Typography variant="subtitle2" gutterBottom>{t("mgmt.title")}</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+          {t("mgmt.explainer")}
+        </Typography>
+
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+          {server.callhome_ip ? (
+            <Chip size="small" color="success" variant="outlined"
+                  label={`${t("mgmt.address")}: ${server.callhome_ip}`} />
+          ) : (
+            <Chip size="small" label={t("mgmt.notEnrolled")} />
+          )}
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={enrollMgmtTunnel}
+            disabled={mgmtLoading}
+            startIcon={mgmtLoading ? <CircularProgress size={14} /> : undefined}
+          >
+            {server.callhome_ip ? t("mgmt.reissue") : t("mgmt.enroll")}
+          </Button>
+        </Box>
+
+        {mgmtError && <Alert severity="error" sx={{ mt: 1 }}>{mgmtError}</Alert>}
+
+        {mgmt && (
+          <Box sx={{ mt: 1.5 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
+              {t("mgmt.installHint")}
+            </Typography>
+            <CopyField label={t("mgmt.installCommand")} value={mgmt.install} mono />
+          </Box>
+        )}
 
         {/* Operations history */}
         {server.operations && server.operations.length > 0 && (

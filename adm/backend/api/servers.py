@@ -201,6 +201,11 @@ def get_server_detail(server_id: int):
     # Remove root password from response (security)
     result.pop("root_password_enc", None)
 
+    # The tunnel's key material has no business in a browser. The address is
+    # useful to show; the private key and PSK are not, encrypted or otherwise.
+    result.pop("callhome_privkey_enc", None)
+    result.pop("callhome_psk_enc", None)
+
     # Include recent operations
     result["operations"] = get_operations_by_server(server_id, limit=10)
 

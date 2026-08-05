@@ -41,9 +41,17 @@ export interface ServerDetail extends Server {
   ss_cipher: string;
   node_id: string | null;
   install_adguard: number;
+  callhome_ip: string | null;
   created_at: number;
   updated_at: number;
   operations: Operation[];
+}
+
+export interface MgmtTunnelData {
+  address: string;
+  interface: string;
+  config: string;
+  install: string;
 }
 
 export interface Operation {
