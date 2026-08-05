@@ -26,7 +26,15 @@ bp = Blueprint("servers", __name__)
 # ── Agent proxy helpers ──────────────────────────────────────────────────
 
 def _agent_url(server: dict) -> str:
-    return f"https://{server['ip']}:{server.get('agent_port', 5051)}"
+    """Prefer the management tunnel; fall back to the public address.
+
+    Same order the scheduler uses. Without this the dashboard would keep
+    reaching for a public port that the tunnel exists precisely to replace.
+    """
+    port = server.get("agent_port", 5051)
+    if server.get("callhome_ip"):
+        return f"https://{server['callhome_ip']}:{port}"
+    return f"https://{server['ip']}:{port}"
 
 
 def _agent_headers(server: dict) -> dict:
@@ -253,12 +261,71 @@ def delete_server_endpoint(server_id: int):
     from core.inventory_writer import remove_host_vars
     remove_host_vars(server["name"])
 
+    # Release its management address before the row goes, or the allocator
+    # keeps treating it as taken.
+    if server.get("callhome_ip"):
+        try:
+            from core.mgmt_network import forget_exit_peer
+            forget_exit_peer(server_id)
+        except Exception:
+            log.warning("Could not drop %s from the management network",
+                        server["name"], exc_info=True)
+
     delete_server(server_id)
 
     # Regenerate hosts.yml without this server
     from core.inventory_writer import write_hosts_yml
     write_hosts_yml(get_all_servers())
 
+    return jsonify({"ok": True})
+
+
+# ── Management tunnel ────────────────────────────────────────────────────
+
+@bp.post("/api/servers/<int:server_id>/mgmt-tunnel")
+def enroll_mgmt_tunnel(server_id: int):
+    """Enrol an exit node on the management network and hand back its config.
+
+    Returning the text matters as much as the enrolment. A node whose public
+    address has stopped answering cannot be reached by Ansible — which is the
+    situation that motivated this — but its provider console still works, so
+    the config has to be something a human can paste in.
+    """
+    server = get_server(server_id)
+    if not server:
+        return jsonify({"ok": False, "error": "Server not found"}), 404
+
+    from core.mgmt_network import INTERFACE, ensure_exit_peer
+    try:
+        conf, error = ensure_exit_peer(server_id)
+    except Exception as e:
+        log.exception("Management tunnel enrolment failed")
+        return jsonify({"ok": False, "error": str(e)}), 500
+    if error:
+        return jsonify({"ok": False, "error": error}), 400
+
+    server = get_server(server_id)
+    return jsonify({"ok": True, "data": {
+        "address": server["callhome_ip"],
+        "interface": INTERFACE,
+        "config": conf,
+        "install": (
+            f"cat > /etc/wireguard/{INTERFACE}.conf <<'EOF'\n{conf}EOF\n"
+            f"chmod 600 /etc/wireguard/{INTERFACE}.conf\n"
+            f"systemctl enable --now wg-quick@{INTERFACE}"
+        ),
+    }})
+
+
+@bp.delete("/api/servers/<int:server_id>/mgmt-tunnel")
+def revoke_mgmt_tunnel(server_id: int):
+    """Take an exit node off the management network."""
+    server = get_server(server_id)
+    if not server:
+        return jsonify({"ok": False, "error": "Server not found"}), 404
+
+    from core.mgmt_network import forget_exit_peer
+    forget_exit_peer(server_id)
     return jsonify({"ok": True})
 
 

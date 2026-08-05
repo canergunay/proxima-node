@@ -43,6 +43,13 @@
     - role: xray-reality
       tags: [xray-reality]
 
+    # Only when ADM passed a configuration, so a node provisioned outside ADM
+    # is left exactly as it was. Skipping the role rather than ending the host
+    # keeps the summary below running for everyone.
+    - role: mgmt-tunnel
+      when: mgmt_tunnel_conf_b64 | default("") | trim | length > 0
+      tags: [mgmt-tunnel]
+
   post_tasks:
     - name: Display setup summary
       ansible.builtin.debug:

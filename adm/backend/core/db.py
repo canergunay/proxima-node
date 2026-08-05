@@ -48,6 +48,10 @@ def init_db() -> None:
             agent_port            INTEGER NOT NULL DEFAULT 5051,
             node_id               TEXT,
             install_adguard       INTEGER NOT NULL DEFAULT 0,
+            callhome_ip           TEXT,
+            callhome_pubkey       TEXT,
+            callhome_privkey_enc  TEXT,
+            callhome_psk_enc      TEXT,
             created_at            INTEGER NOT NULL,
             updated_at            INTEGER NOT NULL
         );
@@ -337,6 +341,21 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE server_metrics ADD COLUMN cpu_pct REAL")
         conn.commit()
 
+    # Exit nodes join the management network too. Their agent is reachable on
+    # a public port today, which dies whenever the path to that IP does — and
+    # then ADM reports the node offline while the node itself is healthy.
+    # Riding the tunnel instead makes "agent unreachable" mean something.
+    server_cols = {row[1] for row in conn.execute("PRAGMA table_info(servers)").fetchall()}
+    if "callhome_ip" not in server_cols:
+        for stmt in (
+            "ALTER TABLE servers ADD COLUMN callhome_ip TEXT",
+            "ALTER TABLE servers ADD COLUMN callhome_pubkey TEXT",
+            "ALTER TABLE servers ADD COLUMN callhome_privkey_enc TEXT",
+            "ALTER TABLE servers ADD COLUMN callhome_psk_enc TEXT",
+        ):
+            conn.execute(stmt)
+        conn.commit()
+
     # alert_config migrations
     alert_cols = {row[1] for row in conn.execute("PRAGMA table_info(alert_config)").fetchall()}
     if "cpu_threshold" not in alert_cols:
@@ -435,6 +454,8 @@ def update_server(server_id: int, updates: dict) -> bool:
         "ss_port", "ss_cipher", "agent_port", "ssh_port", "node_id",
         "install_adguard",
         "vless_uuid", "vless_public_key", "vless_short_id", "vless_port",
+        "callhome_ip", "callhome_pubkey", "callhome_privkey_enc",
+        "callhome_psk_enc",
     }
     sets, vals = [], []
     for key, val in updates.items():

@@ -24,7 +24,8 @@ import subprocess
 
 from core.auth import decrypt_value, encrypt_value
 from core.config import DB_PATH
-from core.db import get_all_vpn_servers, get_vpn_server, update_vpn_server
+from core.db import (get_all_servers, get_all_vpn_servers, get_server,
+                     get_vpn_server, update_server, update_vpn_server)
 
 log = logging.getLogger("adm.mgmt_network")
 
@@ -46,6 +47,9 @@ SERVER_KEY_PATH = os.environ.get(
 
 # .1 is the interface itself; sites start after it.
 FIRST_HOST = 10
+# Exit nodes sit in their own decade, so an address says which population it
+# belongs to and the two allocators cannot hand out the same one.
+FIRST_EXIT_HOST = 100
 
 
 def _wg(*args: str, stdin: str | None = None) -> str:
@@ -81,12 +85,28 @@ def server_public_key() -> str:
 
 # ── Addressing ───────────────────────────────────────────────────────────
 
-def next_address() -> str | None:
-    """The lowest free address in the management subnet."""
+def _enrolled() -> list[dict]:
+    """Every row on the network, from both populations, tagged with its kind.
+
+    Sites and exit nodes live in different tables with the same four columns.
+    The interface does not care which is which, but the address allocator has
+    to: one subnet serves both.
+    """
+    return ([{**site, "kind": "vpn"} for site in get_all_vpn_servers()]
+            + [{**node, "kind": "exit"} for node in get_all_servers()])
+
+
+def next_address(exit_node: bool = False) -> str | None:
+    """The lowest free address in the management subnet.
+
+    Addresses taken by *either* population are excluded. Nothing else would
+    stop a site and an exit node being handed the same one on different days.
+    """
     network = ipaddress.ip_network(SUBNET, strict=True)
-    taken = {s["callhome_ip"] for s in get_all_vpn_servers() if s.get("callhome_ip")}
+    taken = {r["callhome_ip"] for r in _enrolled() if r.get("callhome_ip")}
+    floor = FIRST_EXIT_HOST if exit_node else FIRST_HOST
     for host in network.hosts():
-        if int(str(host).split(".")[-1]) < FIRST_HOST:
+        if int(str(host).split(".")[-1]) < floor:
             continue
         if str(host) not in taken:
             return str(host)
@@ -127,10 +147,10 @@ def render_conf() -> str:
         f"PostDown = iptables -D FORWARD -o {INTERFACE} -j ACCEPT",
     ]
 
-    for server in get_all_vpn_servers():
+    for server in _enrolled():
         if not (server.get("callhome_pubkey") and server.get("callhome_ip")):
             continue
-        lines += ["", f"# {server['name']}", "[Peer]",
+        lines += ["", f"# {server['name']} ({server['kind']})", "[Peer]",
                   f"PublicKey  = {server['callhome_pubkey']}"]
         psk = decrypt_value(server["callhome_psk_enc"]) if server.get("callhome_psk_enc") else None
         if psk:
@@ -230,6 +250,73 @@ def ensure_peer(vpn_server_id: int) -> tuple[str | None, str | None]:
     return config, None
 
 
+def ensure_exit_peer(server_id: int) -> tuple[str | None, str | None]:
+    """Give an exit node its place on the management network.
+
+    Same contract as ensure_peer, against the other table. Exit nodes have no
+    inbound requirement at all once this is up: the agent port can be closed
+    to the internet, which removes both the failure where a stalled scanner on
+    5051 freezes the agent and the one where a blocked route to the public
+    address makes a healthy node report as offline.
+    """
+    server = get_server(server_id)
+    if not server:
+        return None, "Exit server not found"
+
+    updates: dict = {}
+    address = server.get("callhome_ip")
+    if not address:
+        address = next_address(exit_node=True)
+        if not address:
+            return None, "No free address left in the management network"
+        updates["callhome_ip"] = address
+
+    private_key = (decrypt_value(server["callhome_privkey_enc"])
+                   if server.get("callhome_privkey_enc") else None)
+    if not private_key:
+        private_key = _wg("genkey")
+        updates["callhome_privkey_enc"] = encrypt_value(private_key)
+        updates["callhome_pubkey"] = _wg("pubkey", stdin=private_key)
+        updates["callhome_psk_enc"] = encrypt_value(_wg("genpsk"))
+
+    if updates:
+        update_server(server_id, updates)
+        server = get_server(server_id)
+        log.info(f"[MGMT] Registered exit node {server['name']} "
+                 f"at {server['callhome_ip']}")
+
+    sync()
+
+    psk = decrypt_value(server["callhome_psk_enc"]) if server.get("callhome_psk_enc") else ""
+    config = (
+        "# Managed by ADM. Install as /etc/wireguard/wg-adm.conf.\n"
+        "[Interface]\n"
+        f"PrivateKey = {decrypt_value(server['callhome_privkey_enc'])}\n"
+        f"Address    = {server['callhome_ip']}/{SUBNET.split('/')[1]}\n"
+        "\n"
+        "[Peer]\n"
+        f"PublicKey    = {server_public_key()}\n"
+        + (f"PresharedKey = {psk}\n" if psk else "")
+        # Carrying the admin range is what lets a human reach a node whose
+        # public address has stopped answering — the case this path exists for.
+        + f"AllowedIPs   = {SUBNET}, {ADMIN_NETWORK}\n"
+        f"Endpoint     = {ENDPOINT}:{LISTEN_PORT}\n"
+        # The node dials out and keeps the tunnel warm. Nothing dials in, so
+        # there is no port forward to maintain and CGNAT is not a problem.
+        "PersistentKeepalive = 25\n"
+    )
+    return config, None
+
+
+def forget_exit_peer(server_id: int) -> None:
+    """Drop an exit node from the network — its address returns to the pool."""
+    update_server(server_id, {
+        "callhome_ip": None, "callhome_pubkey": None,
+        "callhome_privkey_enc": None, "callhome_psk_enc": None,
+    })
+    sync()
+
+
 def forget_peer(vpn_server_id: int) -> None:
     """Drop a site from the network — its address returns to the pool."""
     update_vpn_server(vpn_server_id, {
@@ -262,11 +349,13 @@ def status() -> dict:
     """What the management network looks like right now."""
     seen = handshakes()
     peers = []
-    for server in get_all_vpn_servers():
+    for server in _enrolled():
         if not server.get("callhome_pubkey"):
             continue
         peers.append({
-            "vpn_server_id": server["id"],
+            "kind": server["kind"],
+            "vpn_server_id": server["id"] if server["kind"] == "vpn" else None,
+            "server_id": server["id"] if server["kind"] == "exit" else None,
             "name": server["name"],
             "display_name": server.get("display_name") or server["name"],
             "address": server.get("callhome_ip"),

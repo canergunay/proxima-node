@@ -1,0 +1,6 @@
+---
+# The management tunnel the node dials out on. ADM generates the config and
+# passes it base64-encoded; without it the role does nothing, so a play that
+# does not supply one leaves the node exactly as it was.
+mgmt_tunnel_interface: wg-adm
+mgmt_tunnel_conf_b64: ""

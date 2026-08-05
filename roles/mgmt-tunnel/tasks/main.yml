@@ -1,0 +1,47 @@
+---
+# Management rides an outbound WireGuard tunnel to ADM rather than an inbound
+# port on the node's public address.
+#
+# Two failures drove this. A stalled scanner on the public agent port froze
+# the agent for 19 hours (ERG-FI, July). Then ERG-PL's public address stopped
+# answering from Russia entirely while the box itself was healthy — 28 days of
+# uptime, every service running, and ADM reporting it offline for 14 hours,
+# because the only path ADM had was the one that broke.
+#
+# A tunnel the node dials out on needs no port forward, no inbound rule, and
+# no reachable public address. It also gives "the agent is unreachable" a
+# meaning it did not have before: the tunnel is down, rather than something
+# unknown about the network in between.
+
+- name: Install WireGuard
+  ansible.builtin.apt:
+    name: wireguard-tools
+    state: present
+    update_cache: true
+
+- name: Write the management tunnel configuration
+  ansible.builtin.copy:
+    content: "{{ mgmt_tunnel_conf_b64 | b64decode }}"
+    dest: "/etc/wireguard/{{ mgmt_tunnel_interface }}.conf"
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Restart management tunnel
+
+- name: Enable and start the management tunnel
+  ansible.builtin.systemd:
+    name: "wg-quick@{{ mgmt_tunnel_interface }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+
+# Reaching the agent over the tunnel is the point, so the rule has to exist
+# before the public one can be withdrawn. The public allow is left in place
+# here on purpose — see the note in roles/common/tasks/ufw.yml.
+- name: Allow the agent port from the management network
+  community.general.ufw:
+    rule: allow
+    port: "{{ agent_port | default(5051) }}"
+    proto: tcp
+    from_ip: "{{ mgmt_tunnel_subnet | default('10.12.12.0/24') }}"
+    comment: "proxima-agent over the management tunnel"

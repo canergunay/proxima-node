@@ -97,8 +97,32 @@ def _maybe_refresh_source() -> None:
         log.info(f"Source refreshed to {revision['short']}")
 
 
+def _agent_urls(server: dict) -> list[str]:
+    """Where to reach this server's agent, best path first.
+
+    The management tunnel comes first when the server is enrolled on it. That
+    path is obfuscated, outbound-initiated and carries no public port, so it
+    survives the two things that have actually taken agents offline: a stalled
+    scanner on the public port, and a route to the public address going dark
+    while the box itself is healthy.
+
+    The public address stays as a fallback rather than being dropped. A server
+    whose tunnel has not come up yet, or whose tunnel is the thing that broke,
+    must not become unmanageable because ADM stopped trying the old way.
+    """
+    port = server.get("agent_port", 5051)
+    urls = []
+    if server.get("callhome_ip"):
+        urls.append(f"https://{server['callhome_ip']}:{port}")
+    if server.get("ip"):
+        urls.append(f"https://{server['ip']}:{port}")
+    return urls
+
+
 def _agent_url(server: dict) -> str:
-    return f"https://{server['ip']}:{server.get('agent_port', 5051)}"
+    """The preferred URL. Kept for callers that only need one."""
+    urls = _agent_urls(server)
+    return urls[0] if urls else f"https://{server.get('ip')}:{server.get('agent_port', 5051)}"
 
 
 def _agent_headers(server: dict) -> dict:
@@ -112,10 +136,26 @@ def _agent_headers(server: dict) -> dict:
 
 
 def _poll_server(server: dict) -> dict:
-    """Poll a single server's agent for status metrics."""
+    """Poll a single server's agent for status metrics.
+
+    Tries the management tunnel first and the public address second, so a node
+    is only reported offline when *no* path to it works.
+    """
     result = {"online": False}
+    for url_base in _agent_urls(server):
+        if _poll_agent_at(url_base, server, result):
+            result["agent_path"] = (
+                "tunnel" if url_base.startswith(f"https://{server.get('callhome_ip')}:")
+                else "public"
+            )
+            break
+    return result
+
+
+def _poll_agent_at(url_base: str, server: dict, result: dict) -> bool:
+    """Fill *result* from one candidate URL. Returns True when it answered."""
     try:
-        url = _agent_url(server) + "/api/status"
+        url = url_base + "/api/status"
         resp = http_requests.get(
             url, headers=_agent_headers(server), timeout=10, verify=False
         )
@@ -147,11 +187,12 @@ def _poll_server(server: dict) -> dict:
                     1 for c in containers
                     if isinstance(c, dict) and "up" in c.get("status", "").lower()
                 )
+            return True
     except http_requests.exceptions.RequestException:
         pass
     except Exception:
-        log.debug(f"Error polling {server['name']}", exc_info=True)
-    return result
+        log.debug(f"Error polling {server['name']} at {url_base}", exc_info=True)
+    return False
 
 
 def _collect_metrics() -> None:
