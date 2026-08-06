@@ -15,10 +15,11 @@
 # A management path built on a protocol DPI recognises is a path waiting to
 # be taken away.
 #
-# The implementation is userspace on purpose. amneziawg-go is a single static
-# binary; the kernel module needs a DKMS build on every node and is already
-# on the productization fragility list. Management traffic is a few KB per
-# poll, so the performance difference does not exist here.
+# Userspace where there is no kernel module, which is every exit node. The
+# module needs a DKMS build per host and is already on the productization
+# fragility list, while amneziawg-go is one static binary and management
+# traffic is a few KB per poll. Sites already carry the module for
+# ProximaVPN's wg1, so the role detects rather than assumes.
 
 - name: Install WireGuard tools (awg-quick's dependencies)
   ansible.builtin.apt:
@@ -26,18 +27,70 @@
     state: present
     update_cache: true
 
-- name: Install the AmneziaWG userspace binaries
+# The CLI and the unit are vendored — there is no apt repository for these
+# on Debian. See files/README.md for provenance and hashes.
+- name: Install the AmneziaWG command-line tools
   ansible.builtin.copy:
-    src: "{{ item.src }}"
-    dest: "{{ item.dest }}"
+    src: "{{ item }}"
+    dest: "/usr/bin/{{ item }}"
     owner: root
     group: root
     mode: "0755"
   loop:
-    - { src: "awg", dest: "/usr/bin/awg" }
-    - { src: "awg-quick", dest: "/usr/bin/awg-quick" }
-    - { src: "amneziawg-go", dest: "/usr/bin/amneziawg-go" }
+    - awg
+    - awg-quick
   notify: Restart management tunnel
+
+- name: Install the awg-quick systemd template
+  ansible.builtin.copy:
+    src: "awg-quick@.service"
+    dest: "/lib/systemd/system/awg-quick@.service"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart management tunnel
+
+- name: Look for the amneziawg kernel module
+  ansible.builtin.command: modinfo amneziawg
+  register: mgmt_tunnel_kmod
+  changed_when: false
+  failed_when: false
+
+- name: Check whether the userspace implementation is already installed
+  ansible.builtin.stat:
+    path: /usr/bin/amneziawg-go
+  register: mgmt_tunnel_go
+
+# 5.9 MB, and every exit node already has a working build of it inside the
+# AmneziaVPN container. Taking it from there keeps it out of the repository
+# and guarantees the binary matches the host it will run on. Sites skip this
+# entirely — they carry the kernel module for ProximaVPN's wg1.
+- name: Extract the userspace implementation from the AmneziaWG container
+  ansible.builtin.shell: |
+    set -e
+    docker cp amnezia-awg2:/usr/bin/amneziawg-go /usr/bin/amneziawg-go
+    chmod 755 /usr/bin/amneziawg-go
+  register: mgmt_tunnel_extract
+  changed_when: mgmt_tunnel_extract.rc == 0
+  # Not fatal here on purpose: the task below turns a missing container into a
+  # sentence someone can act on, and an aborted play would never reach it.
+  failed_when: false
+  when:
+    - mgmt_tunnel_kmod.rc != 0
+    - not mgmt_tunnel_go.stat.exists
+  notify: Restart management tunnel
+
+- name: Fail clearly when there is no way to run AmneziaWG
+  ansible.builtin.fail:
+    msg: >-
+      {{ inventory_hostname }} has neither the amneziawg kernel module nor
+      /usr/bin/amneziawg-go, and the amnezia-awg2 container it would normally
+      be taken from is not present. Install one of the two before running this
+      role — a config written without it would sit on disk doing nothing.
+  when:
+    - mgmt_tunnel_kmod.rc != 0
+    - not mgmt_tunnel_go.stat.exists
+    - mgmt_tunnel_extract.rc | default(1) != 0
 
 - name: Create the AmneziaWG configuration directory
   ansible.builtin.file:
@@ -58,6 +111,15 @@
 
 # awg-quick@ resolves the userspace implementation from the environment, and
 # there is no kernel module to fall back to, so the unit has to carry it.
+- name: Create the awg-quick drop-in directory
+  ansible.builtin.file:
+    path: "/etc/systemd/system/awg-quick@{{ mgmt_tunnel_interface }}.service.d"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: mgmt_tunnel_kmod.rc != 0
+
 - name: Point awg-quick at the userspace implementation
   ansible.builtin.copy:
     content: |
@@ -70,6 +132,7 @@
     owner: root
     group: root
     mode: "0644"
+  when: mgmt_tunnel_kmod.rc != 0
   notify: Restart management tunnel
 
 - name: Enable and start the management tunnel
