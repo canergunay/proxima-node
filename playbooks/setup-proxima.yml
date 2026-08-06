@@ -69,9 +69,14 @@
   tasks:
     # ── 1. Call-home tunnel ────────────────────────────────────────────────
     #
-    # Plain WireGuard under systemd, deliberately not a container: Docker may
-    # start late, and Proxima's own work restarts containers. A recovery path
-    # cannot depend on the thing it recovers.
+    # AmneziaWG under systemd, deliberately not a container: Docker may start
+    # late, and Proxima's own work restarts containers. A recovery path cannot
+    # depend on the thing it recovers.
+    #
+    # AmneziaWG rather than plain WireGuard because ADM's interface speaks it —
+    # the obfuscation parameters are interface-wide, so every peer moves
+    # together. Starting an AWG config with plain wg-quick fails on the first
+    # Jc= line, which is exactly how this was found.
 
     - name: Install wireguard-tools
       ansible.builtin.apt:
@@ -81,10 +86,36 @@
         cache_valid_time: 3600
       when: not skip_callhome | bool
 
+    - name: Create the AmneziaWG configuration directory
+      ansible.builtin.file:
+        path: /etc/amnezia/amneziawg
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+      when: not skip_callhome | bool
+
+    # A site provisioned before the move still has the plain-WireGuard unit
+    # enabled. Left running it holds the interface name and the new one cannot
+    # come up; left enabled it returns on the next reboot.
+    - name: Retire the plain WireGuard call-home unit
+      ansible.builtin.systemd:
+        name: "wg-quick@{{ callhome_iface }}"
+        enabled: false
+        state: stopped
+      failed_when: false
+      when: not skip_callhome | bool
+
+    - name: Remove the plain WireGuard call-home config
+      ansible.builtin.file:
+        path: "/etc/wireguard/{{ callhome_iface }}.conf"
+        state: absent
+      when: not skip_callhome | bool
+
     - name: Write the call-home config
       ansible.builtin.copy:
         content: "{{ callhome_conf_b64 | b64decode }}"
-        dest: "/etc/wireguard/{{ callhome_iface }}.conf"
+        dest: "/etc/amnezia/amneziawg/{{ callhome_iface }}.conf"
         owner: root
         group: root
         mode: "0600"
@@ -93,7 +124,7 @@
 
     - name: Enable and start the call-home tunnel
       ansible.builtin.systemd:
-        name: "wg-quick@{{ callhome_iface }}"
+        name: "awg-quick@{{ callhome_iface }}"
         enabled: true
         state: started
         daemon_reload: true
@@ -104,7 +135,7 @@
 
     - name: Wait for the tunnel to hand-shake
       ansible.builtin.shell: >-
-        wg show {{ callhome_iface }} latest-handshakes | awk '{print $2}'
+        awg show {{ callhome_iface }} latest-handshakes | awk '{print $2}'
       register: callhome_handshake
       changed_when: false
       retries: 6
@@ -233,5 +264,5 @@
   handlers:
     - name: Restart call-home tunnel
       ansible.builtin.systemd:
-        name: "wg-quick@{{ callhome_iface }}"
+        name: "awg-quick@{{ callhome_iface }}"
         state: restarted
