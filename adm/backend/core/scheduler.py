@@ -29,6 +29,10 @@ _last_cleanup: float = 0.0
 _last_source_refresh: float = 0.0
 
 POLL_INTERVAL = 300  # 5 minutes
+# How far back an offline alert may look when working out how long a server
+# has been down. An outage older than this is reported as "over 24h" rather
+# than pretending the oldest row on hand is when it started.
+OFFLINE_LOOKBACK_HOURS = 24
 COOLDOWN_SECONDS = 3600  # 1 hour between same alerts
 CLEANUP_INTERVAL = 86400  # daily cleanup
 SOURCE_REFRESH_INTERVAL = 3600  # hourly: keep the drift comparison honest
@@ -312,8 +316,12 @@ def _check_alerts() -> None:
         sid = server["id"]
         name = server["display_name"]
 
-        # Get recent metrics (last 15 minutes)
-        recent = get_metrics(server_id=sid, hours=1)
+        # A day's worth, not an hour's. The window used to be an hour and the
+        # duration was counted in readings, so it could never exceed the number
+        # of polls an hour holds: every alert for a server down since yesterday
+        # said "~65 minutes", hour after hour, and the number carried no
+        # information at all.
+        recent = get_metrics(server_id=sid, hours=OFFLINE_LOOKBACK_HOURS)
         if not recent:
             continue
 
@@ -321,20 +329,30 @@ def _check_alerts() -> None:
 
         # Check offline
         if not latest.get("online"):
-            # Count how many consecutive offline readings
-            offline_count = 0
+            # Walk back to the last reading that was online. The one after it
+            # is when this outage started, so the duration comes from its
+            # timestamp rather than from how many rows happen to be in view.
+            first_offline = None
+            saw_online = False
             for m in reversed(recent):
-                if not m.get("online"):
-                    offline_count += 1
-                else:
+                if m.get("online"):
+                    saw_online = True
                     break
+                first_offline = m
 
-            offline_duration = offline_count * (POLL_INTERVAL / 60)
+            started = (first_offline or {}).get("timestamp")
+            offline_duration = (now - started) / 60 if started else 0.0
+
             if offline_duration >= offline_minutes:
+                # Without an online reading in the window the outage predates
+                # everything we can see, so say so instead of implying the
+                # oldest row is when it began.
+                how_long = (f"~{int(offline_duration)} minutes" if saw_online
+                            else f"over {OFFLINE_LOOKBACK_HOURS}h")
                 _maybe_send_alert(
                     sid, "offline", bot_token, chat_id,
                     f"*Server Offline*\nServer: {name}\n"
-                    f"Down for: ~{int(offline_duration)} minutes",
+                    f"Down for: {how_long}",
                     now,
                 )
             continue
