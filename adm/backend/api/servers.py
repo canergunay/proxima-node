@@ -25,16 +25,27 @@ bp = Blueprint("servers", __name__)
 
 # ── Agent proxy helpers ──────────────────────────────────────────────────
 
-def _agent_url(server: dict) -> str:
-    """Prefer the management tunnel; fall back to the public address.
+def _agent_urls(server: dict) -> list[str]:
+    """Where to reach this agent, best path first: tunnel, then public.
 
-    Same order the scheduler uses. Without this the dashboard would keep
-    reaching for a public port that the tunnel exists precisely to replace.
+    Both, not just the first. Returning the tunnel alone made the dashboard
+    report a node offline whose public address was answering perfectly well —
+    the scheduler fell back and the UI did not, so the two disagreed about
+    the same server on the same screen.
     """
     port = server.get("agent_port", 5051)
+    urls = []
     if server.get("callhome_ip"):
-        return f"https://{server['callhome_ip']}:{port}"
-    return f"https://{server['ip']}:{port}"
+        urls.append(f"https://{server['callhome_ip']}:{port}")
+    if server.get("ip"):
+        urls.append(f"https://{server['ip']}:{port}")
+    return urls
+
+
+def _agent_url(server: dict) -> str:
+    """The preferred URL, for callers that only need one."""
+    urls = _agent_urls(server)
+    return urls[0] if urls else f"https://{server.get('ip')}:{server.get('agent_port', 5051)}"
 
 
 def _agent_headers(server: dict) -> dict:
@@ -49,21 +60,41 @@ def _agent_headers(server: dict) -> dict:
 
 def _proxy_request(server: dict, method: str, path: str,
                    body: dict | None = None, timeout: int = 15) -> dict:
-    """Forward an HTTP request to a proxima-agent."""
-    url = _agent_url(server) + path
+    """Forward an HTTP request to a proxima-agent.
+
+    Tries the tunnel and then the public address, so a node is only reported
+    unreachable when no path to it works. The last transport error is
+    re-raised if they all fail, leaving callers' error handling unchanged.
+    """
     headers = _agent_headers(server)
+    urls = _agent_urls(server)
+    last_error: Exception | None = None
 
-    if method == "GET":
-        resp = http_requests.get(url, headers=headers, timeout=timeout, verify=False)
-    elif method == "POST":
-        resp = http_requests.post(url, json=body, headers=headers, timeout=timeout, verify=False)
-    elif method == "PUT":
-        resp = http_requests.put(url, json=body, headers=headers, timeout=timeout, verify=False)
-    else:
-        raise ValueError(f"Unsupported method: {method}")
+    for base in urls:
+        url = base + path
+        try:
+            if method == "GET":
+                resp = http_requests.get(url, headers=headers, timeout=timeout, verify=False)
+            elif method == "POST":
+                resp = http_requests.post(url, json=body, headers=headers, timeout=timeout, verify=False)
+            elif method == "PUT":
+                resp = http_requests.put(url, json=body, headers=headers, timeout=timeout, verify=False)
+            else:
+                raise ValueError(f"Unsupported method: {method}")
 
-    resp.raise_for_status()
-    return resp.json()
+            resp.raise_for_status()
+            return resp.json()
+        except http_requests.exceptions.RequestException as e:
+            # Only a failure to reach it is worth retrying elsewhere. A 4xx or
+            # 5xx from the agent is the agent's answer, and asking the other
+            # address would just get the same one.
+            if e.response is not None:
+                raise
+            last_error = e
+
+    if last_error:
+        raise last_error
+    raise ValueError(f"No address recorded for {server.get('name')}")
 
 
 def _fetch_server_status(server: dict) -> dict:
