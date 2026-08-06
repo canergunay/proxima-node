@@ -54,3 +54,42 @@
   loop:
     - "{{ mgmt_tunnel_subnet | default('10.12.12.0/24') }}"
     - "{{ mgmt_tunnel_admin_subnet | default('10.13.13.0/24') }}"
+
+# ── Withdrawing the public agent port ────────────────────────────────────
+#
+# Only once the tunnel has actually carried a handshake. roles/common adds
+# the public allows earlier in the same play, so the ordering gives the right
+# failure mode for free: a tunnel that comes up closes the public port, and a
+# tunnel that does not leaves it open and the node still manageable. Closing
+# it on faith is how a node becomes reachable only through its provider's
+# console.
+
+- name: Wait for the tunnel to complete a handshake
+  ansible.builtin.shell: >-
+    wg show {{ mgmt_tunnel_interface }} latest-handshakes
+    | awk '$2 > 0 {found=1} END {exit !found}'
+  register: mgmt_tunnel_handshake
+  changed_when: false
+  failed_when: false
+  retries: 6
+  delay: 5
+  until: mgmt_tunnel_handshake.rc == 0
+
+- name: Report that the public agent port is being kept
+  ansible.builtin.debug:
+    msg: >-
+      No handshake on {{ mgmt_tunnel_interface }} yet — leaving the public
+      agent port open so this node stays reachable.
+  when: mgmt_tunnel_handshake.rc != 0
+
+- name: Withdraw the public agent port now the tunnel carries traffic
+  community.general.ufw:
+    rule: allow
+    port: "{{ agent_port | default(5051) }}"
+    proto: tcp
+    from_ip: "{{ item }}"
+    delete: true
+  loop: "{{ proxima_ips | default([]) }}"
+  when:
+    - mgmt_tunnel_close_public | default(true) | bool
+    - mgmt_tunnel_handshake.rc == 0
