@@ -1,5 +1,14 @@
-*.sh text eol=lf
-*.py text eol=lf
-*.yml text eol=lf
-*.yaml text eol=lf
-*.md text eol=lf
+# These are shipped to Linux hosts verbatim. Checked out on Windows without
+# this, git rewrites the shell scripts to CRLF and they arrive on a Debian box
+# as "bad interpreter: /bin/bash^M" — a failure that looks nothing like its
+# cause. The binary is marked so no conversion is ever attempted on it.
+roles/mgmt-tunnel/files/awg           binary
+roles/mgmt-tunnel/files/awg-quick     text eol=lf
+roles/mgmt-tunnel/files/awg-quick@.service  text eol=lf
+
+# Everything Ansible and the installers run on the far side of an ssh
+# connection has the same problem.
+*.sh        text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.j2        text eol=lf
