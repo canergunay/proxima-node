@@ -21,6 +21,23 @@
 # traffic is a few KB per poll. Sites already carry the module for
 # ProximaVPN's wg1, so the role detects rather than assumes.
 
+# Checked before anything is written, because the write overwrites a file the
+# node's only management path may depend on. A run with a malformed value put
+# rubbish in place of a working configuration and took the tunnel down with
+# it; the length check the site playbook had would not have caught it either,
+# since any non-empty string passes that.
+- name: Verify the supplied configuration is a WireGuard interface
+  ansible.builtin.assert:
+    that:
+      - mgmt_tunnel_conf_b64 | default("") | length > 0
+      - "'[Interface]' in (mgmt_tunnel_conf_b64 | b64decode)"
+      - "'PrivateKey' in (mgmt_tunnel_conf_b64 | b64decode)"
+      - "'[Peer]' in (mgmt_tunnel_conf_b64 | b64decode)"
+    fail_msg: >-
+      mgmt_tunnel_conf_b64 does not decode to a WireGuard configuration.
+      Nothing has been changed on {{ inventory_hostname }}.
+    quiet: true
+
 - name: Install WireGuard tools (awg-quick's dependencies)
   ansible.builtin.apt:
     name: wireguard-tools
