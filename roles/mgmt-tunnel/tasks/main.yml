@@ -183,30 +183,38 @@
 
 # ── Withdrawing the public agent port ────────────────────────────────────
 #
-# Only once the tunnel has actually carried a handshake. roles/common adds
+# Only once the tunnel has actually carried traffic. roles/common adds
 # the public allows earlier in the same play, so the ordering gives the right
 # failure mode for free: a tunnel that comes up closes the public port, and a
 # tunnel that does not leaves it open and the node still manageable. Closing
 # it on faith is how a node becomes reachable only through its provider's
 # console.
 
-- name: Wait for the tunnel to complete a handshake
+# A handshake is not enough, and ERG-DE is why. Its tunnel completes the
+# handshake every time and then drops every data packet — counters frozen on
+# both sides while both ends keep retransmitting. Closing the public port on
+# that evidence would have left the node reachable by nothing at all.
+#
+# So the test is whether the tunnel actually carries traffic: reach ADM's end
+# of it from here. That is the same thing ADM will be doing in reverse.
+- name: Wait for the tunnel to carry traffic
   ansible.builtin.shell: >-
-    awg show {{ mgmt_tunnel_interface }} latest-handshakes
-    | awk '$2 > 0 {found=1} END {exit !found}'
-  register: mgmt_tunnel_handshake
+    ping -c 2 -W 3 {{ mgmt_tunnel_gateway | default('10.12.12.1') }} >/dev/null 2>&1
+  register: mgmt_tunnel_alive
   changed_when: false
   failed_when: false
   retries: 6
   delay: 5
-  until: mgmt_tunnel_handshake.rc == 0
+  until: mgmt_tunnel_alive.rc == 0
 
 - name: Report that the public agent port is being kept
   ansible.builtin.debug:
     msg: >-
-      No handshake on {{ mgmt_tunnel_interface }} yet — leaving the public
-      agent port open so this node stays reachable.
-  when: mgmt_tunnel_handshake.rc != 0
+      {{ mgmt_tunnel_interface }} does not carry traffic to
+      {{ mgmt_tunnel_gateway | default('10.12.12.1') }} — leaving the public
+      agent port open so this node stays reachable. A handshake alone does not
+      count; see the note above this task.
+  when: mgmt_tunnel_alive.rc != 0
 
 - name: Withdraw the public agent port now the tunnel carries traffic
   community.general.ufw:
@@ -218,5 +226,5 @@
   loop: "{{ proxima_ips | default([]) }}"
   when:
     - mgmt_tunnel_close_public | default(true) | bool
-    - mgmt_tunnel_handshake.rc == 0
+    - mgmt_tunnel_alive.rc == 0
     - "'Status: active' in (mgmt_tunnel_ufw.stdout | default(''))"

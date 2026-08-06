@@ -13,3 +13,6 @@ mgmt_tunnel_admin_subnet: 10.13.13.0/24
 # A stalled scanner on that port froze an agent for 19 hours in July; a port
 # that is not reachable cannot be scanned. Set false to keep both paths.
 mgmt_tunnel_close_public: true
+# ADM's own end of the tunnel. The role pings it to decide whether the tunnel
+# actually carries traffic before withdrawing the public agent port.
+mgmt_tunnel_gateway: 10.12.12.1
