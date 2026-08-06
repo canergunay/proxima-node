@@ -18,8 +18,10 @@ is removed.
 """
 
 import ipaddress
+import json
 import logging
 import os
+import secrets
 import subprocess
 
 from core.auth import decrypt_value, encrypt_value
@@ -39,11 +41,27 @@ ENDPOINT = os.environ.get("ADM_MGMT_ENDPOINT", "vpn.ergunay.com")
 # so a site's logs name the device that reached it instead of showing every
 # admin as the gateway.
 ADMIN_NETWORK = os.environ.get("ADM_ADMIN_NETWORK", "10.13.13.0/24")
-CONF_PATH = os.environ.get("ADM_MGMT_CONF", f"/etc/wireguard/{INTERFACE}.conf")
+# awg-quick reads /etc/amnezia/amneziawg, not /etc/wireguard, and will not
+# find a file left in the latter.
+CONF_PATH = os.environ.get(
+    "ADM_MGMT_CONF", f"/etc/amnezia/amneziawg/{INTERFACE}.conf")
 # Kept beside the database rather than in /etc: this is ADM's state, and it
 # should travel with the rest of it.
 SERVER_KEY_PATH = os.environ.get(
     "ADM_MGMT_KEY", os.path.join(os.path.dirname(DB_PATH), "mgmt-server.key"))
+
+# AmneziaWG rather than plain WireGuard. Plain WG is a protocol Russian DPI
+# recognises, and the services on these nodes have been disappearing one
+# transport at a time — TCP first. The obfuscation parameters live beside the
+# interface key because they are part of its identity: change them and every
+# node's configuration stops matching at once.
+AWG_PARAMS_PATH = os.environ.get(
+    "ADM_MGMT_AWG_PARAMS",
+    os.path.join(os.path.dirname(DB_PATH), "mgmt-awg-params.json"))
+# The tools are AmneziaWG's forks of wg/wg-quick. They read the same key
+# format, so nothing about existing peers changes when the transport does.
+WG_BIN = os.environ.get("ADM_MGMT_WG_BIN", "awg")
+WG_QUICK_BIN = os.environ.get("ADM_MGMT_WG_QUICK_BIN", "awg-quick")
 
 # .1 is the interface itself; sites start after it.
 FIRST_HOST = 10
@@ -53,8 +71,61 @@ FIRST_EXIT_HOST = 100
 
 
 def _wg(*args: str, stdin: str | None = None) -> str:
-    return subprocess.run(["wg", *args], capture_output=True, text=True,
+    return subprocess.run([WG_BIN, *args], capture_output=True, text=True,
                           input=stdin, check=True).stdout.strip()
+
+
+# ── Obfuscation ──────────────────────────────────────────────────────────
+
+def awg_params() -> dict:
+    """The interface's AmneziaWG parameters, created once and kept.
+
+    Both ends must agree exactly, so these are generated on first use and
+    then never rewritten — regenerating them would silently invalidate every
+    node's configuration, the same reason the interface key is written once.
+
+    The constraints are AmneziaWG's own: the four header markers have to be
+    distinct and above the four message types they stand in for, and the two
+    junk sizes must not collide once the response header is added, or an
+    initiation and a response become indistinguishable.
+    """
+    if os.path.exists(AWG_PARAMS_PATH):
+        with open(AWG_PARAMS_PATH) as f:
+            params = json.load(f)
+        if params:
+            return params
+
+    headers = set()
+    while len(headers) < 4:
+        headers.add(secrets.randbelow(0x7FFFFFFF - 5) + 5)
+    h1, h2, h3, h4 = sorted(headers)
+
+    s1 = secrets.randbelow(100) + 15
+    s2 = secrets.randbelow(100) + 15
+    while s2 == s1 + 56:
+        s2 = secrets.randbelow(100) + 15
+
+    params = {
+        "Jc": secrets.randbelow(5) + 3,      # junk packets before the handshake
+        "Jmin": 40,
+        "Jmax": 70,
+        "S1": s1,                            # junk prepended to the initiation
+        "S2": s2,                            # junk prepended to the response
+        "H1": h1, "H2": h2, "H3": h3, "H4": h4,
+    }
+
+    fd = os.open(AWG_PARAMS_PATH, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        json.dump(params, f, indent=2)
+    log.info("[MGMT] Generated the interface's obfuscation parameters")
+    return params
+
+
+def _awg_lines() -> list[str]:
+    """The parameters as configuration lines, in AmneziaWG's declared order."""
+    p = awg_params()
+    return [f"{k} = {p[k]}" for k in
+            ("Jc", "Jmin", "Jmax", "S1", "S2", "H1", "H2", "H3", "H4")]
 
 
 # ── Server identity ──────────────────────────────────────────────────────
@@ -132,6 +203,7 @@ def render_conf() -> str:
         f"Address    = {address}/{prefix}",
         f"ListenPort = {LISTEN_PORT}",
         f"PrivateKey = {server_private_key()}",
+        *_awg_lines(),
         "",
         # Sites have to reach each other's ADM-side services through here, and
         # an admin on wg-easy's interface has to reach the sites, so this
@@ -175,14 +247,14 @@ def apply_live() -> None:
     interface down and take every site with it, including whichever one is
     being worked on.
     """
-    stripped = subprocess.run(["wg-quick", "strip", INTERFACE],
+    stripped = subprocess.run([WG_QUICK_BIN, "strip", INTERFACE],
                               capture_output=True, text=True, check=True).stdout
-    subprocess.run(["wg", "syncconf", INTERFACE, "/dev/stdin"],
+    subprocess.run([WG_BIN, "syncconf", INTERFACE, "/dev/stdin"],
                    input=stripped, text=True, check=True)
 
 
 def is_up() -> bool:
-    return subprocess.run(["wg", "show", INTERFACE], capture_output=True).returncode == 0
+    return subprocess.run([WG_BIN, "show", INTERFACE], capture_output=True).returncode == 0
 
 
 def sync() -> None:
@@ -236,7 +308,8 @@ def ensure_peer(vpn_server_id: int) -> tuple[str | None, str | None]:
         "[Interface]\n"
         f"PrivateKey = {decrypt_value(server['callhome_privkey_enc'])}\n"
         f"Address    = {server['callhome_ip']}/{SUBNET.split('/')[1]}\n"
-        "\n"
+        + "".join(f"{line}\n" for line in _awg_lines())
+        + "\n"
         "[Peer]\n"
         f"PublicKey    = {server_public_key()}\n"
         + (f"PresharedKey = {psk}\n" if psk else "")
@@ -289,11 +362,13 @@ def ensure_exit_peer(server_id: int) -> tuple[str | None, str | None]:
 
     psk = decrypt_value(server["callhome_psk_enc"]) if server.get("callhome_psk_enc") else ""
     config = (
-        "# Managed by ADM. Install as /etc/wireguard/wg-adm.conf.\n"
+        "# Managed by ADM. AmneziaWG, not plain WireGuard: install as\n"
+        "# /etc/amnezia/amneziawg/wg-adm.conf and bring up with awg-quick.\n"
         "[Interface]\n"
         f"PrivateKey = {decrypt_value(server['callhome_privkey_enc'])}\n"
         f"Address    = {server['callhome_ip']}/{SUBNET.split('/')[1]}\n"
-        "\n"
+        + "".join(f"{line}\n" for line in _awg_lines())
+        + "\n"
         "[Peer]\n"
         f"PublicKey    = {server_public_key()}\n"
         + (f"PresharedKey = {psk}\n" if psk else "")

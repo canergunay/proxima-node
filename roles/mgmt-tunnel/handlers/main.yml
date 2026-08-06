@@ -1,8 +1,9 @@
 ---
-# Restart rather than reload: wg-quick@ is oneshot with RemainAfterExit, so a
+# Restart rather than reload: awg-quick@ is oneshot with RemainAfterExit, so a
 # start on an interface systemd already considers active is a no-op and the
 # new configuration would sit on disk doing nothing.
 - name: Restart management tunnel
   ansible.builtin.systemd:
-    name: "wg-quick@{{ mgmt_tunnel_interface }}"
+    name: "awg-quick@{{ mgmt_tunnel_interface }}"
     state: restarted
+    daemon_reload: true

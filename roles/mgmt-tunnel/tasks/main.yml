@@ -1,49 +1,84 @@
 ---
-# Management rides an outbound WireGuard tunnel to ADM rather than an inbound
+# Management rides an outbound AmneziaWG tunnel to ADM rather than an inbound
 # port on the node's public address.
 #
-# Two failures drove this. A stalled scanner on the public agent port froze
-# the agent for 19 hours (ERG-FI, July). Then ERG-PL's public address stopped
-# answering from Russia entirely while the box itself was healthy — 28 days of
-# uptime, every service running, and ADM reporting it offline for 14 hours,
-# because the only path ADM had was the one that broke.
+# Two failures drove the tunnel itself. A stalled scanner on the public agent
+# port froze the agent for 19 hours (ERG-FI, July). Then ERG-PL's public
+# address stopped answering from Russia entirely while the box was healthy —
+# 28 days of uptime, every service running, and ADM reporting it offline for
+# 14 hours, because the only path ADM had was the one that broke.
 #
-# A tunnel the node dials out on needs no port forward, no inbound rule, and
-# no reachable public address. It also gives "the agent is unreachable" a
-# meaning it did not have before: the tunnel is down, rather than something
-# unknown about the network in between.
+# It is AmneziaWG rather than plain WireGuard because the transports on these
+# nodes have been disappearing one at a time. TCP went first: Shadowsocks and
+# the agent port on two nodes died within a day of each other while the
+# obfuscated AWG data plane to the same addresses carried traffic untouched.
+# A management path built on a protocol DPI recognises is a path waiting to
+# be taken away.
+#
+# The implementation is userspace on purpose. amneziawg-go is a single static
+# binary; the kernel module needs a DKMS build on every node and is already
+# on the productization fragility list. Management traffic is a few KB per
+# poll, so the performance difference does not exist here.
 
-- name: Install WireGuard
+- name: Install WireGuard tools (awg-quick's dependencies)
   ansible.builtin.apt:
     name: wireguard-tools
     state: present
     update_cache: true
 
+- name: Install the AmneziaWG userspace binaries
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - { src: "awg", dest: "/usr/bin/awg" }
+    - { src: "awg-quick", dest: "/usr/bin/awg-quick" }
+    - { src: "amneziawg-go", dest: "/usr/bin/amneziawg-go" }
+  notify: Restart management tunnel
+
+- name: Create the AmneziaWG configuration directory
+  ansible.builtin.file:
+    path: /etc/amnezia/amneziawg
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
 - name: Write the management tunnel configuration
   ansible.builtin.copy:
     content: "{{ mgmt_tunnel_conf_b64 | b64decode }}"
-    dest: "/etc/wireguard/{{ mgmt_tunnel_interface }}.conf"
+    dest: "/etc/amnezia/amneziawg/{{ mgmt_tunnel_interface }}.conf"
     owner: root
     group: root
     mode: "0600"
   notify: Restart management tunnel
 
+# awg-quick@ resolves the userspace implementation from the environment, and
+# there is no kernel module to fall back to, so the unit has to carry it.
+- name: Point awg-quick at the userspace implementation
+  ansible.builtin.copy:
+    content: |
+      # Managed by Ansible — roles/mgmt-tunnel.
+      # No amneziawg kernel module is installed; without this awg-quick tries
+      # to create a kernel interface and fails with "operation not supported".
+      [Service]
+      Environment=WG_QUICK_USERSPACE_IMPLEMENTATION=amneziawg-go
+    dest: "/etc/systemd/system/awg-quick@{{ mgmt_tunnel_interface }}.service.d/userspace.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart management tunnel
+
 - name: Enable and start the management tunnel
   ansible.builtin.systemd:
-    name: "wg-quick@{{ mgmt_tunnel_interface }}"
+    name: "awg-quick@{{ mgmt_tunnel_interface }}"
     enabled: true
     state: started
     daemon_reload: true
 
-# Reaching the agent over the tunnel is the point, so the rule has to exist
-# before the public one can be withdrawn. The public allow is left in place
-# here on purpose — see the note in roles/common/tasks/ufw.yml.
-#
-# Both ranges, not just the management one: ADM polls from 10.12.12.1, but an
-# admin debugging a node comes from wg-easy's 10.13.13.0/24. The client config
-# already routes both, so allowing only the first produces a tunnel that ADM
-# can use and a human cannot — which is how this was first deployed, and it
-# took a confused round trip to notice.
 - name: Check whether this host uses ufw
   ansible.builtin.command: ufw status
   register: mgmt_tunnel_ufw
@@ -77,7 +112,7 @@
 
 - name: Wait for the tunnel to complete a handshake
   ansible.builtin.shell: >-
-    wg show {{ mgmt_tunnel_interface }} latest-handshakes
+    awg show {{ mgmt_tunnel_interface }} latest-handshakes
     | awk '$2 > 0 {found=1} END {exit !found}'
   register: mgmt_tunnel_handshake
   changed_when: false
