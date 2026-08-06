@@ -44,6 +44,16 @@
 # already routes both, so allowing only the first produces a tunnel that ADM
 # can use and a human cannot — which is how this was first deployed, and it
 # took a confused round trip to notice.
+- name: Check whether this host uses ufw
+  ansible.builtin.command: ufw status
+  register: mgmt_tunnel_ufw
+  changed_when: false
+  failed_when: false
+
+# Not every node runs ufw — erg-tr and erg-ru are filtered by the
+# PROXIMA_AGENT iptables chain that roles/proxima-agent installs, and that
+# template carries the same two ranges. Running the ufw module on a host
+# without ufw would fail the play for no reason.
 - name: Allow the agent port from the management and admin networks
   community.general.ufw:
     rule: allow
@@ -54,6 +64,7 @@
   loop:
     - "{{ mgmt_tunnel_subnet | default('10.12.12.0/24') }}"
     - "{{ mgmt_tunnel_admin_subnet | default('10.13.13.0/24') }}"
+  when: "'Status: active' in (mgmt_tunnel_ufw.stdout | default(''))"
 
 # ── Withdrawing the public agent port ────────────────────────────────────
 #
@@ -93,3 +104,4 @@
   when:
     - mgmt_tunnel_close_public | default(true) | bool
     - mgmt_tunnel_handshake.rc == 0
+    - "'Status: active' in (mgmt_tunnel_ufw.stdout | default(''))"

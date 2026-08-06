@@ -14,6 +14,11 @@ PORT={{ agent_port }}
 
 iptables -N "$CHAIN" 2>/dev/null || iptables -F "$CHAIN"
 
+{# The management tunnel first: on a node whose public address has become  #}
+{# unreachable, this is the only source ADM can reach it from. Leaving it  #}
+{# out means the tunnel comes up and the agent still refuses the poll.     #}
+iptables -A "$CHAIN" -s {{ mgmt_tunnel_subnet | default('10.12.12.0/24') }} -j ACCEPT
+iptables -A "$CHAIN" -s {{ mgmt_tunnel_admin_subnet | default('10.13.13.0/24') }} -j ACCEPT
 {% for ip in proxima_ips %}
 iptables -A "$CHAIN" -s {{ ip }} -j ACCEPT
 {% endfor %}
