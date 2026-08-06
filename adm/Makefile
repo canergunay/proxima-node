@@ -1,8 +1,14 @@
-.PHONY: build install dev clean
+.PHONY: build install dev clean deploy
 
 # Build frontend and copy to backend/static
 build:
 	cd frontend && npm ci && npx vite build
+
+# Pull, rebuild the UI, restart the service, verify. Run as root.
+# Updating the backend without rebuilding the frontend serves a stale UI —
+# see the note at the top of deploy.sh.
+deploy:
+	@./deploy.sh $(ARGS)
 
 # Set up Python venv and install dependencies
 install:
