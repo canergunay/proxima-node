@@ -974,6 +974,20 @@ def get_vpn_metrics(
     )
 
 
+def get_vpn_servers_last_online() -> dict[int, bool]:
+    """Last-known online flag per VPN server, from its newest metric row.
+
+    Servers with no metrics yet are simply absent — callers treat missing
+    as unknown, not offline.
+    """
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT vpn_server_id, online FROM vpn_server_metrics WHERE id IN "
+        "(SELECT MAX(id) FROM vpn_server_metrics GROUP BY vpn_server_id)"
+    ).fetchall()
+    return {r["vpn_server_id"]: bool(r["online"]) for r in rows}
+
+
 def get_alert_config() -> dict:
     conn = get_conn()
     row = conn.execute("SELECT * FROM alert_config WHERE id = 1").fetchone()

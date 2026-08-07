@@ -31,6 +31,10 @@ def _fetch_vpn_server_status(server: dict) -> dict:
         "display_name": server["display_name"],
         "url": server["url"],
         "public_url": server.get("public_url", ""),
+        # What single-login discovery will actually hand to clients: the DB
+        # value, never the live-reported one merged in below. The UI warns
+        # on this field — warning on the merged public_url would hide the gap.
+        "discovery_url": server.get("public_url", ""),
         "has_token": bool(server.get("api_token_enc")),
         "online": False,
         "proxima_status": None,
@@ -103,6 +107,7 @@ def list_vpn_servers():
                     "id": s["id"], "name": s["name"],
                     "display_name": s["display_name"], "url": s["url"],
                     "public_url": s.get("public_url", ""),
+                    "discovery_url": s.get("public_url", ""),
                     "has_token": bool(s.get("api_token_enc")),
                     "online": False, "proxima_status": None,
                     "connectivity": None, "error": str(e),

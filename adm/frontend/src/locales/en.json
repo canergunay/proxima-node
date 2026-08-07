@@ -118,6 +118,7 @@
   "vpnServer.online": "Online",
   "vpnServer.offline": "Offline",
   "vpnServer.noToken": "No API token",
+  "vpnServer.noPublicUrl": "No public URL — hidden from client login discovery",
   "vpnServer.slotsHealthy": "{{healthy}}/{{total}} healthy",
   "vpnServer.dnsMode": "DNS Mode",
   "vpnServer.dnsActive": "Active",

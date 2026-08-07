@@ -132,6 +132,9 @@ export interface VpnServer {
   display_name: string;
   url: string;
   public_url: string;
+  /** The DB-stored public URL — what single-login discovery returns to
+   *  clients. public_url above may be masked by the instance's live value. */
+  discovery_url: string;
   has_token: boolean;
   online: boolean;
   proxima_status: ProximaStatus | null;

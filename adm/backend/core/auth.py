@@ -98,33 +98,41 @@ def decrypt_value(ciphertext: str) -> str | None:
 
 _rate_lock = threading.Lock()
 _fail_tracker: dict[str, list[float]] = {}
-RATE_WINDOW = 300
-MAX_ATTEMPTS = 10
+RATE_WINDOW = 300          # 5-minute sliding window
+MAX_ATTEMPTS = 10          # max failures per window for a single identity
+MAX_ATTEMPTS_PER_IP = 100  # coarse backstop for one source address
 LOCKOUT_SECONDS = 300
 
 
-def check_rate_limit(ip: str) -> int | None:
-    """Check if IP is rate-limited. Returns seconds remaining if locked out."""
+def check_rate_limit(key: str, max_attempts: int = MAX_ATTEMPTS) -> int | None:
+    """Check if a key is rate-limited. Returns seconds remaining if locked out.
+
+    The key is whatever identity failures were recorded under — a bare
+    address, or "ip|username" for the per-identity tier. Counting only by
+    address is wrong for endpoints a whole site reaches through one NAT:
+    one person's typo would lock out every colleague behind it.
+    """
     now = time.time()
     with _rate_lock:
-        timestamps = _fail_tracker.get(ip, [])
+        timestamps = _fail_tracker.get(key, [])
         timestamps = [t for t in timestamps if now - t < RATE_WINDOW + LOCKOUT_SECONDS]
-        _fail_tracker[ip] = timestamps
+        _fail_tracker[key] = timestamps
         recent = [t for t in timestamps if now - t < RATE_WINDOW]
-        if len(recent) >= MAX_ATTEMPTS:
+        if len(recent) >= max_attempts:
             last_fail = max(recent)
             remaining = int(LOCKOUT_SECONDS - (now - last_fail))
             return max(remaining, 1)
     return None
 
 
-def record_login_failure(ip: str) -> None:
+def record_login_failure(*keys: str) -> None:
+    now = time.time()
     with _rate_lock:
-        if ip not in _fail_tracker:
-            _fail_tracker[ip] = []
-        _fail_tracker[ip].append(time.time())
+        for key in keys:
+            _fail_tracker.setdefault(key, []).append(now)
 
 
-def clear_login_failures(ip: str) -> None:
+def clear_login_failures(*keys: str) -> None:
     with _rate_lock:
-        _fail_tracker.pop(ip, None)
+        for key in keys:
+            _fail_tracker.pop(key, None)

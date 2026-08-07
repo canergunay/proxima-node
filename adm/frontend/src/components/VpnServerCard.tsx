@@ -394,6 +394,16 @@ export default function VpnServerCard({ server, sourceRevision, onClick, onEdit,
             </Typography>
           )}
 
+          {/* Discovery silently omits servers without a stored public URL —
+              say so here, or the gap only ever shows up as a user's missing
+              site. Keyed on discovery_url (the DB value), not public_url,
+              which may be masked by the instance's live-reported address. */}
+          {!server.discovery_url && (
+            <Typography variant="caption" color="warning.main" sx={{ mt: 1, display: "block" }}>
+              {t("vpnServer.noPublicUrl")}
+            </Typography>
+          )}
+
           {server.error && server.has_token && (
             <Typography variant="caption" color="error" sx={{ mt: 1, display: "block" }}>
               {server.error}

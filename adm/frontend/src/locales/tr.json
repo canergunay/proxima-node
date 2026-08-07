@@ -118,6 +118,7 @@
   "vpnServer.online": "Çevrimiçi",
   "vpnServer.offline": "Çevrimdışı",
   "vpnServer.noToken": "API token yok",
+  "vpnServer.noPublicUrl": "Public URL yok — istemci giriş keşfinde görünmez",
   "vpnServer.slotsHealthy": "{{healthy}}/{{total}} sağlıklı",
   "vpnServer.dnsMode": "DNS Modu",
   "vpnServer.dnsActive": "Aktif",

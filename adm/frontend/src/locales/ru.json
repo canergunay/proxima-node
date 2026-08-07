@@ -118,6 +118,7 @@
   "vpnServer.online": "Онлайн",
   "vpnServer.offline": "Офлайн",
   "vpnServer.noToken": "Нет API токена",
+  "vpnServer.noPublicUrl": "Нет публичного URL — скрыт из обнаружения при входе в клиенте",
   "vpnServer.slotsHealthy": "{{healthy}}/{{total}} работают",
   "vpnServer.dnsMode": "DNS режим",
   "vpnServer.dnsActive": "Активен",
