@@ -412,17 +412,24 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
                       <ListItemText
                         primary={
                           <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                            {c.severity === "warning" ? (
+                            {c.severity === "blocker" ? (
+                              <ErrorIcon sx={{ fontSize: 14, color: "error.main" }} />
+                            ) : c.severity === "warning" ? (
                               <ErrorIcon sx={{ fontSize: 14, color: "warning.main" }} />
                             ) : (
                               <InfoIcon sx={{ fontSize: 14, color: "info.main" }} />
                             )}
-                            <Typography variant="body2">
+                            <Typography
+                              variant="body2"
+                              color={c.severity === "blocker" ? "error.main" : undefined}
+                            >
                               {c.type === "port"
                                 ? `${t("preflight.portInUse", { port: c.port })} — ${c.detail}`
                                 : c.type === "service"
                                   ? `${t("preflight.serviceActive")}: ${c.name} (${c.detail})`
-                                  : `${t("preflight.containerRunning")}: ${c.name} (${c.detail})`
+                                  : c.type === "container"
+                                    ? `${t("preflight.containerRunning")}: ${c.name} (${c.detail})`
+                                    : `${c.name}: ${c.detail}`
                               }
                             </Typography>
                           </Box>

@@ -277,17 +277,22 @@ export interface AlertEntry {
 }
 
 export interface PreflightConflict {
-  type: "port" | "service" | "container";
+  type: "port" | "service" | "container" | "virtualisation" | "tun" | "modules";
   port?: number;
   name?: string;
   detail: string;
-  severity: "warning" | "info";
+  /** "blocker" means the box cannot be an exit node at all — container
+   *  virtualisation, or no /dev/net/tun. Not a warning to weigh up. */
+  severity: "blocker" | "warning" | "info";
 }
 
 export interface PreflightData {
   os: string;
   arch: string;
   python: string;
+  virt: string;
+  tun_device: string;
+  kernel_modules: string;
   disk_free_gb: number;
   memory_mb: number;
   occupied_ports: { port: number; process: string }[];

@@ -16,6 +16,15 @@ PYTHON=$(python3 --version 2>/dev/null | awk '{print $2}' || echo "")
 DISK_FREE=$(df -BG / 2>/dev/null | tail -1 | awk '{print $4}' | tr -d 'G' || echo "0")
 MEM_TOTAL=$(free -m 2>/dev/null | awk '/Mem:/{print $2}' || echo "0")
 
+# The two things that decide whether this box can be an exit node at all.
+# A container-based VPS cannot load the AmneziaWG kernel module or open a
+# tun device, so AWG, Xray and tun2socks are all impossible on it — and
+# providers do not always say which they sell. Finding that out from a
+# failed provision costs an afternoon; finding it out here costs a second.
+VIRT=$(systemd-detect-virt 2>/dev/null || echo "unknown")
+if [ -c /dev/net/tun ]; then TUN="yes"; else TUN="no"; fi
+if [ -d "/lib/modules/$(uname -r)" ]; then MODULES="yes"; else MODULES="no"; fi
+
 # Check ports
 PORTS_JSON="["
 FIRST=1
@@ -54,6 +63,9 @@ cat <<ENDJSON
   "os": "$OS",
   "arch": "$ARCH",
   "python": "$PYTHON",
+  "virt": "$VIRT",
+  "tun_device": "$TUN",
+  "kernel_modules": "$MODULES",
   "disk_free_gb": $DISK_FREE,
   "memory_mb": $MEM_TOTAL,
   "occupied_ports": $PORTS_JSON,
@@ -114,6 +126,44 @@ def run_preflight(server_ip: str, root_password: str | None = None,
 
         # Build conflicts list
         conflicts = []
+
+        # Blockers first — these are not "you may want to look at this", they
+        # are "this box cannot do the job". A container-based VPS has no way
+        # to run AmneziaWG, and without /dev/net/tun neither AWG, Xray nor
+        # tun2socks can start. Both are worth knowing before a provision runs
+        # rather than after it fails halfway through.
+        virt = (data.get("virt") or "unknown").lower()
+        if virt in ("openvz", "lxc", "lxc-libvirt", "docker", "podman"):
+            conflicts.append({
+                "type": "virtualisation",
+                "name": virt,
+                "detail": ("container-based virtualisation — AmneziaWG cannot "
+                           "run here, this cannot be an exit node"),
+                "severity": "blocker",
+            })
+        elif virt == "unknown":
+            conflicts.append({
+                "type": "virtualisation",
+                "name": "unknown",
+                "detail": "could not determine virtualisation type — verify KVM before relying on this node",
+                "severity": "warning",
+            })
+
+        if data.get("tun_device") == "no":
+            conflicts.append({
+                "type": "tun",
+                "name": "/dev/net/tun",
+                "detail": "missing — AWG, Xray and tun2socks all need it",
+                "severity": "blocker",
+            })
+
+        if data.get("kernel_modules") == "no":
+            conflicts.append({
+                "type": "modules",
+                "name": f"/lib/modules",
+                "detail": "no module tree for the running kernel — out-of-tree modules cannot be built",
+                "severity": "warning",
+            })
 
         for port_info in data.get("occupied_ports", []):
             conflicts.append({
