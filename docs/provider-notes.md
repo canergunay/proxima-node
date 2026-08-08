@@ -8,6 +8,7 @@ Recommendations and observations from running Proxima exit servers.
 |----------|--------|----------|------|-------|-------|
 | BlueVPS | ERG-PL | Warsaw, PL | NVMe-bKVM 1024 | $6/mo | Good latency (31ms), stable |
 | Hetzner | ERG-DE | Germany | — | — | Good but IPs sometimes throttled in RU |
+| vps.com.tr | ERG-TR (FAST) | Istanbul, TR | EXTRA X (4C/4GB/60GB) | 249.90 TL + KDV = 299.88 TL/mo | **KVM, and the panel reports `Bandwidth: Unlimited`.** Bought 2026-08-09. AS213657, a Turkish AS registered to the operator — see "What the TR nodes measured" |
 | HOSTKEY | ERG-TR | Turkey | server ID 37582 | 830 ₽/mo | **Metered: 0.5 TB outbound included, then 720 ₽/TB.** Inbound unlimited, 1000 Mbps port. Active since 18.06.2026, auto-renew from balance |
 | Unknown | ERG-FI | Finland | — | — | Aeza — see "Providers to Avoid"; kept because Aeza IPs are not blocked on Russian LTE |
 
@@ -23,15 +24,18 @@ offline — **there is no traffic counter anywhere in the stack**, so an overage
 surfaces as an invoice rather than an alert. Add traffic accounting before
 routing bulk traffic through a metered node (master plan 20.A3/20.A4).
 
-## Candidates (not purchased)
+## vps.com.tr — what the site said before we bought (2026-08-04)
 
-| Provider | Location | Plan | Price | Notes |
-|----------|----------|------|-------|-------|
-| vps.com.tr | Istanbul, TR | EXTRA (2C/4GB/50GB) | 209.90 TL/mo + 20 % KDV = 251.88 TL | Out of stock when checked 2026-08-04 |
-| vps.com.tr | Istanbul, TR | EXTRA X (4C/4GB/60GB) | 249.90 TL/mo + 20 % KDV = 299.88 TL | Cheapest in-stock package. Debian 12 offered, 1 Gbit port, 1 IPv4 |
+Kept because the gap between what a provider publishes and what it delivers is
+the useful part of this record.
 
-Both packages are heavily oversized for an exit node (1 GB RAM / 10 GB disk is
-enough). Site researched 2026-08-04 — findings:
+| Plan | Price | Notes |
+|------|-------|-------|
+| EXTRA (2C/4GB/50GB) | 209.90 TL/mo + 20 % KDV = 251.88 TL | Out of stock when checked |
+| EXTRA X (4C/4GB/60GB) | 249.90 TL/mo + 20 % KDV = 299.88 TL | The one bought. Debian 12 offered, 1 Gbit port, 1 IPv4 |
+
+Both are heavily oversized for an exit node (1 GB RAM / 10 GB disk is enough).
+Findings at the time:
 
 - **No traffic policy is published anywhere** — not on the package pages, not
   in `hizmet-sartlari.php`. They never use the words "limitsiz/sınırsız
@@ -54,18 +58,55 @@ enough). Site researched 2026-08-04 — findings:
   sustained throughput over hours before trusting this box with bulk traffic.
 - Legal entity: HZD Teknoloji ve İnovasyon San. ve Tic. Ltd. Şti., Istanbul.
 
-**Verdict 2026-08-04: do not buy.** The only reason to prefer it was an
-assumption that it is unmetered, and that claim appears nowhere in its
-published material. Turkish hosts sell unmetered traffic at a capped port
-speed instead — İnetmar advertises "limitsiz 100 Mbit/s", states KVM and a
-Tier III ISO-27001 Türkiye datacenter, and starts at **$3.99/mo (~188 TL)**,
-cheaper than vps.com.tr's 299.88 TL with all three terms in writing.
+**Verdict 2026-08-04: do not buy — overturned 2026-08-09, bought and in
+service.** The verdict rested on two claims, and both were wrong.
 
-For an exit node that shape is strictly better: 1080p ≈ 8 Mbit and 4K ≈ 25
-Mbit, so 100 Mbit carries ~4 concurrent 4K streams — while a 1 Gbit port
-against a 0.5 TB cap runs out after ~70 h of 4K. **Unmetered at 100 Mbit beats
-metered at 1 Gbit for this workload.** Other providers that put unmetered TR
-traffic in writing: İdealHosting, Turhost, DeHost, hosting.com.tr, Sunucun.
+The first was mine. İnetmar was described here as advertising unmetered
+traffic in writing; it does not. Its hero line reads *"limitsiz 100 Mbit/s
+**hat**"* — the *line* is unmetered, not the volume — and its package table
+states **2 TB/month**. That distinction is exactly the one Turkish hosting
+marketing blurs, and it was repeated here from a search summary without being
+checked against the page.
+
+The second was the assumption that vps.com.tr's silence meant something bad.
+The customer panel answers both open questions plainly: **Proxmox with virtio
+boot order (a full KVM guest, not a container)** and **`Bandwidth Usage:
+0 MB / Unlimited`**. A one-second preflight probe confirmed `virt: kvm` and
+`/dev/net/tun` present before anything was installed.
+
+So the honest summary is that the page was uninformative, not that the product
+was poor. "Ask, do not infer" survives as the lesson; "unstated means bad"
+does not.
+
+The ~200 Mbit complaint on Şikayetvar remains untested — nothing so far has
+needed sustained throughput.
+
+## What the TR nodes measured (2026-08-09)
+
+Both nodes geolocate to Turkey in two independent databases, and both are
+flagged as datacenter ranges:
+
+| | ERG-TR (FAST) | ERG-TR (HOSTKEY) |
+|---|---|---|
+| country (ipinfo, ip-api) | TR | TR |
+| ISP / AS | HZD Teknoloji, **AS213657** | Hostkey B.V., AS57043 |
+| `hosting` flag | true | true |
+
+The AS registration differs and may matter: the new node's is a Turkish
+company on a Turkish AS, the older one's a Dutch B.V.
+
+**A controlled test found one platform that genuinely geo-gates.** TOD
+(todtv.com.tr) returns 403 from Germany and 200 from Turkey, and the new node
+passes it. TRT/tabii, Exxen, PuhuTV and five bank homepages return 200 from
+both countries, so those tell us nothing — their gating, if any, happens at
+playback or login rather than on the landing page.
+
+Playback and banking-app login were verified by hand on 2026-08-09 and work.
+Neither is testable from a shell: geo-gating for video happens in the player
+and its licence request, and a bank decides at login on IP reputation and
+device binding. `hosting: true` means the datacenter-blocking platforms
+(Netflix and similar) will still refuse — TOD passing shows it checks
+geography but not hosting.
 
 ## Turkish exit — what it is and is not for
 
@@ -77,10 +118,10 @@ traffic in writing: İdealHosting, Turhost, DeHost, hosting.com.tr, Sunucun.
   (Netflix, Disney+, Amazon) block hosting ASNs; Turkish local platforms are
   far more permissive. Some banks refuse datacenter ranges outright — this is a
   property of the specific IP, not of "Turkey". Test per platform and per bank.
-- **GeoIP must agree.** HOSTKEY is a Russian company running a TR region;
-  GeoIP databases sometimes report the registrant rather than the presence.
-  Verify `82.26.94.37` resolves to TR in MaxMind/IP2Location before relying on
-  it for geo-restricted content.
+- **GeoIP must agree — checked 2026-08-09, both do.** ipinfo.io and ip-api.com
+  place `82.26.94.37` and `185.229.12.109` in TR. Worth rechecking after any IP
+  change: a database can report the registrant rather than the presence, which
+  was the specific worry with HOSTKEY, a Dutch B.V. selling a TR region.
 - **Session stability matters more than uptime for banking.** An exit change
   mid-session (TR → DE) reads as account takeover: session kill, device
   re-verification, or a fraud lock. Prefer failing closed over failing over.
