@@ -13,8 +13,13 @@ set -e
 OS=$(cat /etc/os-release 2>/dev/null | grep PRETTY_NAME | cut -d'"' -f2 || echo "unknown")
 ARCH=$(uname -m)
 PYTHON=$(python3 --version 2>/dev/null | awk '{print $2}' || echo "")
-DISK_FREE=$(df -BG / 2>/dev/null | tail -1 | awk '{print $4}' | tr -d 'G' || echo "0")
-MEM_TOTAL=$(free -m 2>/dev/null | awk '/Mem:/{print $2}' || echo "0")
+DISK_FREE=$(df -BG / 2>/dev/null | tail -1 | awk '{print $4}' | tr -d 'G')
+MEM_TOTAL=$(free -m 2>/dev/null | awk '/Mem:/{print $2}')
+# These are emitted as bare JSON numbers, so an empty value would produce
+# `"disk_free_gb": ,` and take the whole document with it.
+case "$DISK_FREE" in ''|*[!0-9]*) DISK_FREE=0 ;; esac
+case "$MEM_TOTAL" in ''|*[!0-9]*) MEM_TOTAL=0 ;; esac
+[ -z "$OS" ] && OS="unknown"
 
 # The two things that decide whether this box can be an exit node at all.
 # A container-based VPS cannot load the AmneziaWG kernel module or open a
@@ -42,7 +47,14 @@ PORTS_JSON="${PORTS_JSON}]"
 SVCS_JSON="["
 FIRST=1
 for SVC in shadowsocks-libev-server@config outline-ss-server zapret-nfqws2 proxima-agent proxima-ssconf; do
-    STATE=$(systemctl is-active "$SVC" 2>/dev/null || echo "inactive")
+    # No fallback with || here. For a unit that does not exist systemctl
+    # prints inactive AND exits non-zero, so the fallback fired as well and
+    # STATE ended up as two lines. That is not equal to inactive, so every
+    # absent service was reported as present, carrying a newline into a JSON
+    # string and taking the whole document with it. It could only ever show
+    # on a genuinely fresh box, where none of these units exist yet.
+    STATE=$(systemctl is-active "$SVC" 2>/dev/null | head -1 | tr -d '[:space:]')
+    [ -z "$STATE" ] && STATE="inactive"
     if [ "$STATE" != "inactive" ]; then
         [ $FIRST -eq 0 ] && SVCS_JSON="${SVCS_JSON},"
         SVCS_JSON="${SVCS_JSON}{\"name\":\"${SVC}\",\"state\":\"${STATE}\"}"
