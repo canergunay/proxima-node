@@ -47,6 +47,7 @@ def create_app() -> Flask:
     from api.vpn_servers import bp as vpn_servers_bp
     from api.vpn_users import bp as vpn_users_bp
     from api.vpn_discover import bp as vpn_discover_bp
+    from api.vpn_sync import bp as vpn_sync_bp
     from api.admins import bp as admins_bp
     from api.monitoring import bp as monitoring_bp
     app.register_blueprint(auth_bp)
@@ -56,14 +57,17 @@ def create_app() -> Flask:
     app.register_blueprint(vpn_servers_bp)
     app.register_blueprint(vpn_users_bp)
     app.register_blueprint(vpn_discover_bp)
+    app.register_blueprint(vpn_sync_bp)
     app.register_blueprint(admins_bp)
     app.register_blueprint(monitoring_bp)
 
     # Auth middleware
-    # /api/vpn/discover IS a login (the single-login client's), so it cannot
-    # sit behind the admin token gate; it carries its own rate limiting.
+    # /api/vpn/discover IS a login (the single-login client's) and
+    # /api/vpn/sync authenticates with an instance-issued user token, so
+    # neither can sit behind the admin token gate; both carry their own
+    # rate limiting and delegate verification to the instance.
     NO_AUTH_PATHS = {"/api/auth/login", "/api/auth/setup", "/api/auth/me",
-                     "/api/vpn/discover"}
+                     "/api/vpn/discover", "/api/vpn/sync"}
 
     def _scoped_admin_may(path: str, method: str) -> bool:
         """What a non-superadmin may reach.
