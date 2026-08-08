@@ -31,7 +31,31 @@ def _atomic_write(path: str, content: str) -> None:
     os.replace(tmp_path, path)
 
 
-def _management_host(row: dict, public: str | None) -> dict:
+def _live_tunnels() -> dict:
+    """Peers that have handshaked recently, by public key.
+
+    Reading `wg show` rather than trusting the database. A row having a
+    callhome_ip only means an address was allocated — the tunnel may never
+    have been installed, or may have stopped carrying traffic. Pointing
+    Ansible at an address on that evidence is how a provision fails with
+    "unreachable" against a box whose public address was fine all along.
+
+    Failure here is deliberately quiet: an empty result sends everything to
+    its public address, which is the safe direction to be wrong in.
+    """
+    try:
+        from core.mgmt_network import handshakes
+        return handshakes()
+    except Exception:
+        log.debug("Could not read management tunnel handshakes", exc_info=True)
+        return {}
+
+
+# Keepalive is 25s, so a tunnel carrying traffic handshakes well inside this.
+TUNNEL_FRESH_SECONDS = 180
+
+
+def _management_host(row: dict, public: str | None, live: dict | None = None) -> dict:
     """Which address Ansible should use, and the other one written beside it.
 
     The management tunnel when the node is on it. Ansible is management, and
@@ -40,16 +64,23 @@ def _management_host(row: dict, public: str | None) -> dict:
     Russia within a day of each other, and running a play against them meant
     passing -e ansible_host by hand every time.
 
-    A node with no tunnel yet still gets its public address, which is what
-    makes first provisioning work: callhome_ip is empty until ADM enrols it.
+    But only a tunnel that is actually up. An allocated address is not a
+    working path: a node enrolled before it was provisioned has a callhome_ip
+    and nothing listening on it, and choosing that would fail the provision
+    against a box whose public address was reachable the whole time. So the
+    decision comes from a recent handshake, not from the database — the same
+    correction the role needed, made in the same wrong place twice.
 
-    public_host is recorded either way. A tunnel can be the broken one — ERG-DE
-    handshakes and carries nothing — and then the override is
-    `-e ansible_host={{ public_host }}` rather than a hunt for the address.
+    public_host is recorded either way, so the override for an unusual case
+    is `-e ansible_host={{ public_host }}` rather than a hunt for the address.
     """
     entry: dict = {}
     tunnel = row.get("callhome_ip")
-    entry["ansible_host"] = tunnel or public
+    pubkey = row.get("callhome_pubkey")
+    seen = (live or {}).get(pubkey) if pubkey else None
+    tunnel_up = tunnel and seen is not None and seen <= TUNNEL_FRESH_SECONDS
+
+    entry["ansible_host"] = tunnel if tunnel_up else public
     if public:
         entry["public_host"] = public
     if tunnel:
@@ -69,11 +100,12 @@ def write_hosts_yml(servers: list[dict], vpn_servers: list[dict] | None = None) 
     vpn_exit_hosts = {}
     dpi_bypass_hosts = {}
     proxima_site_hosts = {}
+    live = _live_tunnels()
 
     for s in vpn_servers or []:
         if not s.get("ssh_host"):
             continue  # registered by hand, not provisioned by ADM
-        entry = _management_host(s, s["ssh_host"])
+        entry = _management_host(s, s["ssh_host"], live)
         if s.get("ssh_port") and s["ssh_port"] != 22:
             entry["ansible_port"] = s["ssh_port"]
         entry["ansible_user"] = s.get("ssh_user") or "root"
@@ -86,7 +118,7 @@ def write_hosts_yml(servers: list[dict], vpn_servers: list[dict] | None = None) 
     for s in servers:
         if s["status"] == "decommissioned":
             continue
-        host_entry = _management_host(s, s["ip"])
+        host_entry = _management_host(s, s["ip"], live)
         ssh_port = s.get("ssh_port", 22)
         if ssh_port and ssh_port != 22:
             host_entry["ansible_port"] = ssh_port
