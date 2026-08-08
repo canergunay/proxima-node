@@ -31,6 +31,32 @@ def _atomic_write(path: str, content: str) -> None:
     os.replace(tmp_path, path)
 
 
+def _management_host(row: dict, public: str | None) -> dict:
+    """Which address Ansible should use, and the other one written beside it.
+
+    The management tunnel when the node is on it. Ansible is management, and
+    the tunnel is the path built to survive what has been taking the public
+    addresses away — two of four exit nodes stopped answering publicly from
+    Russia within a day of each other, and running a play against them meant
+    passing -e ansible_host by hand every time.
+
+    A node with no tunnel yet still gets its public address, which is what
+    makes first provisioning work: callhome_ip is empty until ADM enrols it.
+
+    public_host is recorded either way. A tunnel can be the broken one — ERG-DE
+    handshakes and carries nothing — and then the override is
+    `-e ansible_host={{ public_host }}` rather than a hunt for the address.
+    """
+    entry: dict = {}
+    tunnel = row.get("callhome_ip")
+    entry["ansible_host"] = tunnel or public
+    if public:
+        entry["public_host"] = public
+    if tunnel:
+        entry["mgmt_tunnel_host"] = tunnel
+    return entry
+
+
 def write_hosts_yml(servers: list[dict], vpn_servers: list[dict] | None = None) -> None:
     """Generate inventory/hosts.yml from the server lists.
 
@@ -47,7 +73,7 @@ def write_hosts_yml(servers: list[dict], vpn_servers: list[dict] | None = None) 
     for s in vpn_servers or []:
         if not s.get("ssh_host"):
             continue  # registered by hand, not provisioned by ADM
-        entry = {"ansible_host": s["ssh_host"]}
+        entry = _management_host(s, s["ssh_host"])
         if s.get("ssh_port") and s["ssh_port"] != 22:
             entry["ansible_port"] = s["ssh_port"]
         entry["ansible_user"] = s.get("ssh_user") or "root"
@@ -60,7 +86,7 @@ def write_hosts_yml(servers: list[dict], vpn_servers: list[dict] | None = None) 
     for s in servers:
         if s["status"] == "decommissioned":
             continue
-        host_entry = {"ansible_host": s["ip"]}
+        host_entry = _management_host(s, s["ip"])
         ssh_port = s.get("ssh_port", 22)
         if ssh_port and ssh_port != 22:
             host_entry["ansible_port"] = ssh_port
