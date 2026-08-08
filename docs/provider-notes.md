@@ -9,15 +9,21 @@ Recommendations and observations from running Proxima exit servers.
 | BlueVPS | ERG-PL | Warsaw, PL | NVMe-bKVM 1024 | $6/mo | Good latency (31ms), stable |
 | Hetzner | ERG-DE | Germany | — | — | Good but IPs sometimes throttled in RU |
 | vps.com.tr | ERG-TR (FAST) | Istanbul, TR | EXTRA X (4C/4GB/60GB) | 249.90 TL + KDV = 299.88 TL/mo | **KVM, and the panel reports `Bandwidth: Unlimited`.** Bought 2026-08-09. AS213657, a Turkish AS registered to the operator — see "What the TR nodes measured" |
-| HOSTKEY | ERG-TR | Turkey | server ID 37582 | 830 ₽/mo | **Metered: 0.5 TB outbound included, then 720 ₽/TB.** Inbound unlimited, 1000 Mbps port. Active since 18.06.2026, auto-renew from balance |
+| HOSTKEY | ERG-TR | Turkey | server ID 37582 | 830 ₽/mo | **Metered: 0.5 TB outbound. The panel quotes 720 ₽/TB, but Can confirms overage is not billed — the connection is cut instead.** Inbound unlimited, 1000 Mbps port. Active since 18.06.2026 |
 | Unknown | ERG-FI | Finland | — | — | Aeza — see "Providers to Avoid"; kept because Aeza IPs are not blocked on Russian LTE |
 
 ## Metered vs unmetered
 
-ERG-TR is the only **metered** node. For an exit server the billed direction is
+ERG-TR is the only **metered** node. For an exit server the metered direction is
 the painful one: internet → server is inbound (free), server → client is
 outbound (metered), so downloads and video streaming land squarely on the cap.
 0.5 TB is roughly 220–330 h of 1080p, ~165 h of Netflix HD, or ~70 h of 4K.
+
+**And the failure mode is worse than a bill.** The panel quotes 720 ₽/TB, which
+reads like an overage tariff, but Can confirms nothing is charged: the
+connection is cut at the cap. So exceeding it does not produce an invoice
+someone notices at the end of the month — it produces an exit node that stops
+carrying traffic, on a stack with no traffic counter to say why.
 
 `agent.py` collects cpu/disk/memory only and ADM alerts on cpu/disk/memory/
 offline — **there is no traffic counter anywhere in the stack**, so an overage
