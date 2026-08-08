@@ -48,6 +48,8 @@ def init_db() -> None:
             agent_port            INTEGER NOT NULL DEFAULT 5051,
             node_id               TEXT,
             install_adguard       INTEGER NOT NULL DEFAULT 0,
+            traffic_limit_gb      REAL,
+            traffic_period_day    INTEGER NOT NULL DEFAULT 1,
             callhome_ip           TEXT,
             callhome_pubkey       TEXT,
             callhome_privkey_enc  TEXT,
@@ -341,11 +343,27 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE server_metrics ADD COLUMN cpu_pct REAL")
         conn.commit()
 
+    # Cumulative byte counters from the billed interface, stored as read.
+    # Rates are derived at query time: the counters reset on reboot and only
+    # something comparing consecutive samples can tell a reset from a quiet
+    # interval.
+    if "rx_bytes" not in metric_cols:
+        conn.execute("ALTER TABLE server_metrics ADD COLUMN rx_bytes INTEGER")
+        conn.execute("ALTER TABLE server_metrics ADD COLUMN tx_bytes INTEGER")
+        conn.commit()
+
     # Exit nodes join the management network too. Their agent is reachable on
     # a public port today, which dies whenever the path to that IP does — and
     # then ADM reports the node offline while the node itself is healthy.
     # Riding the tunnel instead makes "agent unreachable" mean something.
     server_cols = {row[1] for row in conn.execute("PRAGMA table_info(servers)").fetchall()}
+    # What the plan allows and when it resets. NULL means unmetered — most
+    # nodes — so an alert only exists where a limit does.
+    if "traffic_limit_gb" not in server_cols:
+        conn.execute("ALTER TABLE servers ADD COLUMN traffic_limit_gb REAL")
+        conn.execute("ALTER TABLE servers ADD COLUMN traffic_period_day INTEGER NOT NULL DEFAULT 1")
+        conn.commit()
+
     if "callhome_ip" not in server_cols:
         for stmt in (
             "ALTER TABLE servers ADD COLUMN callhome_ip TEXT",
@@ -456,6 +474,7 @@ def update_server(server_id: int, updates: dict) -> bool:
         "vless_uuid", "vless_public_key", "vless_short_id", "vless_port",
         "callhome_ip", "callhome_pubkey", "callhome_privkey_enc",
         "callhome_psk_enc",
+        "traffic_limit_gb", "traffic_period_day",
     }
     sets, vals = [], []
     for key, val in updates.items():
@@ -865,8 +884,9 @@ def insert_metric(server_id: int, data: dict) -> None:
     conn = get_conn()
     conn.execute(
         "INSERT INTO server_metrics "
-        "(server_id, timestamp, online, uptime, disk_pct, memory_pct, cpu_pct, services_ok, docker_ok) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "(server_id, timestamp, online, uptime, disk_pct, memory_pct, cpu_pct, services_ok, docker_ok, "
+        "rx_bytes, tx_bytes) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             server_id, int(time.time()),
             1 if data.get("online") else 0,
@@ -876,6 +896,8 @@ def insert_metric(server_id: int, data: dict) -> None:
             data.get("cpu_pct"),
             data.get("services_ok"),
             data.get("docker_ok"),
+            data.get("rx_bytes"),
+            data.get("tx_bytes"),
         ),
     )
     conn.commit()
@@ -1318,3 +1340,64 @@ def mark_all_access_pending(user_id: int) -> None:
         (int(time.time()), user_id),
     )
     conn.commit()
+
+
+# ── Traffic accounting ───────────────────────────────────────────────────
+
+def period_start(period_day: int, now: float | None = None) -> int:
+    """Start of the current billing period, as a unix timestamp.
+
+    Providers count from a day of the month, not from the 1st — HOSTKEY's
+    ERG-TR turns over on the 18th. A month boundary would report the wrong
+    figure for three weeks of every four.
+    """
+    import datetime as _dt
+    ts = _dt.datetime.fromtimestamp(now or time.time())
+    day = max(1, min(28, int(period_day or 1)))
+    start = ts.replace(day=day, hour=0, minute=0, second=0, microsecond=0)
+    if ts.day < day:
+        # Before this month's turnover, so the period began last month.
+        start = (start.replace(day=1) - _dt.timedelta(days=1)).replace(
+            day=day, hour=0, minute=0, second=0, microsecond=0)
+    return int(start.timestamp())
+
+
+def traffic_since(server_id: int, since_ts: int) -> dict:
+    """Bytes moved since *since_ts*, summed from consecutive samples.
+
+    The stored counters are cumulative and reset whenever the box reboots, so
+    a plain last-minus-first would report a negative number after any reboot
+    and silently under-count after every one. Summing only the positive steps
+    treats a reset as an unknown gap rather than as traffic that never
+    happened — an undercount at worst, which is the honest direction for a
+    figure someone will use to decide whether they are near a cap.
+    """
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT rx_bytes, tx_bytes FROM server_metrics "
+        "WHERE server_id = ? AND timestamp >= ? AND tx_bytes IS NOT NULL "
+        "ORDER BY timestamp",
+        (server_id, since_ts),
+    ).fetchall()
+
+    rx = tx = 0
+    resets = 0
+    prev = None
+    for row in rows:
+        cur = (row["rx_bytes"], row["tx_bytes"])
+        if prev is not None:
+            if cur[0] >= prev[0] and cur[1] >= prev[1]:
+                rx += cur[0] - prev[0]
+                tx += cur[1] - prev[1]
+            else:
+                resets += 1
+        prev = cur
+
+    return {
+        "rx_bytes": rx,
+        "tx_bytes": tx,
+        "rx_gb": round(rx / (1024**3), 2),
+        "tx_gb": round(tx / (1024**3), 2),
+        "samples": len(rows),
+        "counter_resets": resets,
+    }

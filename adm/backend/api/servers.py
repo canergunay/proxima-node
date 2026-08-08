@@ -240,6 +240,18 @@ def get_server_detail(server_id: int):
     # Include recent operations
     result["operations"] = get_operations_by_server(server_id, limit=10)
 
+    # Traffic used this billing period. Only meaningful where a limit exists,
+    # but reported either way so an unmetered node still shows what it moves.
+    try:
+        from core.db import period_start, traffic_since
+        start = period_start(result.get("traffic_period_day") or 1)
+        result["traffic"] = {**traffic_since(server_id, start),
+                             "period_start": start,
+                             "limit_gb": result.get("traffic_limit_gb")}
+    except Exception:
+        log.debug("Could not compute traffic for %s", server_id, exc_info=True)
+        result["traffic"] = None
+
     # Include live online status
     result["online"] = False
     result["agent_status"] = None

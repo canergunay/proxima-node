@@ -194,6 +194,48 @@ def _get_memory() -> dict:
         return {}
 
 
+def _get_network() -> dict:
+    """Cumulative byte counters for the interface carrying the default route.
+
+    Exit nodes are billed on outbound traffic, and until now nothing in the
+    stack counted it — an overage was discovered from the provider, not from
+    us. Worse on a plan that cuts the connection instead of charging: the
+    first symptom is a node that silently stops carrying traffic.
+
+    Reported cumulative rather than as a rate, because the counters reset on
+    reboot and only the collector can tell a reset from a quiet interval.
+    The default-route interface is the billed one; loopback, docker bridges,
+    veth pairs and the tunnels themselves are traffic that never leaves.
+    """
+    try:
+        iface = None
+        with open("/proc/net/route") as f:
+            next(f)
+            for line in f:
+                parts = line.split()
+                # Destination 00000000 is the default route.
+                if len(parts) > 1 and parts[1] == "00000000":
+                    iface = parts[0]
+                    break
+        if not iface:
+            return {}
+
+        with open("/proc/net/dev") as f:
+            for line in f:
+                name, _, rest = line.partition(":")
+                if name.strip() != iface:
+                    continue
+                fields = rest.split()
+                return {
+                    "iface": iface,
+                    "rx_bytes": int(fields[0]),
+                    "tx_bytes": int(fields[8]),
+                }
+    except Exception:
+        pass
+    return {}
+
+
 def _get_cpu_usage() -> dict:
     """Read /proc/stat twice with 200ms interval to compute CPU usage."""
     try:
@@ -352,6 +394,7 @@ def get_status():
         "cpu": _get_cpu_usage(),
         "disk": _get_disk_usage(),
         "memory": _get_memory(),
+        "network": _get_network(),
         "docker_containers": _get_docker_containers(),
     }
 

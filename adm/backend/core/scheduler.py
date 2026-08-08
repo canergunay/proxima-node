@@ -18,6 +18,8 @@ from core.db import (
     insert_alert,
     insert_metric,
     insert_vpn_metric,
+    period_start,
+    traffic_since,
 )
 
 log = logging.getLogger("adm.scheduler")
@@ -178,6 +180,11 @@ def _poll_agent_at(url_base: str, server: dict, result: dict) -> bool:
             cpu = status_data.get("cpu", {})
             if isinstance(cpu, dict):
                 result["cpu_pct"] = cpu.get("used_pct")
+            # Cumulative, stored as read — see traffic_since() for why.
+            net = status_data.get("network", {})
+            if isinstance(net, dict):
+                result["rx_bytes"] = net.get("rx_bytes")
+                result["tx_bytes"] = net.get("tx_bytes")
             # Count services
             services = status_data.get("services", {})
             if services:
@@ -368,6 +375,53 @@ def _check_alerts() -> None:
                       memory_threshold, bot_token, chat_id, now)
         _check_metric(sid, name, "cpu", "CPU", latest.get("cpu_pct"),
                       cpu_threshold, bot_token, chat_id, now)
+        _check_traffic(server, bot_token, chat_id, now)
+
+
+def _check_traffic(server: dict, bot_token: str, chat_id: str, now: float) -> None:
+    """Warn before a metered node reaches its allowance.
+
+    Only outbound is counted. On an exit node the billed direction is the one
+    carrying the payload — internet to server is inbound and free, server to
+    client is outbound and metered — so downloads and video land squarely on
+    the cap while inbound stays near zero.
+
+    This exists because nothing counted it. ERG-TR allows 0.5 TB and its
+    provider does not bill overage, it cuts the connection: the first symptom
+    was going to be an exit node that silently stopped working, with no
+    number anywhere to explain it.
+    """
+    limit_gb = server.get("traffic_limit_gb")
+    if not limit_gb or limit_gb <= 0:
+        return  # unmetered, nothing to warn about
+
+    start = period_start(server.get("traffic_period_day") or 1, now)
+    used = traffic_since(server["id"], start)
+    if not used["samples"]:
+        return
+
+    pct = used["tx_gb"] / limit_gb * 100
+    for level in (90, 70):
+        if pct >= level:
+            days_left = max(0, int((period_start(
+                server.get("traffic_period_day") or 1,
+                now + 31 * 86400) - now) / 86400))
+            lines = [
+                f"*Traffic {level}%*",
+                f"Server: {server['display_name']}",
+                f"Outbound: {used['tx_gb']:.1f} GB of {limit_gb:.0f} GB ({pct:.0f}%)",
+                f"Period resets in ~{days_left} days",
+            ]
+            if used["counter_resets"]:
+                # A reboot lost whatever moved between the last sample before
+                # it and the first one after. Say so rather than present an
+                # undercount as the figure.
+                lines.append("_Counter reset seen — the real figure may be higher._")
+            _maybe_send_alert(
+                server["id"], f"traffic{level}", bot_token, chat_id,
+                "\n".join(lines), now,
+            )
+            break
 
 
 def _check_metric(
