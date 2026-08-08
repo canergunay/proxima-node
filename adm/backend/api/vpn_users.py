@@ -55,6 +55,13 @@ bp = Blueprint("vpn_users", __name__)
 USERNAME_RE = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
 MIN_PASSWORD_LEN = 8
 
+# Peers a new grant gets when nobody says otherwise. NULL means unlimited,
+# and the access matrix grants with an empty body — so leaving it unset
+# handed every tick of a checkbox an unlimited device allowance. A person
+# with a laptop and a phone is the common case; raising it is a deliberate
+# edit, which is the right way round.
+DEFAULT_MAX_PEERS = 2
+
 
 # ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -446,6 +453,12 @@ def grant_access(user_id: int, vpn_server_id: int):
     data, err = _parse_access_body(request.get_json(silent=True) or {})
     if err:
         return jsonify({"ok": False, "error": err}), 400
+
+    # Only for a brand-new grant: editing an existing one to unlimited is a
+    # choice and must survive, but creating one from the matrix should not
+    # silently mean "as many devices as you like".
+    if "max_peers" not in data and not get_access(user_id, vpn_server_id):
+        data["max_peers"] = DEFAULT_MAX_PEERS
 
     upsert_user_access(user_id, vpn_server_id, data)
     sync = _push_now(user_id)
