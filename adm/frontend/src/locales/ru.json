@@ -393,5 +393,11 @@
   "mgmt.reissue": "Показать команду установки",
   "mgmt.installHint": "Выполните это на узле. Консоль провайдера работает даже когда SSH недоступен.",
   "mgmt.installCommand": "Команда установки",
-  "mgmt.failed": "Не удалось подключить узел"
+  "mgmt.failed": "Не удалось подключить узел",
+  "traffic.title": "Трафик за период",
+  "traffic.outbound": "Исходящий",
+  "traffic.inbound": "Входящий",
+  "traffic.unmetered": "без лимита",
+  "traffic.since": "Отсчёт с {{date}}",
+  "traffic.reset": "счётчик сбрасывался, реальное значение может быть выше"
 }

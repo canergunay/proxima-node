@@ -393,5 +393,11 @@
   "mgmt.reissue": "Show install command",
   "mgmt.installHint": "Run this on the node. Its provider console works even when SSH does not.",
   "mgmt.installCommand": "Install command",
-  "mgmt.failed": "Could not enrol the node"
+  "mgmt.failed": "Could not enrol the node",
+  "traffic.title": "Traffic this period",
+  "traffic.outbound": "Outbound",
+  "traffic.inbound": "Inbound",
+  "traffic.unmetered": "unmetered",
+  "traffic.since": "Counted since {{date}}",
+  "traffic.reset": "a counter reset was seen, so the real figure may be higher"
 }

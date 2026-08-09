@@ -566,6 +566,28 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
           </Box>
         </Box>
 
+        {/* Traffic this billing period */}
+        {server.traffic && server.traffic.samples > 1 && (
+          <>
+            <Divider sx={{ my: 2 }} />
+            <Typography variant="subtitle2" gutterBottom>{t("traffic.title")}</Typography>
+            <Typography variant="body2" color="text.secondary">
+              {t("traffic.outbound")}: <b>{server.traffic.tx_gb.toFixed(1)} GB</b>
+              {server.traffic.limit_gb
+                ? ` / ${server.traffic.limit_gb.toFixed(0)} GB (${
+                    Math.round((server.traffic.tx_gb / server.traffic.limit_gb) * 100)}%)`
+                : ` — ${t("traffic.unmetered")}`}
+              {"  ·  "}{t("traffic.inbound")}: {server.traffic.rx_gb.toFixed(1)} GB
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+              {t("traffic.since", {
+                date: new Date(server.traffic.period_start * 1000).toLocaleDateString(),
+              })}
+              {server.traffic.counter_resets > 0 && ` — ${t("traffic.reset")}`}
+            </Typography>
+          </>
+        )}
+
         {/* Management tunnel */}
         <Divider sx={{ my: 2 }} />
         <Typography variant="subtitle2" gutterBottom>{t("mgmt.title")}</Typography>

@@ -393,5 +393,11 @@
   "mgmt.reissue": "Kurulum komutunu göster",
   "mgmt.installHint": "Bunu node üzerinde çalıştır. SSH çalışmasa bile sağlayıcı konsolu çalışır.",
   "mgmt.installCommand": "Kurulum komutu",
-  "mgmt.failed": "Node kaydedilemedi"
+  "mgmt.failed": "Node kaydedilemedi",
+  "traffic.title": "Bu dönemdeki trafik",
+  "traffic.outbound": "Giden",
+  "traffic.inbound": "Gelen",
+  "traffic.unmetered": "limitsiz",
+  "traffic.since": "{{date}} tarihinden beri sayılıyor",
+  "traffic.reset": "sayaç sıfırlanması görüldü, gerçek rakam daha yüksek olabilir"
 }

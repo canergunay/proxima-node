@@ -42,9 +42,21 @@ export interface ServerDetail extends Server {
   node_id: string | null;
   install_adguard: number;
   callhome_ip: string | null;
+  traffic: TrafficUsage | null;
   created_at: number;
   updated_at: number;
   operations: Operation[];
+}
+
+export interface TrafficUsage {
+  rx_gb: number;
+  tx_gb: number;
+  samples: number;
+  /** Reboots seen in the window. The figure undercounts by whatever moved
+   *  across each one, so the UI says so rather than implying precision. */
+  counter_resets: number;
+  period_start: number;
+  limit_gb: number | null;
 }
 
 export interface MgmtTunnelData {
