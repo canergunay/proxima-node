@@ -10,6 +10,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from flask import Blueprint, jsonify, request
 
 from core.auth import decrypt_value, encrypt_value
+from core.proxima_client import PROBE_TIMEOUT
 from core.db import (
     create_server,
     delete_server,
@@ -59,12 +60,17 @@ def _agent_headers(server: dict) -> dict:
 
 
 def _proxy_request(server: dict, method: str, path: str,
-                   body: dict | None = None, timeout: int = 15) -> dict:
+                   body: dict | None = None,
+                   timeout: int | tuple[int, int] = 15) -> dict:
     """Forward an HTTP request to a proxima-agent.
 
     Tries the tunnel and then the public address, so a node is only reported
     unreachable when no path to it works. The last transport error is
     re-raised if they all fail, leaving callers' error handling unchanged.
+
+    Because both addresses are tried in turn, a node that answers on neither
+    costs *twice* the timeout — which is why the status probes below pass a
+    `(connect, read)` tuple rather than a scalar.
     """
     headers = _agent_headers(server)
     urls = _agent_urls(server)
@@ -119,7 +125,8 @@ def _fetch_server_status(server: dict) -> dict:
         return result
 
     try:
-        data = _proxy_request(server, "GET", "/api/status", timeout=10)
+        data = _proxy_request(server, "GET", "/api/status",
+                              timeout=PROBE_TIMEOUT)
         if data.get("ok"):
             result["online"] = True
             result["agent_status"] = data.get("data")
@@ -257,7 +264,8 @@ def get_server_detail(server_id: int):
     result["agent_status"] = None
     if result.get("status") in ("active", "provisioning", "error"):
         try:
-            status_data = _proxy_request(server, "GET", "/api/status", timeout=5)
+            status_data = _proxy_request(server, "GET", "/api/status",
+                                         timeout=PROBE_TIMEOUT)
             if status_data.get("ok"):
                 result["online"] = True
                 result["agent_status"] = status_data.get("data")

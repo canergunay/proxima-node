@@ -16,7 +16,7 @@ from core.db import (
     update_vpn_server,
 )
 from core.authz import scoped_server_ids, superadmin_only
-from core.proxima_client import request as _proxima_request
+from core.proxima_client import PROBE_TIMEOUT, request as _proxima_request
 from core.subnets import validate_for_server
 
 log = logging.getLogger("adm.vpn_servers")
@@ -47,7 +47,8 @@ def _fetch_vpn_server_status(server: dict) -> dict:
         return result
 
     try:
-        resp = _proxima_request(server, "GET", "/api/status", timeout=10)
+        resp = _proxima_request(server, "GET", "/api/status",
+                                timeout=PROBE_TIMEOUT)
         resp.raise_for_status()
         data = resp.json()
         if data.get("ok"):
@@ -71,7 +72,8 @@ def _fetch_vpn_server_status(server: dict) -> dict:
     if result["online"]:
         try:
             cresp = _proxima_request(server, "GET",
-                                     "/api/vpn/self/connectivity", timeout=5)
+                                     "/api/vpn/self/connectivity",
+                                     timeout=PROBE_TIMEOUT)
             if cresp.status_code == 200:
                 cdata = cresp.json()
                 if cdata.get("ok") and cdata.get("data"):
