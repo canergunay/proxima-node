@@ -11,6 +11,7 @@ from flask import Blueprint, jsonify, request
 
 from core.auth import decrypt_value, encrypt_value
 from core.proxima_client import PROBE_TIMEOUT
+from core import mgmt_network as mgmt
 from core.db import (
     create_server,
     delete_server,
@@ -170,6 +171,14 @@ def list_servers():
     # Sort by original DB order
     order = {s["id"]: i for i, s in enumerate(servers)}
     results.sort(key=lambda r: order.get(r["id"], 999))
+
+    # Management-tunnel state, read once for the whole list — see the note in
+    # vpn_servers.py: `online` here can be true over the public address while
+    # the tunnel is dead, so the two are reported separately.
+    peers = mgmt.peer_status()
+    by_id = {s["id"]: s for s in servers}
+    for r in results:
+        r["mgmt_tunnel"] = mgmt.tunnel_for(by_id.get(r["id"], {}), peers)
 
     return jsonify({"ok": True, "data": results})
 

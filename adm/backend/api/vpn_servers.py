@@ -17,6 +17,7 @@ from core.db import (
 )
 from core.authz import scoped_server_ids, superadmin_only
 from core.proxima_client import PROBE_TIMEOUT, request as _proxima_request
+from core import mgmt_network as mgmt
 from core.subnets import validate_for_server
 
 log = logging.getLogger("adm.vpn_servers")
@@ -118,6 +119,15 @@ def list_vpn_servers():
     # Sort by original DB order
     order = {s["id"]: i for i, s in enumerate(servers)}
     results.sort(key=lambda r: order.get(r["id"], 999))
+
+    # Management-tunnel state, read once for the whole list. Reported beside
+    # `online` rather than folded into it: a node answering on its public
+    # address while its tunnel is dead is exactly the state that has to be
+    # visible, and merging the two would hide it.
+    peers = mgmt.peer_status()
+    by_id = {s["id"]: s for s in servers}
+    for r in results:
+        r["mgmt_tunnel"] = mgmt.tunnel_for(by_id.get(r["id"], {}), peers)
 
     return jsonify({"ok": True, "data": results})
 

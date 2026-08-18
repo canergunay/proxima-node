@@ -23,6 +23,7 @@ import logging
 import os
 import secrets
 import subprocess
+import time
 
 from core.auth import decrypt_value, encrypt_value
 from core.config import DB_PATH
@@ -255,6 +256,75 @@ def apply_live() -> None:
 
 def is_up() -> bool:
     return subprocess.run([WG_BIN, "show", INTERFACE], capture_output=True).returncode == 0
+
+
+# How long a peer may go without a handshake before we call the tunnel dead.
+# WireGuard rekeys about every two minutes while anything is flowing, and every
+# config here sets PersistentKeepalive=25, so a live peer is never quiet for
+# five minutes. Anything older means the tunnel is down, whatever the node's
+# agent says over its public address.
+STALE_AFTER = 300
+
+
+def peer_status() -> dict[str, dict]:
+    """Last-handshake state per peer, keyed by public key.
+
+    Read straight from the interface rather than inferred from agent polling.
+    That distinction is the whole point: `_proxy_request` falls back to a
+    node's public address when the tunnel does not answer, so a node reports
+    itself healthy while the recovery path it is supposed to be reachable
+    through has been dead for days. Nothing surfaced that until it was looked
+    for by hand — two of six tunnels turned out to be down, one for six and a
+    half days.
+
+    Returns {} when the interface is not up, which callers must treat as
+    "unknown", not "everything is down".
+    """
+    try:
+        dump = _wg("show", INTERFACE, "dump")
+    except Exception:
+        return {}
+
+    now = time.time()
+    peers: dict[str, dict] = {}
+    # First line describes the interface itself; peers follow, tab separated:
+    # pubkey, psk, endpoint, allowed-ips, last-handshake, rx, tx, keepalive
+    for line in dump.splitlines()[1:]:
+        parts = line.split("\t")
+        if len(parts) < 7:
+            continue
+        pubkey, _psk, endpoint, allowed, handshake, rx, tx = parts[:7]
+        try:
+            last = int(handshake)
+        except ValueError:
+            last = 0
+        age = int(now - last) if last else None
+        peers[pubkey] = {
+            "endpoint": None if endpoint == "(none)" else endpoint,
+            "allowed_ips": allowed,
+            "handshake_age": age,
+            "rx_bytes": int(rx) if rx.isdigit() else 0,
+            "tx_bytes": int(tx) if tx.isdigit() else 0,
+            # never  — configured but has not once completed a handshake
+            # up     — seen within STALE_AFTER
+            # stale  — was up at some point, is not now
+            "state": "never" if age is None else ("up" if age <= STALE_AFTER else "stale"),
+        }
+    return peers
+
+
+def tunnel_for(server: dict, peers: dict[str, dict] | None) -> dict:
+    """The management-tunnel view of one server, for the API to embed.
+
+    `peers` is passed in so a list endpoint reads the interface once instead of
+    once per row.
+    """
+    pubkey = server.get("callhome_pubkey")
+    if not pubkey:
+        return {"state": "absent"}
+    if peers is None:
+        return {"state": "unknown"}
+    return peers.get(pubkey, {"state": "absent"})
 
 
 def sync() -> None:
