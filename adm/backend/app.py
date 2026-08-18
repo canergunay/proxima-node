@@ -33,6 +33,19 @@ def create_app() -> Flask:
     from core.first_boot import import_existing_servers
     import_existing_servers()
 
+    # hosts.yml is generated from the DB and is no longer tracked in git, so a
+    # fresh checkout arrives without one. Write it here rather than waiting for
+    # the next server edit, or a deploy followed straight by a playbook run
+    # would find no inventory at all. After the import above, never before it:
+    # that reads the file to seed an empty DB, and generating first would
+    # overwrite what it was about to read.
+    from core.config import REPO_ROOT
+    import os as _os
+    if not _os.path.exists(_os.path.join(REPO_ROOT, "inventory", "hosts.yml")):
+        from core.inventory_writer import regenerate_inventory
+        regenerate_inventory()
+        log.info("Inventory regenerated (no hosts.yml present)")
+
     # SSH key management (Linux only)
     from core.ssh_keys import ensure_ssh_key, ensure_group_vars_ssh_key
     pubkey = ensure_ssh_key()

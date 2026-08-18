@@ -8,6 +8,15 @@ inventory/host_vars/*.yml
 !inventory/host_vars/*.yml.example
 !inventory/host_vars/.gitignore
 
+# Generated from the database by core/inventory_writer.py, the same writer
+# that produces host_vars above — every server add, edit, delete and
+# provisioning run rewrites it. Tracking it meant ADM's own work showed up as
+# local modifications on the server, and the next deploy's `git pull` aborted
+# with "commit your changes or stash them"; the service then kept running the
+# old code while the deploy looked like it had gone through. app.py writes the
+# file on startup when it is missing, so a fresh checkout still gets one.
+inventory/hosts.yml
+
 # Python
 __pycache__/
 *.pyc
