@@ -113,6 +113,24 @@ def start_provision(vpn_server_id: int, admin_id: int | None = None,
     address = server["callhome_ip"]
     regenerate_for_vpn_server(server)
 
+    # Refresh the checkout we are about to ship. The scheduler already fetches
+    # it hourly, but that exists to keep the drift badge honest — it says
+    # nothing about the moment a deploy runs. A deploy started inside that hour
+    # carried the previous commit and said nothing about it, which is how a
+    # fix that had just been pushed reached one site and silently skipped
+    # another.
+    #
+    # A failed fetch does not stop the deploy: a box that cannot reach GitHub
+    # should still be able to re-deploy what it already has. Either way the
+    # revision actually being shipped is logged before the playbook starts, so
+    # "what did this deploy contain" is answerable afterwards.
+    revision, src_error = update_source()
+    if src_error:
+        log.warning(f"[PROVISION] {src_error} — deploying the checkout as-is")
+        revision = source_revision()
+    if revision:
+        log.info(f"[PROVISION] Deploying {revision['short']} to {server['name']}")
+
     op_id = create_operation(None, "provision_proxima", "setup-proxima.yml")
 
     def on_complete(success: bool, _op_id: int) -> None:
