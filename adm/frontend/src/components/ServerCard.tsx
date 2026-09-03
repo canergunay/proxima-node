@@ -1,13 +1,16 @@
 import {
   Card, CardActionArea, CardContent, Typography, Box, Chip, LinearProgress,
+  IconButton, Tooltip,
 } from "@mui/material";
 import CircleIcon from "@mui/icons-material/Circle";
+import EditIcon from "@mui/icons-material/Edit";
 import { useTranslation } from "react-i18next";
 import type { Server } from "../api/types";
 
 interface Props {
   server: Server;
   onClick: () => void;
+  onEdit: () => void;
 }
 
 function formatUptime(seconds: number): string {
@@ -26,7 +29,7 @@ const statusColors: Record<string, string> = {
   decommissioned: "#616161",
 };
 
-export default function ServerCard({ server, onClick }: Props) {
+export default function ServerCard({ server, onClick, onEdit }: Props) {
   const { t } = useTranslation();
   const status = server.agent_status;
   const isOnline = server.online;
@@ -45,6 +48,16 @@ export default function ServerCard({ server, onClick }: Props) {
               </Typography>
             </Box>
             <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.5 }}>
+              <Tooltip title={t("editServer.title")} placement="top">
+                <IconButton
+                  size="small"
+                  aria-label={t("editServer.title")}
+                  onClick={(e) => { e.stopPropagation(); onEdit(); }}
+                  sx={{ p: 0.5 }}
+                >
+                  <EditIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Tooltip>
               <Chip
                 icon={<CircleIcon sx={{ fontSize: 10, color: isOnline ? "#4caf50" : undefined }} />}
                 label={isOnline ? t("server.online") : t("server.offline")}

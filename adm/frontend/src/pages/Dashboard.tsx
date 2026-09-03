@@ -16,6 +16,7 @@ import AddVpnServerDialog from "../components/AddVpnServerDialog";
 import SetupVpnServerDialog from "../components/SetupVpnServerDialog";
 import ServiceInventoryDialog from "../components/ServiceInventoryDialog";
 import VpnServerDetailDialog from "../components/VpnServerDetailDialog";
+import EditServerDialog from "../components/EditServerDialog";
 import MonitoringTab from "../components/MonitoringTab";
 import VpnUsersTab from "../components/VpnUsersTab";
 import OutputViewer from "../components/OutputViewer";
@@ -45,6 +46,8 @@ export default function Dashboard({ role }: { role: AdminRole }) {
   const [servicesFor, setServicesFor] = useState<VpnServer | null>(null);
   const [sourceRevision, setSourceRevision] = useState<SourceRevision | null>(null);
   const [selectedVpn, setSelectedVpn] = useState<VpnServer | null>(null);
+  const [editingExit, setEditingExit] = useState<Server | null>(null);
+  const [editingVpn, setEditingVpn] = useState<VpnServer | null>(null);
   const [updatingVpn, setUpdatingVpn] = useState<VpnServer | null>(null);
   const [updateOpId, setUpdateOpId] = useState<number | null>(null);
   const [updateOp, setUpdateOp] = useState<{ status: string; output?: string } | null>(null);
@@ -213,11 +216,23 @@ export default function Dashboard({ role }: { role: AdminRole }) {
             <Grid container spacing={2}>
               {servers.map((server) => (
                 <Grid key={server.id} size={{ xs: 12, sm: 6, md: 4 }}>
-                  <ServerCard server={server} onClick={() => setSelectedId(server.id)} />
+                  <ServerCard
+                    server={server}
+                    onClick={() => setSelectedId(server.id)}
+                    onEdit={() => setEditingExit(server)}
+                  />
                 </Grid>
               ))}
             </Grid>
           )}
+
+          <EditServerDialog
+            open={!!editingExit}
+            kind="exit"
+            server={editingExit}
+            onClose={() => setEditingExit(null)}
+            onSaved={() => { setEditingExit(null); fetchServers(); }}
+          />
 
           <ProvisionDialog
             open={provisionOpen}
@@ -255,7 +270,7 @@ export default function Dashboard({ role }: { role: AdminRole }) {
                     server={server}
                     sourceRevision={sourceRevision}
                     onClick={() => setSelectedVpn(server)}
-                    onEdit={() => setSelectedVpn(server)}
+                    onEdit={() => setEditingVpn(server)}
                     onServices={() => setServicesFor(server)}
                     onDelete={() => setSelectedVpn(server)}
                     onUpdate={isSuperadmin ? () => startVpnUpdate(server) : undefined}
@@ -321,6 +336,14 @@ export default function Dashboard({ role }: { role: AdminRole }) {
             open={setupVpnOpen}
             onClose={() => setSetupVpnOpen(false)}
             onCreated={() => { setSetupVpnOpen(false); fetchVpnServers(); }}
+          />
+
+          <EditServerDialog
+            open={!!editingVpn}
+            kind="vpn"
+            server={editingVpn}
+            onClose={() => setEditingVpn(null)}
+            onSaved={() => { setEditingVpn(null); fetchVpnServers(); }}
           />
 
           <AddVpnServerDialog
