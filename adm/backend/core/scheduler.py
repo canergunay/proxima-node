@@ -19,6 +19,7 @@ from core.db import (
     insert_metric,
     insert_vpn_metric,
     period_start,
+    set_server_profiles,
     traffic_since,
 )
 
@@ -235,6 +236,34 @@ def _collect_metrics() -> None:
     )
 
 
+def _published_profiles(status_data: dict) -> list[dict]:
+    """Direct profiles a site advertises, from its /api/status payload.
+
+    The label is taken as-is: Proxima reports the slot's own label, never the
+    active key, because that string is what a user sees and it must not change
+    when failover rotates the pool.
+    """
+    slots = status_data.get("slots")
+    if not isinstance(slots, dict):
+        return []
+    profiles = []
+    for slot_id, slot in slots.items():
+        if not isinstance(slot, dict):
+            continue
+        profile = slot.get("client_profile") or {}
+        if not profile.get("enabled"):
+            continue
+        health = slot.get("health") or {}
+        profiles.append({
+            "slot_id": slot_id,
+            "label": slot.get("label") or slot_id,
+            "description": profile.get("description") or "",
+            "enabled": bool(slot.get("enabled", True)),
+            "last_ip_ok": health.get("last_ip_ok"),
+        })
+    return sorted(profiles, key=lambda p: p["slot_id"])
+
+
 def _poll_vpn_server(server: dict) -> dict:
     """Poll a VPN server (Proxima instance) for system metrics."""
     result = {"online": False}
@@ -259,6 +288,7 @@ def _poll_vpn_server(server: dict) -> dict:
             cpu = system.get("cpu", {})
             if isinstance(cpu, dict) and "used_pct" in cpu:
                 result["cpu_pct"] = cpu["used_pct"]
+            result["profiles"] = _published_profiles(data.get("data", {}))
     except http_requests.exceptions.RequestException:
         pass
     except Exception:
@@ -290,6 +320,10 @@ def _collect_vpn_metrics() -> None:
     for server in active:
         metric = results.get(server["id"], {"online": False})
         insert_vpn_metric(server["id"], metric)
+        # Only refresh from a site that actually answered; a failed poll must
+        # not erase profiles an admin is in the middle of granting.
+        if metric.get("online") and "profiles" in metric:
+            set_server_profiles(server["id"], metric["profiles"])
 
     log.info(
         f"Collected VPN metrics for {len(active)} server(s): "

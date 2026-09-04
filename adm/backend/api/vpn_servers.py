@@ -13,6 +13,7 @@ from core.db import (
     delete_vpn_server,
     get_all_vpn_servers,
     get_vpn_server,
+    parse_server_profiles,
     update_vpn_server,
 )
 from core.authz import scoped_server_ids, superadmin_only
@@ -353,6 +354,30 @@ def management_network():
     """
     from core.mgmt_network import status
     return jsonify({"ok": True, "data": status()})
+
+
+@bp.get("/api/vpn-servers/profiles")
+def list_server_profiles():
+    """Direct profiles each site publishes, keyed by server id.
+
+    Served from the poller's cache rather than fetched live: granting a user
+    a profile must not depend on the site answering at that moment, and the
+    users page must not fan out one request per site to draw its checkboxes.
+    `cached_at` is returned so the UI can say how stale the list is.
+    """
+    servers = get_all_vpn_servers()
+    allowed = scoped_server_ids()
+    if allowed is not None:
+        servers = [s for s in servers if s["id"] in allowed]
+    return jsonify({"ok": True, "data": {
+        str(s["id"]): {
+            "server_name": s["name"],
+            "server_display_name": s["display_name"],
+            "cached_at": s.get("profiles_cached_at"),
+            "profiles": parse_server_profiles(s),
+        }
+        for s in servers
+    }})
 
 
 @bp.get("/api/vpn-servers/subnets")

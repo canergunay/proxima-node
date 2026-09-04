@@ -1,5 +1,6 @@
 """SQLite database — shared connection, schema init, CRUD helpers."""
 
+import json
 import sqlite3
 import threading
 import time
@@ -145,6 +146,12 @@ def init_db() -> None:
             -- behind one connection reports the same public IP, so detecting
             -- it produces a plausible address pointing at the wrong machine.
             vpn_endpoint    TEXT,
+            -- Direct profiles the site publishes, refreshed by the poller.
+            -- Cached rather than fetched per request so that granting a user
+            -- a profile does not depend on the site answering right then, and
+            -- so the users page never fans out to every site at once.
+            profiles_cache  TEXT,
+            profiles_cached_at INTEGER,
             created_at      INTEGER NOT NULL,
             updated_at      INTEGER NOT NULL
         );
@@ -314,6 +321,13 @@ def _migrate(conn: sqlite3.Connection) -> None:
             "ALTER TABLE vpn_user_access ADD COLUMN "
             "allowed_profiles TEXT NOT NULL DEFAULT '[]'"
         )
+        conn.commit()
+
+    vpn_cols = {r[1] for r in conn.execute(
+        "PRAGMA table_info(vpn_servers)").fetchall()}
+    if vpn_cols and "profiles_cache" not in vpn_cols:
+        conn.execute("ALTER TABLE vpn_servers ADD COLUMN profiles_cache TEXT")
+        conn.execute("ALTER TABLE vpn_servers ADD COLUMN profiles_cached_at INTEGER")
         conn.commit()
 
     cols = {row[1] for row in conn.execute("PRAGMA table_info(servers)").fetchall()}
@@ -864,6 +878,34 @@ def update_vpn_server(vpn_server_id: int, updates: dict) -> bool:
     conn.execute(f"UPDATE vpn_servers SET {', '.join(sets)} WHERE id = ?", vals)
     conn.commit()
     return True
+
+
+def set_server_profiles(vpn_server_id: int, profiles: list[dict]) -> None:
+    """Store the Direct profiles a site currently publishes.
+
+    Deliberately does not touch updated_at: this is polled state, not an
+    administrative edit, and drift indicators key off updated_at.
+    """
+    conn = get_conn()
+    conn.execute(
+        "UPDATE vpn_servers SET profiles_cache = ?, profiles_cached_at = ? WHERE id = ?",
+        (json.dumps(profiles), int(time.time()), vpn_server_id),
+    )
+    conn.commit()
+
+
+def parse_server_profiles(row: dict | None) -> list[dict]:
+    """Read the cached profiles off a vpn_servers row already in hand."""
+    try:
+        value = json.loads((row or {}).get("profiles_cache") or "[]")
+    except (ValueError, TypeError):
+        return []
+    return value if isinstance(value, list) else []
+
+
+def get_server_profiles(vpn_server_id: int) -> list[dict]:
+    """Profiles last seen on a site. Empty when never polled or unparseable."""
+    return parse_server_profiles(get_vpn_server(vpn_server_id))
 
 
 def delete_vpn_server(vpn_server_id: int) -> bool:
