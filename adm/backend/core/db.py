@@ -232,6 +232,11 @@ def init_db() -> None:
             speed_download  TEXT,
             speed_upload    TEXT,
             assigned_groups TEXT NOT NULL DEFAULT '[]',
+            -- Which published Direct-profile slots this user may pick on that
+            -- site, as a JSON list of slot ids. Sibling of assigned_groups and
+            -- lan_access: the three are independent axes, not nested tiers —
+            -- a user may hold a Direct profile without general VPN routing.
+            allowed_profiles TEXT NOT NULL DEFAULT '[]',
             -- May this user's devices reach that site's LAN? Per-server by
             -- nature: someone can be trusted on one site and not another.
             lan_access      INTEGER NOT NULL DEFAULT 1,
@@ -299,6 +304,15 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute(
             "UPDATE vpn_user_access SET password_synced_at = updated_at "
             "WHERE sync_status = 'synced'"
+        )
+        conn.commit()
+
+    if access_cols and "allowed_profiles" not in access_cols:
+        # Empty list is the safe default: nobody gains a Direct profile by
+        # migrating, they are granted explicitly.
+        conn.execute(
+            "ALTER TABLE vpn_user_access ADD COLUMN "
+            "allowed_profiles TEXT NOT NULL DEFAULT '[]'"
         )
         conn.commit()
 
@@ -1131,6 +1145,7 @@ def delete_vpn_user(user_id: int) -> bool:
 ACCESS_FIELDS = {
     "enabled", "max_peers", "bandwidth_quota",
     "speed_download", "speed_upload", "assigned_groups", "lan_access",
+    "allowed_profiles",
 }
 
 
@@ -1200,14 +1215,15 @@ def upsert_user_access(user_id: int, vpn_server_id: int, data: dict) -> int:
     cur = conn.execute(
         "INSERT INTO vpn_user_access (user_id, vpn_server_id, remote_user_id, enabled, "
         "max_peers, bandwidth_quota, speed_download, speed_upload, assigned_groups, "
-        "lan_access, sync_status, created_at, updated_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
+        "allowed_profiles, lan_access, sync_status, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
         (
             user_id, vpn_server_id, data.get("remote_user_id"),
             1 if data.get("enabled", True) else 0,
             data.get("max_peers"), data.get("bandwidth_quota"),
             data.get("speed_download"), data.get("speed_upload"),
             data.get("assigned_groups", "[]"),
+            data.get("allowed_profiles", "[]"),
             1 if data.get("lan_access", True) else 0, ts, ts,
         ),
     )

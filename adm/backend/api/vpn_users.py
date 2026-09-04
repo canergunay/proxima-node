@@ -84,6 +84,10 @@ def _public_access(a: dict) -> dict:
         groups = json.loads(a.get("assigned_groups") or "[]")
     except (ValueError, TypeError):
         groups = []
+    try:
+        profiles = json.loads(a.get("allowed_profiles") or "[]")
+    except (ValueError, TypeError):
+        profiles = []
     return {
         "vpn_server_id": a["vpn_server_id"],
         "server_name": a.get("server_name"),
@@ -96,6 +100,7 @@ def _public_access(a: dict) -> dict:
         "speed_download": a["speed_download"],
         "speed_upload": a["speed_upload"],
         "assigned_groups": groups,
+        "allowed_profiles": profiles,
         "sync_status": a["sync_status"],
         "sync_error": a["sync_error"],
         "synced_at": a["synced_at"],
@@ -149,6 +154,14 @@ def _parse_access_body(body: dict) -> tuple[dict | None, str | None]:
         if not isinstance(groups, list):
             return None, "assigned_groups must be a list"
         data["assigned_groups"] = json.dumps(groups)
+
+    if "allowed_profiles" in body:
+        profiles = body["allowed_profiles"]
+        if not isinstance(profiles, list):
+            return None, "allowed_profiles must be a list"
+        if not all(isinstance(p, str) and p.strip() for p in profiles):
+            return None, "allowed_profiles must be a list of slot ids"
+        data["allowed_profiles"] = json.dumps(profiles)
 
     return data, None
 

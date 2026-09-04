@@ -40,12 +40,17 @@ def _remote_payload(row: dict) -> dict:
         groups = json.loads(row.get("assigned_groups") or "[]")
     except (ValueError, TypeError):
         groups = []
+    try:
+        profiles = json.loads(row.get("allowed_profiles") or "[]")
+    except (ValueError, TypeError):
+        profiles = []
     return {
         "max_peers": row["max_peers"],
         "bandwidth_quota": row["bandwidth_quota"],
         "speed_download": row["speed_download"],
         "speed_upload": row["speed_upload"],
         "assigned_groups": groups,
+        "allowed_profiles": profiles,
         "lan_access": bool(row["lan_access"]),
     }
 
