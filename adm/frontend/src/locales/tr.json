@@ -286,6 +286,8 @@
   "vpnUsers.maxPeers": "En fazla cihaz",
   "vpnUsers.unlimited": "sınırsız",
   "vpnUsers.lanAccess": "LAN erişimi",
+  "vpnUsers.directRoutes": "Doğrudan yollar",
+  "vpnUsers.profileUnhealthy": "kullanılamıyor",
   "vpnUsers.copyPackage": "Kopyala",
   "vpnUsers.pkgHeader": "ProximaVPN erişimi",
   "vpnUsers.pkgAddress": "Adres",

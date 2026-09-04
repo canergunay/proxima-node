@@ -328,9 +328,28 @@ export interface VpnUserAccess {
   speed_download: string | null;
   speed_upload: string | null;
   assigned_groups: string[];
+  /** Published Direct-profile slot ids this user may pick on that site. */
+  allowed_profiles: string[];
   sync_status: "synced" | "pending" | "pending_delete" | "error";
   sync_error: string | null;
   synced_at: number | null;
+}
+
+/** A Direct profile a site publishes, as last seen by ADM's poller. */
+export interface ServerProfile {
+  slot_id: string;
+  label: string;
+  description: string;
+  enabled: boolean;
+  /** null when the site has not run an IP check for that slot yet. */
+  last_ip_ok: boolean | null;
+}
+
+export interface ServerProfiles {
+  server_name: string;
+  server_display_name: string;
+  cached_at: number | null;
+  profiles: ServerProfile[];
 }
 
 export interface VpnUser {

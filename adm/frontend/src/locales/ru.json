@@ -286,6 +286,8 @@
   "vpnUsers.maxPeers": "Максимум устройств",
   "vpnUsers.unlimited": "без ограничений",
   "vpnUsers.lanAccess": "Доступ к LAN",
+  "vpnUsers.directRoutes": "Прямые маршруты",
+  "vpnUsers.profileUnhealthy": "недоступен",
   "vpnUsers.copyPackage": "Копировать",
   "vpnUsers.pkgHeader": "Доступ ProximaVPN",
   "vpnUsers.pkgAddress": "Адрес",

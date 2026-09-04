@@ -286,6 +286,8 @@
   "vpnUsers.maxPeers": "Max devices",
   "vpnUsers.unlimited": "unlimited",
   "vpnUsers.lanAccess": "LAN access",
+  "vpnUsers.directRoutes": "Direct routes",
+  "vpnUsers.profileUnhealthy": "unavailable",
   "vpnUsers.copyPackage": "Copy",
   "vpnUsers.pkgHeader": "ProximaVPN access",
   "vpnUsers.pkgAddress": "Address",

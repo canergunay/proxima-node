@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert, Box, Button, Checkbox, Chip, Dialog, DialogActions, DialogContent,
   DialogTitle, Divider, FormControlLabel, Grid2 as Grid, IconButton, Paper,
@@ -9,7 +9,9 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import { useTranslation } from "react-i18next";
 import api from "../api/client";
-import type { VpnServer, VpnUser, VpnUserAccess } from "../api/types";
+import type {
+  ServerProfile, ServerProfiles, VpnServer, VpnUser, VpnUserAccess,
+} from "../api/types";
 
 interface Props {
   user: VpnUser | null;          // null = create
@@ -23,6 +25,8 @@ interface Draft {
   granted: boolean;
   lan_access: boolean;
   max_peers: string;
+  /** Slot ids of the Direct profiles this user may pick on that site. */
+  allowed_profiles: string[];
 }
 
 const MIN_PASSWORD = 8;
@@ -45,10 +49,29 @@ export default function VpnUserDialog({ user, servers, onClose, onSaved }: Props
         granted: Boolean(a),
         lan_access: a?.lan_access ?? true,
         max_peers: a?.max_peers != null ? String(a.max_peers) : "",
+        allowed_profiles: a?.allowed_profiles ?? [],
       };
     }
     return out;
   });
+
+  /** Published Direct profiles per server id, from ADM's poller cache.
+   *  Cached server-side, so an unreachable site still renders its options. */
+  const [serverProfiles, setServerProfiles] = useState<Record<string, ServerProfile[]>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get("/vpn-servers/profiles")
+      .then(({ data }) => {
+        if (cancelled || !data.ok) return;
+        const entries = Object.entries(data.data as Record<string, ServerProfiles>);
+        setServerProfiles(Object.fromEntries(
+          entries.map(([id, entry]) => [id, entry.profiles ?? []]),
+        ));
+      })
+      .catch(() => { /* the dialog still works without them */ });
+    return () => { cancelled = true; };
+  }, []);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -92,6 +115,7 @@ export default function VpnUserDialog({ user, servers, onClose, onSaved }: Props
     return {
       lan_access: d.lan_access,
       max_peers: d.max_peers.trim() === "" ? null : Number(d.max_peers),
+      allowed_profiles: d.allowed_profiles,
     };
   };
 
@@ -295,6 +319,45 @@ export default function VpnUserDialog({ user, servers, onClose, onSaved }: Props
                               }
                               label={t("vpnUsers.lanAccess")}
                             />
+                            {(serverProfiles[String(s.id)]?.length ?? 0) > 0 && (
+                              <Box>
+                                <Typography variant="caption" color="text.secondary">
+                                  {t("vpnUsers.directRoutes")}
+                                </Typography>
+                                <Stack>
+                                  {serverProfiles[String(s.id)].map((p) => (
+                                    <FormControlLabel
+                                      key={p.slot_id}
+                                      control={
+                                        <Checkbox
+                                          size="small"
+                                          checked={d.allowed_profiles.includes(p.slot_id)}
+                                          onChange={(e) =>
+                                            setDraft(s.id, {
+                                              allowed_profiles: e.target.checked
+                                                ? [...d.allowed_profiles, p.slot_id]
+                                                : d.allowed_profiles.filter((x) => x !== p.slot_id),
+                                            })
+                                          }
+                                        />
+                                      }
+                                      label={
+                                        <Stack direction="row" spacing={1} alignItems="center">
+                                          <Typography variant="body2">{p.label}</Typography>
+                                          {p.last_ip_ok === false && (
+                                            <Chip
+                                              size="small"
+                                              color="warning"
+                                              label={t("vpnUsers.profileUnhealthy")}
+                                            />
+                                          )}
+                                        </Stack>
+                                      }
+                                    />
+                                  ))}
+                                </Stack>
+                              </Box>
+                            )}
                             {existing && (
                               <Typography variant="caption" color="text.secondary">
                                 {t("vpnUsers.revokeFromMatrix")}
