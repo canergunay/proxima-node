@@ -44,6 +44,7 @@ Both sides legitimately write, so the boundary is explicit:
 |---|---|
 | whether the account exists | their own devices (peers) |
 | which servers they are authorized on | device names |
+| which Direct routes they may take | |
 | per-server limits (max devices, quota, speed) | their own password |
 | LAN access policy | |
 | enabled / disabled | |
@@ -69,7 +70,7 @@ Each cell has two controls:
 - **left** — authorized on this server or not
 - **right** — may this person's devices reach that site's LAN
 
-Clicking a name opens the detail dialog for per-server limits. Every column sorts and carries its own filter; the site filters accept several options at once, OR-ed together, so "not authorized" + "LAN blocked" lists everyone who cannot reach that site's LAN by either route.
+Clicking a name opens the detail dialog, which holds per-server limits and the third axis, **Direct routes** (below). Every column sorts and carries its own filter; the site filters accept several options at once, OR-ed together, so "not authorized" + "LAN blocked" lists everyone who cannot reach that site's LAN by either route.
 
 ---
 
@@ -90,6 +91,36 @@ It used to be a per-device flag, but nobody ever used that granularity — acros
 New devices inherit their owner's policy, so a user cannot escape a restriction by creating another device. Changing the policy re-applies it to every device they already have.
 
 Enforcement is an iptables DROP rule per device address, in a dedicated `PROXIMA_LAN` chain. The chain matters: rules placed directly in `FORWARD` were being buried by the interface's own `PostUp` rules on restart, which silently *unblocked* restricted users. The scheduler re-asserts the chain's position every five minutes.
+
+---
+
+## Direct routes
+
+The third authorization axis, and the newest. The other two are `lan_access` — may this person's devices reach that site's local network — and `assigned_groups` — which domain groups their traffic follows. A **Direct route** is neither: it is a whole exit, offered by name.
+
+A site publishes one of its slots as a route. Anyone granted it sees an entry in the ProximaVPN client, and taking it produces a profile whose traffic — all of it, no domain rules on the way — leaves through that slot's exit.
+
+The three axes are **independent flags, not tiers**. "LAN only", "LAN plus general VPN", and "a Turkish exit for banking and no general VPN at all" are each a legitimate combination, and nesting them would have made the last one unreachable.
+
+### Granting
+
+The user dialog has a per-site card. Beside LAN access and the device limit it lists the routes that site publishes, one checkbox each, and the grant is stored as `vpn_user_access.allowed_profiles` — a JSON list of slot ids, per (user, server), pushed by the same sync as every other access field.
+
+The options come from the poller cache rather than a live call to the site, so the list still renders when the site is unreachable. A route whose last health check failed is marked unavailable rather than hidden — the same choice the client makes, for the same reason.
+
+### What a grant costs
+
+Nothing until it is used. The peer is minted the first time the user actually takes the route, and it is deleted the moment the grant is withdrawn or the site stops publishing the slot — a config that still carries traffic is not a revoked one.
+
+**Each route a user takes does cost them a device.** The peer record has a `parent_peer` field meant to keep a route taken on an existing device from counting twice, but the self-service path does not set it: minting is keyed on (user, route), so a person with one ordinary device who takes two routes counts three against `max_peers`. Raise the limit when granting routes.
+
+### The label is a promise
+
+The name a user sees is the slot's own label, never the name of the key currently active in its pool. This is deliberate: a pool rotates on failover, and a profile that renamed itself from `ERG-TR-FAST-Direct` to `ERG-TR-Direct` mid-session would tell the user something moved — which is the exact anxiety these routes exist to remove.
+
+Read the other way round, that makes the label an operational commitment. Whatever a published slot's label says — a country, a provider, a purpose — every key in that slot's pool has to keep it true, because the user cannot see the pool and the client will never correct the name. Renaming a published slot renames the route under everyone already holding it.
+
+Labels are passed through untranslated. A Russian-locale user may well see a Turkish route name, the way an SSID is not translated either.
 
 ---
 
@@ -158,4 +189,5 @@ The reversible password store was removed at the same time. It existed so the pa
 - ADM owns the account and the authorization; the user owns their devices and their password
 - Limits and LAN policy are per-site, because that is the only level at which they mean anything
 - Revoking removes the devices too, because otherwise it removes nothing
+- Direct routes are a third independent axis — an exit by name, granted per site, minted on first use and deleted on revocation
 - Failed pushes keep their intent and retry rather than being lost

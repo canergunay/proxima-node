@@ -232,6 +232,72 @@ Removing a peer from the UI deletes its entry from `wg1.conf` and reloads the Wi
 
 ---
 
+## Direct Profiles
+
+A **Direct profile** publishes one of the site's proxy slots to VPN users by name. A user who is granted it gets an ordinary AmneziaWG peer whose traffic — all of it — leaves through that slot's exit, with no domain routing, no groups and no arbiter in between. It is the plain answer to "I want to come out in Turkey", and the routing decision lives entirely on the site box.
+
+Who may see which route is set centrally — see [VPN Users & Access](/docs/vpn-users.md#direct-routes). This section is what the site itself does.
+
+### Publishing a slot
+
+```
+PUT /api/slots/<slot_id>/client-profile
+{ "enabled": true, "description": "Banking and TR streaming" }
+```
+
+There is no UI for this yet; it is an API call. Three refusals are worth knowing:
+
+| Refused | Why |
+|---|---|
+| A `direct` slot | There is no tunnel to pin traffic to |
+| A non-AWG slot | Measured 2026-08-18: a zapret slot answers SOCKS5 `UDP ASSOCIATE` with `0x07`, so QUIC would fail with no trace and video would quietly degrade. Only the gost-backed AWG slots relay UDP, and only with `?udp=true` on the listener |
+| A slot with no label | The label is the name users see |
+
+Unpublishing deletes every peer pinned to the slot. A config that still carries traffic is not an unpublished profile.
+
+### The peer record
+
+A profile peer is an ordinary peer with two extra fields:
+
+| Field | Meaning |
+|---|---|
+| `profile_slot` | The slot this peer's traffic is pinned to |
+| `parent_peer` | The device peer this one belongs to, when it has one |
+
+`max_peers` counts devices, meaning peers with `parent_peer` null — the field exists so that a route taken on a device the user already has would not be counted twice.
+
+**It is not set on the self-service path today.** Minting is keyed on (user, route), not (device, route): a user gets one peer per route, it carries no parent, and it counts as a device. Someone with one ordinary device who takes two routes is three against the limit, so raise `max_peers` when granting routes.
+
+Peers are minted lazily, on the first fetch of the profile, and deleted the moment the grant is withdrawn or the slot is unpublished. Re-authorizing simply mints again.
+
+### How the pinning works
+
+Two mechanisms, and the second one is not optional:
+
+1. **`ip rule` per peer.** `tunnels.json` carries `direct_peers` (peer address → routing table). The rules are emitted at priority **32721**, above the mark rules at 32730, with private ranges escaped to `main` at **32720** so a pinned peer still reaches the site LAN.
+
+2. **A prerouting bypass.** Peers arrive on `wg1`, which is *not* one of the interfaces accepted early, so without this their traffic enters the marking path, picks up the `@proxied` bit, and TCP/443 is then TPROXY'd to the SNI router. The SNI router chooses its upstream from the hostname alone and opens its own box-sourced connection, so the peer's `ip rule` never applies — the user picks Turkey and port 443 goes wherever the domain map says. The bypass is `ip saddr @direct_peers accept`, placed straight after the private-range accepts.
+
+The bypass is a **static rule against a live set**. `core/direct_routes.py` adds and removes set elements and `ip rule`s directly, because a `dns-router` reload rebuilds the `inet proxima` table from scratch and would empty `@proxied` and every `@group_*` set site-wide — one user pressing a button would be a short outage for everyone. `restore_direct_routes()` refills the set at startup and after each `dns-router` restart, since the set comes back empty.
+
+Verified live on ERG, 2026-09-05: `10.14.14.4 → ip rule 32721 → table 101 → tun1 → slot-3 → 82.26.94.37`, against a default-slot exit of `185.229.12.109`.
+
+### Local LAN stays local, but local *names* do not
+
+Split-tunnel `AllowedIPs` excludes RFC1918, so packets addressed to a device on whatever network the client is physically sitting on still go out the local interface — that does not change with a Direct profile.
+
+Name resolution does. The config sets `DNS` to the site, so a lookup for a short or local hostname is answered by the site's resolver, which knows the *site's* LAN and not the user's. A home NAS reachable by address stops being reachable by name. Use an address, or an FQDN that resolves publicly.
+
+### On other devices
+
+A Direct profile config is an ordinary AmneziaWG config, so it works in the AmneziaWG app on a phone as well as in ProximaVPN — the client needs to know nothing, because the routing decision is made on the site box. The peer appears in the site's peer list like any other, carrying the same Share / QR button, and that is how a route reaches a second device.
+
+**That button hands out the peer's own config, and a WireGuard peer holds one endpoint.** The same config running in two places at once flaps the endpoint and starves both. Use the QR to *move* a route onto a phone, not to run it on the phone and the laptop together. Asking for the route again from the second device does not help: minting is idempotent per (user, route) and hands back the same peer.
+
+Two further limits are worth stating plainly. A third-party client cannot show slot health, so the *unavailable* marking exists only in ProximaVPN — elsewhere a failing slot simply passes no traffic. And the shared config carries no route name — AmneziaVPN labels an imported tunnel by host, so two routes from the same site look alike on the phone and have to be renamed there.
+
+---
+
 ## sing-box Config
 
 Each peer gets a `vless_uuid` field -- an auto-generated UUID v4 that serves as the user ID for sing-box VLESS+Reality protocol. This UUID is not related to WireGuard itself; it is used by the sing-box config generator to produce client configurations for VLESS protocol clients.
