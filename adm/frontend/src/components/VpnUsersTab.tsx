@@ -12,10 +12,13 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import LanIcon from "@mui/icons-material/Lan";
 import BlockIcon from "@mui/icons-material/Block";
+import AltRouteIcon from "@mui/icons-material/AltRoute";
 import ClearIcon from "@mui/icons-material/Clear";
 import { useTranslation } from "react-i18next";
 import api from "../api/client";
-import type { SyncSummary, VpnServer, VpnUser, VpnUserAccess } from "../api/types";
+import type {
+  ServerProfile, ServerProfiles, SyncSummary, VpnServer, VpnUser, VpnUserAccess,
+} from "../api/types";
 import VpnUserDialog from "./VpnUserDialog";
 import ConfirmRevokeDialog from "./ConfirmRevokeDialog";
 
@@ -26,19 +29,23 @@ function cellOf(user: VpnUser, serverId: number): VpnUserAccess | undefined {
 /** Rank a cell so sorting reads top-to-bottom as "most access first". */
 function cellRank(cell: VpnUserAccess | undefined): number {
   if (!cell) return 0;
-  return cell.lan_access ? 2 : 1;
+  // Three axes, so three things to weigh. A Direct route is access like the
+  // other two and has to count, or a row with one sorts below a row without.
+  return 1 + (cell.lan_access ? 1 : 0) + (cell.allowed_profiles?.length ? 1 : 0);
 }
 
 type SortKey = string; // "username" | "enabled" | `server:${id}`
-type ServerFilter = "granted" | "not" | "lan_on" | "lan_off" | "pending";
+type ServerFilter = "granted" | "not" | "lan_on" | "lan_off" | "route_on" | "route_off" | "pending";
 
-const SERVER_FILTERS: ServerFilter[] = ["granted", "not", "lan_on", "lan_off", "pending"];
+const SERVER_FILTERS: ServerFilter[] = ["granted", "not", "lan_on", "lan_off", "route_on", "route_off", "pending"];
 
 const FILTER_LABEL: Record<ServerFilter, string> = {
   granted: "vpnUsers.filterGranted",
   not: "vpnUsers.filterNotGranted",
   lan_on: "vpnUsers.filterLanOn",
   lan_off: "vpnUsers.filterLanOff",
+  route_on: "vpnUsers.filterRouteOn",
+  route_off: "vpnUsers.filterRouteOff",
   pending: "vpnUsers.filterPending",
 };
 
@@ -50,6 +57,8 @@ function FilterIcon({ kind }: { kind: ServerFilter }) {
     case "not": return <RadioButtonUncheckedIcon sx={{ ...sx, color: "action.disabled" }} />;
     case "lan_on": return <LanIcon sx={sx} color="primary" />;
     case "lan_off": return <BlockIcon sx={sx} color="error" />;
+    case "route_on": return <AltRouteIcon sx={sx} color="info" />;
+    case "route_off": return <AltRouteIcon sx={{ ...sx, color: "action.disabled" }} />;
     case "pending": return <CheckCircleIcon sx={sx} color="warning" />;
   }
 }
@@ -65,6 +74,8 @@ function matchesFilter(cell: VpnUserAccess | undefined, f: ServerFilter): boolea
     case "not": return !cell;
     case "lan_on": return Boolean(cell && cell.lan_access);
     case "lan_off": return Boolean(cell && !cell.lan_access);
+    case "route_on": return Boolean(cell && cell.allowed_profiles?.length);
+    case "route_off": return Boolean(cell && !cell.allowed_profiles?.length);
     case "pending": return Boolean(cell && cell.sync_status !== "synced");
   }
 }
@@ -188,6 +199,26 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
       });
     }
   };
+
+  /** Published Direct routes per server id, from ADM's poller cache — the
+   *  same source the user dialog reads, so the matrix and the dialog cannot
+   *  disagree about what a site offers. Cached server-side, so an unreachable
+   *  site still shows its routes rather than appearing to have none. */
+  const [serverProfiles, setServerProfiles] = useState<Record<string, ServerProfile[]>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get("/vpn-servers/profiles")
+      .then(({ data }) => {
+        if (cancelled || !data.ok) return;
+        const entries = Object.entries(data.data as Record<string, ServerProfiles>);
+        setServerProfiles(Object.fromEntries(
+          entries.map(([id, entry]) => [id, entry.profiles ?? []]),
+        ));
+      })
+      .catch(() => { /* the matrix still works without them */ });
+    return () => { cancelled = true; };
+  }, []);
 
   const grant = async (user: VpnUser, server: VpnServer, patch: Record<string, unknown>) => {
     const key = `${user.id}:${server.id}`;
@@ -448,6 +479,22 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
                     const cell = cellOf(u, s.id);
                     const key = `${u.id}:${s.id}`;
                     const pending = cell && cell.sync_status !== "synced";
+                    const published = serverProfiles[String(s.id)] ?? [];
+                    const routes = cell?.allowed_profiles ?? [];
+                    // Names, not slot ids: the label is what the user sees in
+                    // their client, so it is what an admin should be shown too.
+                    const routeNames = published
+                      .filter((pr) => routes.includes(pr.slot_id))
+                      .map((pr) => pr.label);
+                    const routeTitle = !cell
+                      ? ""
+                      : published.length === 0
+                        ? t("vpnUsers.routeNonePublished")
+                        : routeNames.length > 0
+                          ? t("vpnUsers.routeOnHint", { routes: routeNames.join(", ") })
+                          : published.length === 1
+                            ? t("vpnUsers.routeGrantHint", { route: published[0].label })
+                            : t("vpnUsers.routeChooseHint");
                     return (
                       <TableCell key={s.id} align="center" sx={{ whiteSpace: "nowrap" }}>
                         <Tooltip title={cell ? t("vpnUsers.revokeHint") : t("vpnUsers.grantHint")}>
@@ -474,6 +521,45 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
                               {cell?.lan_access
                                 ? <LanIcon fontSize="small" color="primary" />
                                 : <BlockIcon fontSize="small" sx={{ color: cell ? "error.main" : "action.disabledBackground" }} />}
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+
+                        {/* The third axis. It was reachable only from the
+                            detail dialog, so the matrix — the one view whose
+                            job is "who has what, at a glance" — showed two of
+                            the three things a user can be granted.
+
+                            One published route is a plain toggle like the
+                            other two. Several cannot be: a click has no way to
+                            say which, so it opens the dialog that can. The
+                            tooltip says which of the two will happen. */}
+                        <Tooltip title={routeTitle}>
+                          <span>
+                            <IconButton
+                              size="small"
+                              disabled={!cell || published.length === 0 || busy === key}
+                              onClick={() => {
+                                if (!cell) return;
+                                if (published.length !== 1) return setDialogUser(u);
+                                const only = published[0].slot_id;
+                                grant(u, s, {
+                                  allowed_profiles: routes.includes(only)
+                                    ? routes.filter((r) => r !== only)
+                                    : [...routes, only],
+                                });
+                              }}
+                            >
+                              <AltRouteIcon
+                                fontSize="small"
+                                sx={{
+                                  color: routes.length > 0
+                                    ? "info.main"
+                                    : cell && published.length > 0
+                                      ? "action.disabled"
+                                      : "action.disabledBackground",
+                                }}
+                              />
                             </IconButton>
                           </span>
                         </Tooltip>
