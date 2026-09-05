@@ -245,7 +245,9 @@ PUT /api/slots/<slot_id>/client-profile
 { "enabled": true, "description": "Banking and TR streaming" }
 ```
 
-There is no UI for this yet; it is an API call. Three refusals are worth knowing:
+The Proxima panel does this from the slot itself — a control on the slot card and on its table row, with a badge once the slot is offered. The dialog names the slot's label explicitly, because that label is what users see and it does not change when the pool fails over. The API is what that control calls, and remains the way to script it.
+
+Three refusals are worth knowing, and the panel shows each one in place rather than as a generic error:
 
 | Refused | Why |
 |---|---|

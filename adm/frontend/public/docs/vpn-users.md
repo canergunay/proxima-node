@@ -58,19 +58,22 @@ Peers were never contested — ADM does not touch them. The password is the one 
 The Users page in ADM is a matrix: one row per person, one column per site.
 
 ```
-Kullanıcı ⇅        Durum ⇅         ERG ⇅          SHV ⇅
-[search    ] ✕     [All      ▾] ✕  [All     ▾] ✕  [All     ▾] ✕
+User ⇅             Status ⇅        ERG ⇅            SHV ⇅
+[search    ] ✕     [All      ▾] ✕  [All       ▾] ✕  [All       ▾] ✕
 
-can.ergunay        ● Enabled       ✓  🖧          ✓  🖧
-kerem.ergunay      ● Enabled       ✓  🖧          ○  ⊘
+can.ergunay        ● Enabled       ✓  🖧  ⤳        ✓  🖧  ⤳
+kerem.ergunay      ● Enabled       ✓  🖧  ·        ○  ⊘  ·
 ```
 
-Each cell has two controls:
+Each cell carries all three axes, in the order they were added:
 
-- **left** — authorized on this server or not
-- **right** — may this person's devices reach that site's LAN
+- **authorized on this server or not**
+- **may this person's devices reach that site's LAN**
+- **which Direct routes they may take** — lit when they hold one, dim when the site publishes routes they have not been given, dimmer still when it publishes none
 
-Clicking a name opens the detail dialog, which holds per-server limits and the third axis, **Direct routes** (below). Every column sorts and carries its own filter; the site filters accept several options at once, OR-ed together, so "not authorized" + "LAN blocked" lists everyone who cannot reach that site's LAN by either route.
+The first two are plain toggles. The third is one too when the site publishes a single route; where it publishes several, a click cannot say which, so it opens the detail dialog that can — and the tooltip says which of the two will happen. Tooltips name routes by their label rather than their slot id, because the label is what the user sees in their client and therefore what the decision is actually about.
+
+Clicking a name opens that dialog directly, which also holds the per-server limits. Every column sorts and carries its own filter; the site filters accept several options at once, OR-ed together, so "not authorized" + "LAN blocked" lists everyone who cannot reach that site's LAN by either route, and "has a Direct route" narrows to the people holding one.
 
 ---
 
@@ -104,7 +107,7 @@ The three axes are **independent flags, not tiers**. "LAN only", "LAN plus gener
 
 ### Granting
 
-The user dialog has a per-site card. Beside LAN access and the device limit it lists the routes that site publishes, one checkbox each, and the grant is stored as `vpn_user_access.allowed_profiles` — a JSON list of slot ids, per (user, server), pushed by the same sync as every other access field.
+Granting happens in either place. In the matrix, the third glyph in a cell toggles the route when the site publishes exactly one. In the detail dialog, a per-site card lists every route that site publishes with a checkbox each, beside LAN access and the device limit. Both write the same field: `vpn_user_access.allowed_profiles`, a JSON list of slot ids per (user, server), pushed by the same sync as every other access field.
 
 The options come from the poller cache rather than a live call to the site, so the list still renders when the site is unreachable. A route whose last health check failed is marked unavailable rather than hidden — the same choice the client makes, for the same reason.
 
