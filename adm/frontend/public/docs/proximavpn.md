@@ -290,6 +290,31 @@ Split-tunnel `AllowedIPs` excludes RFC1918, so packets addressed to a device on 
 
 Name resolution does. The config sets `DNS` to the site, so a lookup for a short or local hostname is answered by the site's resolver, which knows the *site's* LAN and not the user's. A home NAS reachable by address stops being reachable by name. Use an address, or an FQDN that resolves publicly.
 
+### Three ways to take one
+
+A route can be taken from wherever the device is being set up, because these
+configs are handed over in three different situations and only one of them
+involves the person's own desktop:
+
+| Where | Who | How |
+|---|---|---|
+| ProximaVPN client | the user | Servers → the site → Direct Routes → Use |
+| The portal (`/portal/`) | the user | below their device list, "Add device" |
+| Proxima panel → ProximaVPN | an admin, for someone | pick the route when creating the device |
+
+All three call the same mint, which is idempotent per (user, route): asking
+again hands back the config that already exists rather than spending another
+address. That is what makes "download it and send it to them" work from any of
+them.
+
+The admin path refuses three things, each because the alternative fails later
+and less clearly: a device with no owner (a route peer is keyed on its owner,
+so an unowned one is collected by the next orphan sweep), an unpublished slot,
+and a user who has not been granted the route. That last one is not something
+the site can fix for itself — ADM owns the grant, and its next push would
+overwrite anything set here — so the error says to grant it in ADM rather than
+issue a config that stops working a push later.
+
 ### On other devices
 
 A Direct profile config is an ordinary AmneziaWG config, so it works in the AmneziaWG app on a phone as well as in ProximaVPN — the client needs to know nothing, because the routing decision is made on the site box. The peer appears in the site's peer list like any other, carrying the same Share / QR button, and that is how a route reaches a second device.
