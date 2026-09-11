@@ -43,3 +43,7 @@ adm/data/
 adm/backend/static/
 adm/frontend/node_modules/
 adm/frontend/dist/
+
+# TypeScript incremental build cache — a build artefact that was tracked by
+# mistake, so it showed up dirty after every compile and buried real changes.
+*.tsbuildinfo
