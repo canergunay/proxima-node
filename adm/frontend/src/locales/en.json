@@ -363,6 +363,8 @@
   "vpnServer.updateTitle": "Updating {{name}}",
   "vpnServer.updateStarting": "Starting the deploy…",
   "vpnServer.unmanaged": "Not deployed by ADM",
+  "vpnServer.tokenExpired": "Site token expired on {{date}} — every call fails until the site is re-claimed",
+  "vpnServer.tokenExpiring": "Site token expires on {{date}} — renewal is pending",
   "vpnServer.revision": "Revision {{short}}",
   "vpnServer.update": "Update",
   "panelAccess.explainer": "The columns on the right decide who can sign into each site's own Proxima panel. They use the password they already have here — nothing separate to issue or remember. This is not the same as the servers column: that one only decides whose accounts they may edit in ADM.",

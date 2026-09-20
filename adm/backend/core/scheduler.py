@@ -30,6 +30,7 @@ _cooldowns: dict[tuple[int, str], float] = {}  # (server_id, alert_type) -> last
 _active_alerts: set[tuple[int, str]] = set()  # alerts currently firing
 _last_cleanup: float = 0.0
 _last_source_refresh: float = 0.0
+_last_token_refresh: float = 0.0
 
 POLL_INTERVAL = 300  # 5 minutes
 # How far back an offline alert may look when working out how long a server
@@ -39,6 +40,7 @@ OFFLINE_LOOKBACK_HOURS = 24
 COOLDOWN_SECONDS = 3600  # 1 hour between same alerts
 CLEANUP_INTERVAL = 86400  # daily cleanup
 SOURCE_REFRESH_INTERVAL = 3600  # hourly: keep the drift comparison honest
+TOKEN_REFRESH_INTERVAL = 3600   # hourly: renew site tokens before they expire
 
 # A metric must fall this far below its threshold before we call it recovered,
 # otherwise a value hovering on the threshold alternates alert/recovery forever.
@@ -69,6 +71,7 @@ def _loop() -> None:
             _reconcile_vpn_passwords()
             _retry_panel_access()
             _maybe_refresh_source()
+            _maybe_refresh_site_tokens()
         except Exception:
             log.exception("Scheduler error")
         _stop.wait(timeout=POLL_INTERVAL)
@@ -102,6 +105,49 @@ def _maybe_refresh_source() -> None:
         log.warning(f"Source refresh failed: {error}")
     elif revision:
         log.info(f"Source refreshed to {revision['short']}")
+
+
+def _maybe_refresh_site_tokens() -> None:
+    """Renew each site's admin token before it expires.
+
+    The token ADM holds per site is a 90-day Proxima JWT. Nothing renewed
+    them: ERG's and SHV's, issued 2026-06-20, expired on 2026-09-18 and from
+    then on every user sync to both sites failed with Unauthorized — logged
+    per user as a WARNING, shown nowhere. Found two days later by reading the
+    journal for an unrelated reason.
+
+    A token within TOKEN_REFRESH_AHEAD of expiry is traded for a fresh one at
+    the site's /api/auth/refresh. An already expired one cannot be — by
+    design, on the site — so it is reported at ERROR every hour until someone
+    re-claims the site; loud is the point.
+    """
+    global _last_token_refresh
+    now = time.time()
+    if now - _last_token_refresh < TOKEN_REFRESH_INTERVAL:
+        return
+    _last_token_refresh = now
+
+    from core.auth import encrypt_value
+    from core.db import update_vpn_server
+    from core.proxima_client import refresh_token, token_expiry, token_state
+
+    for server in get_all_vpn_servers():
+        state = token_state(server)
+        if state in ("none", "ok"):
+            continue
+        exp = token_expiry(server) or 0
+        when = time.strftime("%Y-%m-%d", time.localtime(exp))
+        if state == "expired":
+            log.error(f"[TOKEN] {server['name']}: site token expired on {when} — "
+                      f"every call to this site fails until it is re-claimed")
+            continue
+        token, error = refresh_token(server)
+        if error:
+            log.warning(f"[TOKEN] {server['name']}: refresh failed ({error}); "
+                        f"token expires {when}")
+            continue
+        update_vpn_server(server["id"], {"api_token_enc": encrypt_value(token)})
+        log.info(f"[TOKEN] {server['name']}: token refreshed (was expiring {when})")
 
 
 def _agent_urls(server: dict) -> list[str]:

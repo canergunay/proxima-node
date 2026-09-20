@@ -148,6 +148,9 @@ export interface VpnServer {
    *  clients. public_url above may be masked by the instance's live value. */
   discovery_url: string;
   has_token: boolean;
+  /** "none" | "expired" | "expiring" | "ok" — read from the stored JWT. */
+  token_state: "none" | "expired" | "expiring" | "ok";
+  token_expires_at: number | null;
   online: boolean;
   proxima_status: ProximaStatus | null;
   connectivity: ServiceStatus[] | null;

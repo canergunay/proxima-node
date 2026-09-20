@@ -17,7 +17,7 @@ from core.db import (
     update_vpn_server,
 )
 from core.authz import scoped_server_ids, superadmin_only
-from core.proxima_client import PROBE_TIMEOUT, request as _proxima_request
+from core.proxima_client import PROBE_TIMEOUT, request as _proxima_request, token_expiry, token_state
 from core import mgmt_network as mgmt
 from core.subnets import validate_for_server
 
@@ -38,6 +38,8 @@ def _fetch_vpn_server_status(server: dict) -> dict:
         # on this field — warning on the merged public_url would hide the gap.
         "discovery_url": server.get("public_url", ""),
         "has_token": bool(server.get("api_token_enc")),
+        "token_state": token_state(server),
+        "token_expires_at": token_expiry(server),
         "online": False,
         "proxima_status": None,
         "connectivity": None,

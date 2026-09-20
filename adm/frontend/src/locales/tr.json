@@ -363,6 +363,8 @@
   "vpnServer.updateTitle": "{{name}} güncelleniyor",
   "vpnServer.updateStarting": "Dağıtım başlatılıyor…",
   "vpnServer.unmanaged": "ADM ile kurulmamış",
+  "vpnServer.tokenExpired": "Saha token'ı {{date}} tarihinde doldu — saha yeniden tanımlanana kadar her çağrı başarısız",
+  "vpnServer.tokenExpiring": "Saha token'ı {{date}} tarihinde dolacak — yenileme bekliyor",
   "vpnServer.revision": "Revizyon {{short}}",
   "vpnServer.update": "Güncelle",
   "panelAccess.explainer": "Sağdaki sütunlar, her sahanın kendi Proxima paneline kimin girebileceğini belirler. Kişi burada zaten kullandığı parolayla girer — ayrıca üretilecek ya da akılda tutulacak bir şey yok. Bu, sunucular sütunuyla aynı şey değil: o sütun yalnızca ADM'de kimin hesaplarını düzenleyebileceğini belirler.",

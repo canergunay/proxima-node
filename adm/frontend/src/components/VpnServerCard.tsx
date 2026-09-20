@@ -394,6 +394,24 @@ export default function VpnServerCard({ server, sourceRevision, onClick, onEdit,
             </Typography>
           )}
 
+          {/* An expired site token turned every call into a 401 that only the
+              journal saw (ERG + SHV, 2026-09-18). The scheduler renews tokens
+              ahead of time; when it could not, say so where someone looks. */}
+          {server.token_state === "expired" && (
+            <Typography variant="caption" color="error" sx={{ mt: 1, display: "block" }}>
+              {t("vpnServer.tokenExpired", {
+                date: server.token_expires_at ? new Date(server.token_expires_at * 1000).toLocaleDateString() : "?",
+              })}
+            </Typography>
+          )}
+          {server.token_state === "expiring" && (
+            <Typography variant="caption" color="warning.main" sx={{ mt: 1, display: "block" }}>
+              {t("vpnServer.tokenExpiring", {
+                date: server.token_expires_at ? new Date(server.token_expires_at * 1000).toLocaleDateString() : "?",
+              })}
+            </Typography>
+          )}
+
           {/* Discovery silently omits servers without a stored public URL —
               say so here, or the gap only ever shows up as a user's missing
               site. Keyed on discovery_url (the DB value), not public_url,

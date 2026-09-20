@@ -5,7 +5,10 @@ Every call is authenticated with the per-server admin token stored encrypted
 in `vpn_servers.api_token_enc`.
 """
 
+import base64
+import json
 import logging
+import time
 
 import requests
 
@@ -32,6 +35,61 @@ PROBE_TIMEOUT: tuple[int, int] = (2, 8)
 # here — which is the intent; carrying admin tokens and password hashes over
 # an unverified channel is not an acceptable default.
 VERIFY_TLS = True
+
+
+# Proxima admin tokens are JWTs that expire (TOKEN_EXPIRY_DAYS on the site,
+# 90 days). ADM stores one per site and replays it; until 2026-09-20 nothing
+# renewed them, so ERG's and SHV's died on 2026-09-18 and every user sync
+# failed with 401 — visible only in the journal. The scheduler now refreshes a
+# token this far ahead of its expiry, and the UI names an expired one.
+TOKEN_REFRESH_AHEAD = 30 * 86400
+
+
+def token_expiry(server: dict) -> int | None:
+    """Unix expiry of the stored site token, read from the JWT payload.
+
+    Not verified — ADM does not hold the site's secret and does not need to:
+    this decides *when to refresh*, and the site still judges validity.
+    """
+    enc_token = server.get("api_token_enc")
+    if not enc_token:
+        return None
+    token = decrypt_value(enc_token)
+    if not token:
+        return None
+    try:
+        payload = token.split(".")[1]
+        payload += "=" * (-len(payload) % 4)
+        exp = json.loads(base64.urlsafe_b64decode(payload)).get("exp")
+        return int(exp) if exp else None
+    except Exception:  # noqa: BLE001 — an unreadable token is simply "unknown"
+        return None
+
+
+def token_state(server: dict) -> str:
+    """'none', 'expired', 'expiring' (within TOKEN_REFRESH_AHEAD) or 'ok'."""
+    if not server.get("api_token_enc"):
+        return "none"
+    exp = token_expiry(server)
+    if exp is None:
+        return "ok"  # a token we cannot read is left to the site to judge
+    now = time.time()
+    if exp <= now:
+        return "expired"
+    if exp - now < TOKEN_REFRESH_AHEAD:
+        return "expiring"
+    return "ok"
+
+
+def refresh_token(server: dict) -> tuple[str | None, str | None]:
+    """Trade the stored (still valid) token for a fresh one. Returns (token, error)."""
+    data, error = call(server, "POST", "/api/auth/refresh")
+    if error:
+        return None, error
+    token = (data or {}).get("token") if isinstance(data, dict) else None
+    if not token:
+        return None, "No token in refresh response"
+    return token, None
 
 
 def auth_headers(server: dict) -> dict:
