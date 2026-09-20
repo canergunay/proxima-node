@@ -6,22 +6,42 @@ import {
   Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import FilterCenterFocusIcon from "@mui/icons-material/FilterCenterFocus";
 import { useTranslation } from "react-i18next";
 import {
-  LineChart, Line, XAxis, YAxis, Tooltip, Legend,
+  LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid,
 } from "recharts";
 import api from "../api/client";
 import type { MetricPoint, VpnMetricPoint, AlertConfig, AlertEntry } from "../api/types";
 
-const COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff7300", "#00C49F", "#FF8042"];
+/**
+ * Eight categorical hues stepped for a dark surface, in a fixed order that
+ * keeps every adjacent pair apart for colour-blind readers. A ninth server
+ * reuses the hues with a dash pattern rather than inventing a new colour.
+ */
+const SERIES_COLORS = [
+  "#3987e5", "#d95926", "#199e70", "#c98500",
+  "#d55181", "#008300", "#9085e9", "#e66767",
+];
+const SERIES_DASHES = [undefined, "7 4", "2 3"];
 
 type TimeRange = "24h" | "7d" | "30d";
 const RANGE_HOURS: Record<TimeRange, number> = { "24h": 24, "7d": 168, "30d": 720 };
 
 type Metric = "disk" | "memory" | "cpu";
 type ChartRow = { time: number } & Record<string, number | null>;
-type Series = { id: string; name: string; color: string };
+type Series = { id: string; name: string; color: string; dash?: string };
+
+/** Colour follows the server, never its position among the visible ones. */
+function buildSeries(servers: Record<string, { display_name: string }>): Series[] {
+  return Object.keys(servers).map((id, i) => ({
+    id,
+    name: servers[id]?.display_name || id,
+    color: SERIES_COLORS[i % SERIES_COLORS.length],
+    dash: SERIES_DASHES[Math.floor(i / SERIES_COLORS.length) % SERIES_DASHES.length],
+  }));
+}
 
 /** Peak of the bucket a point summarises, kept beside its average. */
 const peakKey = (seriesId: string) => `${seriesId}:max`;
@@ -61,7 +81,10 @@ function buildAll<T extends { timestamp: number }>(points: T[], idField: keyof T
 type MetricChartProps = {
   title: string;
   data: ChartRow[];
+  /** Only the series the filter row leaves visible. */
   series: Series[];
+  /** Series the pointer is resting on in the filter row; the rest fade back. */
+  highlightId: string | null;
   formatAxis: (ts: unknown) => string;
   formatLabel: (ts: unknown) => string;
   peakLabel: string;
@@ -72,7 +95,7 @@ type MetricChartProps = {
  * re-renders all six charts.
  */
 const MetricChart = memo(function MetricChart({
-  title, data, series, formatAxis, formatLabel, peakLabel,
+  title, data, series, highlightId, formatAxis, formatLabel, peakLabel,
 }: MetricChartProps) {
   return (
     <Box sx={{ flex: 1, minWidth: { xs: "100%", sm: 300 }, minHeight: 260 }}>
@@ -92,7 +115,22 @@ const MetricChart = memo(function MetricChart({
           <Tooltip
             labelFormatter={formatLabel}
             isAnimationActive={false}
-            contentStyle={{ backgroundColor: "#1e1e1e", border: "1px solid #555" }}
+            cursor={{ stroke: "#777", strokeWidth: 1 }}
+            /* Recharts paints the tooltip before the rest of the chart
+               chrome, so without this it reads through whatever sits on
+               top of it. */
+            wrapperStyle={{ zIndex: 20, outline: "none" }}
+            contentStyle={{
+              backgroundColor: "#15161a",
+              border: "1px solid #5a5a5a",
+              borderRadius: 6,
+              padding: "6px 10px",
+              boxShadow: "0 4px 14px rgba(0,0,0,0.6)",
+              fontSize: 12,
+            }}
+            labelStyle={{ color: "#bdbdbd", marginBottom: 4 }}
+            itemStyle={{ padding: 0 }}
+            itemSorter={(item) => -(Number(item.value) || 0)}
             formatter={(value, name, item) => {
               const row = item?.payload as ChartRow | undefined;
               const peak = row?.[peakKey(String(item?.dataKey))];
@@ -104,25 +142,143 @@ const MetricChart = memo(function MetricChart({
               return [shown, name];
             }}
           />
-          <Legend wrapperStyle={{ fontSize: 11 }} />
-          {series.map((s) => (
-            <Line
-              key={s.id}
-              dataKey={s.id}
-              name={s.name}
-              stroke={s.color}
-              dot={false}
-              activeDot={{ r: 3 }}
-              strokeWidth={1.8}
-              connectNulls
-              isAnimationActive={false}
-            />
-          ))}
+          {series.map((s) => {
+            const dimmed = highlightId !== null && highlightId !== s.id;
+            return (
+              <Line
+                key={s.id}
+                dataKey={s.id}
+                name={s.name}
+                stroke={s.color}
+                strokeDasharray={s.dash}
+                dot={false}
+                activeDot={{ r: 3 }}
+                strokeWidth={highlightId === s.id ? 2.8 : 1.8}
+                strokeOpacity={dimmed ? 0.15 : 1}
+                connectNulls
+                isAnimationActive={false}
+              />
+            );
+          })}
         </LineChart>
       </ResponsiveContainer>
     </Box>
   );
 });
+
+type SeriesFilterProps = {
+  series: Series[];
+  hidden: Set<string>;
+  onToggle: (id: string) => void;
+  onIsolate: (id: string) => void;
+  onShowAll: () => void;
+  onHover: (id: string | null) => void;
+};
+
+/**
+ * Doubles as the legend for the three charts below it: one row of servers,
+ * click to drop a line, focus icon to keep only that one.
+ */
+const SeriesFilter = memo(function SeriesFilter({
+  series, hidden, onToggle, onIsolate, onShowAll, onHover,
+}: SeriesFilterProps) {
+  const { t } = useTranslation();
+  if (series.length < 2) return null;
+  return (
+    <Box
+      sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, alignItems: "center", mb: 1.5 }}
+      title={t("monitoring.filterHint")}
+      onMouseLeave={() => onHover(null)}
+    >
+      {series.map((s) => {
+        const off = hidden.has(s.id);
+        const solo = !off && hidden.size === series.length - 1;
+        return (
+          <Chip
+            key={s.id}
+            size="small"
+            variant="outlined"
+            label={s.name}
+            onClick={() => onToggle(s.id)}
+            onMouseEnter={() => onHover(off ? null : s.id)}
+            onDelete={() => onIsolate(s.id)}
+            deleteIcon={
+              <FilterCenterFocusIcon
+                titleAccess={solo ? t("monitoring.showAllSeries") : t("monitoring.isolateSeries")}
+              />
+            }
+            icon={
+              <Box
+                sx={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: "50%",
+                  border: `2px solid ${s.color}`,
+                  bgcolor: off ? "transparent" : s.color,
+                }}
+              />
+            }
+            sx={{
+              borderColor: off ? "divider" : s.color,
+              opacity: off ? 0.5 : 1,
+              "& .MuiChip-label": { textDecoration: off ? "line-through" : "none" },
+              "& .MuiChip-deleteIcon": {
+                fontSize: 15,
+                opacity: solo ? 1 : 0.45,
+                "&:hover": { opacity: 1 },
+              },
+            }}
+          />
+        );
+      })}
+      {hidden.size > 0 && (
+        <Button size="small" onClick={onShowAll} sx={{ minWidth: 0, ml: 0.5 }}>
+          {t("monitoring.showAllSeries")}
+        </Button>
+      )}
+    </Box>
+  );
+});
+
+/** Which servers a chart group draws, and which one the pointer is on. */
+function useSeriesFilter(series: Series[]) {
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const [hoverId, setHoverId] = useState<string | null>(null);
+
+  // A server that disappears from the API must not stay hidden forever.
+  useEffect(() => {
+    setHidden((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Set([...prev].filter((id) => series.some((s) => s.id === id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [series]);
+
+  const toggle = useCallback((id: string) => {
+    setHidden((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    setHoverId(null);
+  }, []);
+
+  const isolate = useCallback((id: string) => {
+    setHidden((prev) => {
+      const others = series.filter((s) => s.id !== id).map((s) => s.id);
+      const alreadySolo = !prev.has(id) && others.every((o) => prev.has(o));
+      return alreadySolo ? new Set<string>() : new Set(others);
+    });
+    setHoverId(null);
+  }, [series]);
+
+  const showAll = useCallback(() => setHidden(new Set<string>()), []);
+
+  const visible = useMemo(() => series.filter((s) => !hidden.has(s.id)), [series, hidden]);
+
+  return { hidden, hoverId, setHoverId, toggle, isolate, showAll, visible };
+}
 
 export default function MonitoringTab() {
   const { t } = useTranslation();
@@ -195,22 +351,11 @@ export default function MonitoringTab() {
     fetchAlerts();
   }, [fetchMetrics, fetchVpnMetrics, fetchConfig, fetchAlerts]);
 
-  const exitSeries = useMemo<Series[]>(
-    () => Object.keys(servers).map((id, i) => ({
-      id,
-      name: servers[id]?.display_name || id,
-      color: COLORS[i % COLORS.length],
-    })),
-    [servers],
-  );
-  const vpnSeries = useMemo<Series[]>(
-    () => Object.keys(vpnServers).map((id, i) => ({
-      id,
-      name: vpnServers[id]?.display_name || id,
-      color: COLORS[i % COLORS.length],
-    })),
-    [vpnServers],
-  );
+  const exitSeries = useMemo<Series[]>(() => buildSeries(servers), [servers]);
+  const vpnSeries = useMemo<Series[]>(() => buildSeries(vpnServers), [vpnServers]);
+
+  const exitFilter = useSeriesFilter(exitSeries);
+  const vpnFilter = useSeriesFilter(vpnSeries);
 
   const exitData = useMemo(() => buildAll(metrics, "server_id"), [metrics]);
   const vpnData = useMemo(() => buildAll(vpnMetrics, "vpn_server_id"), [vpnMetrics]);
@@ -296,22 +441,33 @@ export default function MonitoringTab() {
       ) : metrics.length === 0 ? (
         <Alert severity="info" sx={{ mb: 3 }}>{t("monitoring.noData")}</Alert>
       ) : (
-        <Box sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap" }}>
-          {[
-            { label: t("monitoring.diskUsage"), data: exitData.disk },
-            { label: t("monitoring.memoryUsage"), data: exitData.memory },
-            { label: t("monitoring.cpuUsage"), data: exitData.cpu },
-          ].map((chart) => (
-            <MetricChart
-              key={chart.label}
-              title={chart.label}
-              data={chart.data}
-              series={exitSeries}
-              formatAxis={formatAxis}
-              formatLabel={formatLabel}
-              peakLabel={peakLabel}
-            />
-          ))}
+        <Box sx={{ mb: 3 }}>
+          <SeriesFilter
+            series={exitSeries}
+            hidden={exitFilter.hidden}
+            onToggle={exitFilter.toggle}
+            onIsolate={exitFilter.isolate}
+            onShowAll={exitFilter.showAll}
+            onHover={exitFilter.setHoverId}
+          />
+          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+            {[
+              { label: t("monitoring.diskUsage"), data: exitData.disk },
+              { label: t("monitoring.memoryUsage"), data: exitData.memory },
+              { label: t("monitoring.cpuUsage"), data: exitData.cpu },
+            ].map((chart) => (
+              <MetricChart
+                key={chart.label}
+                title={chart.label}
+                data={chart.data}
+                series={exitFilter.visible}
+                highlightId={exitFilter.hoverId}
+                formatAxis={formatAxis}
+                formatLabel={formatLabel}
+                peakLabel={peakLabel}
+              />
+            ))}
+          </Box>
         </Box>
       )}
 
@@ -324,22 +480,33 @@ export default function MonitoringTab() {
       ) : vpnMetrics.length === 0 ? (
         <Alert severity="info" sx={{ mb: 3 }}>{t("monitoring.noVpnData")}</Alert>
       ) : (
-        <Box sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap" }}>
-          {[
-            { label: t("monitoring.diskUsage"), data: vpnData.disk },
-            { label: t("monitoring.memoryUsage"), data: vpnData.memory },
-            { label: t("monitoring.cpuUsage"), data: vpnData.cpu },
-          ].map((chart) => (
-            <MetricChart
-              key={chart.label}
-              title={chart.label}
-              data={chart.data}
-              series={vpnSeries}
-              formatAxis={formatAxis}
-              formatLabel={formatLabel}
-              peakLabel={peakLabel}
-            />
-          ))}
+        <Box sx={{ mb: 3 }}>
+          <SeriesFilter
+            series={vpnSeries}
+            hidden={vpnFilter.hidden}
+            onToggle={vpnFilter.toggle}
+            onIsolate={vpnFilter.isolate}
+            onShowAll={vpnFilter.showAll}
+            onHover={vpnFilter.setHoverId}
+          />
+          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+            {[
+              { label: t("monitoring.diskUsage"), data: vpnData.disk },
+              { label: t("monitoring.memoryUsage"), data: vpnData.memory },
+              { label: t("monitoring.cpuUsage"), data: vpnData.cpu },
+            ].map((chart) => (
+              <MetricChart
+                key={chart.label}
+                title={chart.label}
+                data={chart.data}
+                series={vpnFilter.visible}
+                highlightId={vpnFilter.hoverId}
+                formatAxis={formatAxis}
+                formatLabel={formatLabel}
+                peakLabel={peakLabel}
+              />
+            ))}
+          </Box>
         </Box>
       )}
 
