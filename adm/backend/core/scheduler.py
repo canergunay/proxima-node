@@ -119,7 +119,8 @@ def _maybe_refresh_site_tokens() -> None:
     A token within TOKEN_REFRESH_AHEAD of expiry is traded for a fresh one at
     the site's /api/auth/refresh. An already expired one cannot be — by
     design, on the site — so it is reported at ERROR every hour until someone
-    re-claims the site; loud is the point.
+    re-claims the site, and a Telegram alert goes out — loud is the point,
+    and a log line alone has already proven not to be loud enough.
     """
     global _last_token_refresh
     now = time.time()
@@ -131,23 +132,57 @@ def _maybe_refresh_site_tokens() -> None:
     from core.db import update_vpn_server
     from core.proxima_client import refresh_token, token_expiry, token_state
 
+    # Telegram, not just the log. The failure this guards against went unseen
+    # for two days precisely because it was only ever a log line, and the
+    # ERROR below would have been read exactly as often.
+    alert_config = get_alert_config()
+    bot_token = alert_config.get("telegram_bot_token", "")
+    chat_id = alert_config.get("telegram_chat_id", "")
+    alerting = bool(alert_config.get("enabled")) and bool(bot_token) and bool(chat_id)
+
     for server in get_all_vpn_servers():
+        name = server["name"]
         state = token_state(server)
         if state in ("none", "ok"):
             continue
+
         exp = token_expiry(server) or 0
         when = time.strftime("%Y-%m-%d", time.localtime(exp))
+        # Site-scoped keys; see _maybe_send_alert on why server_id is None.
+        expired_alert = f"site_token_expired:{name}"
+        failed_alert = f"site_token_refresh_failed:{name}"
+
         if state == "expired":
-            log.error(f"[TOKEN] {server['name']}: site token expired on {when} — "
+            log.error(f"[TOKEN] {name}: site token expired on {when} — "
                       f"every call to this site fails until it is re-claimed")
+            if alerting:
+                _maybe_send_alert(
+                    None, expired_alert, bot_token, chat_id,
+                    f"*Site Token Expired*\nSite: {name}\nExpired: {when}\n"
+                    f"Every ADM call to this site fails until it is re-claimed.",
+                    now)
             continue
+
         token, error = refresh_token(server)
         if error:
-            log.warning(f"[TOKEN] {server['name']}: refresh failed ({error}); "
+            log.warning(f"[TOKEN] {name}: refresh failed ({error}); "
                         f"token expires {when}")
+            if alerting:
+                _maybe_send_alert(
+                    None, failed_alert, bot_token, chat_id,
+                    f"*Site Token Refresh Failed*\nSite: {name}\n"
+                    f"Expires: {when}\nError: {error}",
+                    now)
             continue
+
         update_vpn_server(server["id"], {"api_token_enc": encrypt_value(token)})
-        log.info(f"[TOKEN] {server['name']}: token refreshed (was expiring {when})")
+        log.info(f"[TOKEN] {name}: token refreshed (was expiring {when})")
+        if alerting:
+            for alert_type in (failed_alert, expired_alert):
+                _maybe_send_recovery(
+                    None, alert_type, bot_token, chat_id,
+                    f"*Site Token Renewed*\nSite: {name}\n"
+                    f"Was expiring {when}; a fresh token is stored.")
 
 
 def _agent_urls(server: dict) -> list[str]:
@@ -529,11 +564,17 @@ def _check_metric(
 
 
 def _maybe_send_alert(
-    server_id: int, alert_type: str,
+    server_id: int | None, alert_type: str,
     bot_token: str, chat_id: str,
     message: str, now: float,
 ) -> None:
-    """Send alert if cooldown has expired."""
+    """Send alert if cooldown has expired.
+
+    `server_id` is a `servers` row — an exit node. Alerts about a VPN *site*
+    pass None and carry the site in `alert_type` instead, because
+    `alert_history.server_id` is a foreign key into `servers` and a
+    `vpn_servers` id would silently point at an unrelated exit node.
+    """
     key = (server_id, alert_type)
     last_sent = _cooldowns.get(key, 0)
     if now - last_sent < COOLDOWN_SECONDS:
@@ -550,7 +591,7 @@ def _maybe_send_alert(
 
 
 def _maybe_send_recovery(
-    server_id: int, alert_type: str,
+    server_id: int | None, alert_type: str,
     bot_token: str, chat_id: str, message: str,
 ) -> None:
     """Send a one-off recovery notice if this alert was firing.
