@@ -40,6 +40,9 @@ Thumbs.db
 
 # ADM
 adm/data/
+# Runtime data (SQLite, keys) — lives only on the deployed host, so the
+# server's working tree stayed dirty and the pre-deploy clean check was noise.
+adm/backend/data/
 adm/backend/static/
 adm/frontend/node_modules/
 adm/frontend/dist/
