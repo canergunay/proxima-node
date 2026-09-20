@@ -375,18 +375,48 @@ Proxima automatically stops disabled slot containers on startup. If SS slots are
 
 ### General Debugging
 
+`docker compose` only knows its own services (`proxima`, `dnsmasq`,
+`dns-router`). Tunnel clients are created by Proxima, so reach them with plain
+`docker`:
+
 ```bash
 # Check container status and exit code
-docker compose ps -a
+docker compose ps -a          # compose services
+docker ps -a                  # everything, including *-client-slot-N
 
 # Check container logs
-docker compose logs --tail=100 CONTAINER_NAME
+docker compose logs --tail=100 SERVICE_NAME
+docker logs --tail=100 awg-client-slot-1
 
 # Check container events
 docker events --filter container=CONTAINER_NAME --since 5m
 ```
 
 ### AWG Client Won't Start
+
+**First check that the container exists at all.** Tunnel client containers are
+not compose services — Proxima creates one per slot — so a missing one is not
+something `docker compose up` will fix:
+
+```bash
+docker ps -a --filter name=awg-client
+grep -aE 'Created container awg-client|image not found' config/proxima.log | tail
+```
+
+If the container is missing and the log says the image was not found, the site
+never built it:
+
+```bash
+cd docker && docker compose --profile build build awg-client
+```
+
+Proxima then creates the container on the next slot restart, or on its own
+restart. Up to 2026-09-20 AWG slots were three fixed compose services, so a
+fourth slot added from the UI got a config entry, a SOCKS port and a
+dns-router tunnel — and no container. It could never go healthy, on any site,
+and read as a bad key every time.
+
+If the container exists and is crash-looping, check the config:
 
 ```bash
 # Check config file exists and is valid
@@ -397,6 +427,12 @@ The config must have both `[Interface]` and `[Peer]` sections. Common issues:
 - Missing `PrivateKey` in `[Interface]`
 - Missing `PublicKey` or `Endpoint` in `[Peer]`
 - Invalid key format (must be base64-encoded 32-byte key)
+
+If the config is valid and the container still rejects it — typically
+`Line unrecognized: HeaderProtectionKey` — the container is older than the
+image and its tools predate the field. Proxima now replaces such a container
+on restart; `docker inspect awg-client-slot-N --format '{{.Image}} {{.Created}}'`
+against a healthy sibling confirms it.
 
 ### Shadowsocks Client Won't Start
 

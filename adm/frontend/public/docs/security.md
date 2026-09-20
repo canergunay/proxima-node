@@ -15,9 +15,19 @@ This document covers authentication, network security, VPN and DNS security, DPI
 Proxima uses JSON Web Tokens (JWT) for API authentication:
 
 - All API endpoints under `/api/` require a valid JWT token in the `Authorization` header.
-- Tokens are issued upon successful login and expire after a configurable period.
+- Tokens are issued upon successful login and expire after `TOKEN_EXPIRY_DAYS` (90 days).
 - Token expiration is checked on every API request.
 - Expired tokens are rejected with a 401 status code, requiring the user to re-authenticate.
+- `POST /api/auth/refresh` trades a still-valid admin token for a fresh one. An expired
+  token cannot be refreshed — that is the point of the expiry — so a site whose token has
+  run out must be re-claimed.
+
+**Machine callers expire too.** ADM stores one admin token per site and replays it on every
+call. Nothing renewed them until 2026-09-20: ERG's and SHV's, issued 2026-06-20, expired on
+2026-09-18, and from then on every central user sync to both sites failed with `Unauthorized`
+— one WARNING per user in ADM's journal and nothing in the UI. ADM's scheduler now refreshes
+any site token within 30 days of expiry, logs an expired one at ERROR every hour, and the
+server card names it with its date.
 
 ### Password Security
 

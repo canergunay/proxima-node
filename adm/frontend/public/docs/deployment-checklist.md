@@ -60,17 +60,19 @@ cp .env.example .env
 ### 4. Build and Start
 
 ```bash
-# Build all images (including DNS mode)
+# Build all images (DNS mode + the tunnel client images)
 cd /opt/proxima/docker
 docker compose build proxima
-docker compose --profile dns build
+docker compose --profile dns --profile build build
 
-# Start everything
+# Start everything. Only these are compose services; the tunnel clients are
+# created per slot by Proxima once a slot has a key.
 docker compose up -d proxima
 docker compose --profile dns up -d
 ```
 
-- [ ] All containers show `Up` in `docker compose ps`
+- [ ] `docker compose ps` shows `proxima`, `dnsmasq` and `dns-router` `Up`
+- [ ] `docker ps` shows one `*-client-slot-N` per configured slot (none yet on a fresh box)
 - [ ] Web UI accessible at `http://SERVER_IP:5050`
 - [ ] Create admin account on first launch
 
@@ -184,7 +186,7 @@ cp .env.example .env
 ```bash
 cd /opt/proxima/docker
 docker compose build proxima
-docker compose --profile dns build
+docker compose --profile dns --profile build build
 docker compose up -d proxima
 docker compose --profile dns up -d
 ```
