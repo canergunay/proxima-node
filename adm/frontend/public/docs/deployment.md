@@ -66,23 +66,34 @@ The resulting image contains everything needed to serve both the API and the UI.
 
 ## DNS Mode Deploy
 
-DNS Mode requires additional containers: `dnsmasq`, `dns-router`, and `awg-client-slot-1` (plus `awg-client-slot-2` and `awg-client-slot-3` for additional tunnels). These are behind the `dns` Docker Compose profile and must be built and started separately.
+DNS Mode requires two additional compose services, `dnsmasq` and `dns-router`, behind the `dns` profile. The tunnel client containers (`awg-client-slot-N`, `outline-client-slot-N`, `xray-client-slot-N`, `zapret-client-slot-N`) are **not** compose services: compose only builds their images (the `build` profile) and Proxima creates one container per slot from `backend/core/failover.py`. Adding a slot in the UI is all it takes — there is no fixed number of AWG slots.
 
 ### Full DNS Mode Deploy
 
 ```bash
 cd /opt/proxima/docker
-docker compose --profile dns build
+docker compose --profile dns --profile build build
 docker compose --profile dns up -d
 ```
+
+Only the `dns` profile is started. The `build` profile holds image-only services and must never be `up`-ed.
 
 ### Rebuild Only DNS Containers
 
 ```bash
 cd /opt/proxima/docker
-docker compose --profile dns build dnsmasq dns-router awg-client-slot-1 awg-client-slot-2 awg-client-slot-3
-docker compose --profile dns up -d dnsmasq dns-router awg-client-slot-1 awg-client-slot-2 awg-client-slot-3
+docker compose --profile dns build dnsmasq dns-router
+docker compose --profile dns up -d dnsmasq dns-router
 ```
+
+### Rebuild a Tunnel Client Image
+
+```bash
+cd /opt/proxima/docker
+docker compose --profile build build awg-client     # or outline-client / xray-client / zapret-client
+```
+
+Proxima notices on the next restart of each slot (or on its own startup) that the container's image tag has moved on and replaces the container. Nothing needs to be `up`-ed by hand.
 
 ### Deploy Proxima + DNS Together
 
@@ -90,7 +101,7 @@ docker compose --profile dns up -d dnsmasq dns-router awg-client-slot-1 awg-clie
 cd /opt/proxima && git pull
 cd docker
 docker compose build proxima
-docker compose --profile dns build
+docker compose --profile dns --profile build build
 docker compose up -d proxima
 docker compose --profile dns up -d
 ```
@@ -123,8 +134,8 @@ docker compose logs -f dnsmasq
 # Follow dns-router logs
 docker compose logs -f dns-router
 
-# Follow AWG client logs (replace slot-1 with slot-2 or slot-3 as needed)
-docker compose logs -f awg-client-slot-1
+# Follow AWG client logs (not a compose service — use docker directly)
+docker logs -f awg-client-slot-1
 
 # Last 100 lines of a specific container
 docker compose logs --tail=100 proxima
@@ -169,7 +180,7 @@ Docker Compose enforces resource limits on Proxima containers:
 | `proxima` | 512M | 1.0 | Flask API + React frontend |
 | `dnsmasq` | 64M | 0.25 | DNS resolver |
 | `dns-router` | 512M | 2.0 | nftables + tun2socks + gost + SNI router |
-| `awg-client-slot-*` | 256M | 2.0 | AWG tunnels + microsocks |
+| `awg-client-slot-*` | 256M | 2.0 | AWG tunnels (amneziawg-go) + gost SOCKS5 |
 | `outline-client-*` | 128M | 0.25 | Shadowsocks (Outline) tunnels |
 | `xray-client-*` | 128M | 0.25 | VLESS+Reality (Xray) tunnels |
 | `zapret-client-*` | 128M | 0.25 | DPI bypass (zapret/nfqws2) |
@@ -259,7 +270,7 @@ If the update includes changes to DNS Mode containers (dnsmasq config generation
 cd /opt/proxima && git pull
 cd docker
 docker compose build proxima
-docker compose --profile dns build
+docker compose --profile dns --profile build build
 docker compose up -d proxima
 docker compose --profile dns up -d
 ```
