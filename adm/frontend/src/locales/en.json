@@ -281,6 +281,7 @@
   "vpnUsers.revokeFromMatrix": "revoke from the matrix",
   "vpnUsers.username": "Username",
   "vpnUsers.usernameHelp": "Lowercase letters, digits, dot, underscore and hyphen",
+  "vpnUsers.usernameInvalid": "Use only a–z, 0–9 and . _ - (not at the start or end, not two in a row). No spaces, accents or Cyrillic.",
   "vpnUsers.usernameLocked": "Cannot be changed once the account exists on a server",
   "vpnUsers.fullName": "Full name",
   "vpnUsers.note": "Note",

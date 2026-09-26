@@ -281,6 +281,7 @@
   "vpnUsers.revokeFromMatrix": "kaldırma matristen yapılır",
   "vpnUsers.username": "Kullanıcı adı",
   "vpnUsers.usernameHelp": "Küçük harf, rakam, nokta, alt çizgi ve tire",
+  "vpnUsers.usernameInvalid": "Yalnızca a–z, 0–9 ve . _ - kullanın (başta, sonda veya art arda olamaz). Boşluk, Türkçe karakter veya Kiril harf olmaz.",
   "vpnUsers.usernameLocked": "Hesap bir sunucuda oluştuktan sonra değiştirilemez",
   "vpnUsers.fullName": "Ad soyad",
   "vpnUsers.note": "Not",

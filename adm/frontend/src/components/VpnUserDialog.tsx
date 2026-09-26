@@ -30,6 +30,17 @@ interface Draft {
 }
 
 const MIN_PASSWORD = 8;
+/** Mirrors USERNAME_RE in backend/api/vpn_users.py — keep the two in step. */
+const USERNAME_RE = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/;
+
+type SyncResult = { failed?: { target: string; error: string }[] } | undefined;
+
+/** The backend's own reason, not a generic "failed" — a 400 always carries one. */
+const apiError = (err: unknown): string | undefined =>
+  (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+
+const syncFailures = (sync: SyncResult): string =>
+  (sync?.failed ?? []).map((f) => `${f.target}: ${f.error}`).join(", ");
 
 export default function VpnUserDialog({ user, servers, onClose, onSaved }: Props) {
   const { t } = useTranslation();
@@ -77,9 +88,16 @@ export default function VpnUserDialog({ user, servers, onClose, onSaved }: Props
   const [error, setError] = useState("");
   /** Set once the password was accepted, so the onboarding block can be built. */
   const [issued, setIssued] = useState<{ password: string } | null>(null);
+  /** The account was saved but a site did not take it — shown with the package. */
+  const [pushError, setPushError] = useState("");
   const [copied, setCopied] = useState(false);
 
-  const tooShort = password.length > 0 && password.length < MIN_PASSWORD;
+  // Counted after trimming, as the backend does — "1234567 " is 7 characters there.
+  const passwordLen = password.trim().length;
+  const tooShort = passwordLen > 0 && passwordLen < MIN_PASSWORD;
+  const normalizedUsername = username.trim().toLowerCase();
+  const usernameInvalid =
+    isNew && normalizedUsername.length > 0 && !USERNAME_RE.test(normalizedUsername);
 
   const setDraft = (id: number, patch: Partial<Draft>) =>
     setDrafts((d) => ({ ...d, [id]: { ...d[id], ...patch } }));
@@ -125,7 +143,7 @@ export default function VpnUserDialog({ user, servers, onClose, onSaved }: Props
     try {
       if (isNew) {
         const { data } = await api.post("/vpn-users", {
-          username: username.trim().toLowerCase(),
+          username: normalizedUsername,
           full_name: fullName.trim(),
           note: note.trim(),
           password: password.trim(),
@@ -134,6 +152,8 @@ export default function VpnUserDialog({ user, servers, onClose, onSaved }: Props
         });
         if (!data.ok) { setError(data.error); setSaving(false); return; }
         // Stay open and show the block to hand over.
+        const failed = syncFailures(data.data.sync);
+        if (failed) setPushError(t("vpnUsers.syncFailed", { detail: failed }));
         setIssued({ password: data.data.password });
         setSaving(false);
         return;
@@ -156,27 +176,36 @@ export default function VpnUserDialog({ user, servers, onClose, onSaved }: Props
       // Grants: add or update the ones ticked. Revoking is deliberately not
       // done here — it destroys peers, so it goes through the matrix
       // confirmation instead.
+      const failures: string[] = [];
       for (const s of servers) {
         if (!drafts[s.id].granted) continue;
-        await api.put(`/vpn-users/${user!.id}/access/${s.id}`, accessBody(s.id));
+        const res = await api.put(`/vpn-users/${user!.id}/access/${s.id}`, accessBody(s.id));
+        const failed = syncFailures(res.data.data?.sync);
+        if (failed) failures.push(failed);
       }
+      const pushFailed = failures.length
+        ? t("vpnUsers.syncFailed", { detail: failures.join(", ") })
+        : "";
 
       if (password.trim()) {
+        setPushError(pushFailed);
         setIssued({ password: password.trim() });
         setSaving(false);
         return;
       }
+      if (pushFailed) { setError(pushFailed); setSaving(false); return; }
       onSaved();
-    } catch {
-      setError(t("vpnUsers.requestFailed"));
+    } catch (err: unknown) {
+      setError(apiError(err) || t("vpnUsers.requestFailed"));
     }
     setSaving(false);
   };
 
   const canSave =
-    username.trim().length > 0 &&
+    normalizedUsername.length > 0 &&
+    !usernameInvalid &&
     !tooShort &&
-    (!isNew || password.length >= MIN_PASSWORD);
+    (!isNew || passwordLen >= MIN_PASSWORD);
 
   return (
     <Dialog open onClose={issued ? onSaved : onClose} maxWidth="md" fullWidth>
@@ -186,6 +215,7 @@ export default function VpnUserDialog({ user, servers, onClose, onSaved }: Props
 
         {issued ? (
           <Box>
+            {pushError && <Alert severity="warning" sx={{ mb: 2 }}>{pushError}</Alert>}
             <Alert severity="info" sx={{ mb: 2 }}>{t("vpnUsers.packageHint")}</Alert>
             <TextField
               multiline
@@ -213,7 +243,12 @@ export default function VpnUserDialog({ user, servers, onClose, onSaved }: Props
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   disabled={!isNew}
-                  helperText={isNew ? t("vpnUsers.usernameHelp") : t("vpnUsers.usernameLocked")}
+                  error={usernameInvalid}
+                  helperText={
+                    usernameInvalid
+                      ? t("vpnUsers.usernameInvalid")
+                      : isNew ? t("vpnUsers.usernameHelp") : t("vpnUsers.usernameLocked")
+                  }
                   fullWidth
                 />
               </Grid>

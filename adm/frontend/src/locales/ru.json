@@ -281,6 +281,7 @@
   "vpnUsers.revokeFromMatrix": "отзыв выполняется из матрицы",
   "vpnUsers.username": "Имя пользователя",
   "vpnUsers.usernameHelp": "Строчные буквы, цифры, точка, подчёркивание и дефис",
+  "vpnUsers.usernameInvalid": "Только a–z, 0–9 и . _ - (не в начале, не в конце и не подряд). Без пробелов, диакритики и кириллицы.",
   "vpnUsers.usernameLocked": "Нельзя изменить после создания учётной записи на сервере",
   "vpnUsers.fullName": "Полное имя",
   "vpnUsers.note": "Заметка",
