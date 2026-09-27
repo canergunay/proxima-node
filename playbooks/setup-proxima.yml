@@ -39,6 +39,16 @@
     skip_callhome: false
     skip_proxima: false
     answers_path: "/root/.proxima-install-answers.json"
+    # The tunnel's moving parts. The CLI and the unit are the files the
+    # exit-node role vendors — referenced, not copied, so there is one set to
+    # keep current. The daemon is not in the repository (5 MB): it is taken
+    # once from the awg-client image ADM's own host already runs and cached
+    # beside the playbooks, gitignored. Delete the cache to pick up a rebuilt
+    # image.
+    awg_files: "{{ playbook_dir }}/../roles/mgmt-tunnel/files"
+    awg_go_cache: "{{ playbook_dir }}/../cache/amneziawg-go"
+    awg_go_image: "proxima-awg-client:latest"
+    awg_go_image_path: "/usr/local/bin/amneziawg-go"
 
   pre_tasks:
     - name: Verify host is in proxima_sites
@@ -77,6 +87,17 @@
     # the obfuscation parameters are interface-wide, so every peer moves
     # together. Starting an AWG config with plain wg-quick fails on the first
     # Jc= line, which is exactly how this was found.
+    #
+    # And userspace (amneziawg-go), permanently. A bare box has no kernel
+    # module at this point — the installer builds it in step 2, which runs
+    # only after this tunnel is up — so the first provisioning cannot use it
+    # at all. That was found on KLM (2026-09-27): every site until then had
+    # been provisioned on plain WireGuard and moved to AWG later, when the
+    # module was already there, so the gap never showed. Staying in userspace
+    # afterwards is the deliberate part: the management path is the recovery
+    # path, and a DKMS module that has to rebuild on every kernel update is
+    # one of the things it may have to recover from. Management traffic is a
+    # few KB a minute; userspace costs nothing here.
 
     - name: Install wireguard-tools
       ansible.builtin.apt:
@@ -85,6 +106,56 @@
         update_cache: true
         cache_valid_time: 3600
       when: not skip_callhome | bool
+
+    # awg-quick needs the awg CLI beside it and a systemd template to run
+    # under; neither is packaged on Debian.
+    - name: Install the AmneziaWG command-line tools
+      ansible.builtin.copy:
+        src: "{{ awg_files }}/{{ item }}"
+        dest: "/usr/bin/{{ item }}"
+        owner: root
+        group: root
+        mode: "0755"
+      loop: [awg, awg-quick]
+      when: not skip_callhome | bool
+      notify: Restart call-home tunnel
+
+    - name: Install the awg-quick systemd template
+      ansible.builtin.copy:
+        src: "{{ awg_files }}/awg-quick@.service"
+        dest: "/lib/systemd/system/awg-quick@.service"
+        owner: root
+        group: root
+        mode: "0644"
+      when: not skip_callhome | bool
+      notify: Restart call-home tunnel
+
+    # The daemon is pushed the same way the source is: extracted on the ADM
+    # host, never fetched by the site. `creates` makes this a one-time cost.
+    - name: Cache amneziawg-go from the awg-client image on the ADM host
+      ansible.builtin.shell: |
+        set -e
+        mkdir -p "$(dirname '{{ awg_go_cache }}')"
+        id=$(docker create {{ awg_go_image }})
+        docker cp "$id:{{ awg_go_image_path }}" "{{ awg_go_cache }}"
+        docker rm "$id" >/dev/null
+        chmod 0755 "{{ awg_go_cache }}"
+      args:
+        creates: "{{ awg_go_cache }}"
+      delegate_to: localhost
+      become: false
+      run_once: true
+      when: not skip_callhome | bool
+
+    - name: Install the userspace AmneziaWG implementation
+      ansible.builtin.copy:
+        src: "{{ awg_go_cache }}"
+        dest: /usr/bin/amneziawg-go
+        owner: root
+        group: root
+        mode: "0755"
+      when: not skip_callhome | bool
+      notify: Restart call-home tunnel
 
     - name: Create the AmneziaWG configuration directory
       ansible.builtin.file:
@@ -119,6 +190,35 @@
         owner: root
         group: root
         mode: "0600"
+      when: not skip_callhome | bool
+      notify: Restart call-home tunnel
+
+    # Without this awg-quick tries to create a kernel interface and fails
+    # with "operation not supported" on a box that has no module — and would
+    # silently switch to the module on one that does, which is exactly the
+    # dependency the section above refuses.
+    - name: Create the awg-quick drop-in directory
+      ansible.builtin.file:
+        path: "/etc/systemd/system/awg-quick@{{ callhome_iface }}.service.d"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      when: not skip_callhome | bool
+
+    - name: Run the call-home tunnel in userspace
+      ansible.builtin.copy:
+        content: |
+          # Managed by Ansible — playbooks/setup-proxima.yml.
+          # The call-home tunnel runs on amneziawg-go by design, also once the
+          # kernel module exists: the recovery path must not depend on DKMS
+          # rebuilding the module after a kernel update.
+          [Service]
+          Environment=WG_QUICK_USERSPACE_IMPLEMENTATION=amneziawg-go
+        dest: "/etc/systemd/system/awg-quick@{{ callhome_iface }}.service.d/userspace.conf"
+        owner: root
+        group: root
+        mode: "0644"
       when: not skip_callhome | bool
       notify: Restart call-home tunnel
 
@@ -262,7 +362,11 @@
       when: not skip_proxima | bool
 
   handlers:
+    # Restart rather than reload: awg-quick@ is oneshot with RemainAfterExit,
+    # so a start on an interface systemd already considers active is a no-op.
+    # daemon_reload because the template and the drop-in may have just landed.
     - name: Restart call-home tunnel
       ansible.builtin.systemd:
         name: "awg-quick@{{ callhome_iface }}"
         state: restarted
+        daemon_reload: true

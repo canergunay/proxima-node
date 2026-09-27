@@ -50,3 +50,8 @@ adm/frontend/dist/
 # TypeScript incremental build cache — a build artefact that was tracked by
 # mistake, so it showed up dirty after every compile and buried real changes.
 *.tsbuildinfo
+
+# amneziawg-go, extracted once from the awg-client image on the ADM host by
+# playbooks/setup-proxima.yml and pushed to sites from here. 5 MB binary,
+# rebuilt with the image — not something to version.
+cache/

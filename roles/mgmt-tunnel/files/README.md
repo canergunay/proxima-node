@@ -24,5 +24,12 @@ container** is musl-linked for Alpine and will not run on a Debian host
 statically linked and portable. So the CLI comes from here and the daemon
 comes from the container.
 
-Sites do not need `amneziawg-go` at all — they carry the amneziawg kernel
-module already, for ProximaVPN's `wg1`.
+Sites need it too — and at a moment when nothing else can provide it. On a
+bare box the call-home tunnel comes up *before* the installer builds the
+kernel module, and there is no container to take a userspace build from.
+`playbooks/setup-proxima.yml` therefore extracts `amneziawg-go` once from the
+`proxima-awg-client` image on the ADM host into `cache/` (gitignored) and
+pushes it, and keeps the site tunnel in userspace permanently so the recovery
+path never depends on DKMS. Found on KLM, 2026-09-27; the earlier sentence
+here ("sites carry the module already") described boxes that had been
+provisioned on plain WireGuard first.
