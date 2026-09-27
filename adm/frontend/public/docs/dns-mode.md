@@ -512,7 +512,7 @@ When ALL VPN tunnel configurations in the pool fail health checks, Proxima activ
 
 **Bypass activation sequence:**
 
-1. All pool configs fail IP check
+1. IP check retries exhausted, domain check confirms, and a sweep of the whole pool finds no working config
 2. Proxima writes bypass dnsmasq config (removes all nftset entries)
 3. Proxima flushes all nftables sets (clears cached IPs)
 4. dnsmasq is restarted with the bypass config
@@ -522,7 +522,7 @@ When ALL VPN tunnel configurations in the pool fail health checks, Proxima activ
 
 **Bypass recovery sequence:**
 
-1. IP check runs every 2 minutes during bypass mode
+1. IP check runs every 2 minutes during bypass mode on the active config; every 10 minutes the whole pool is swept again
 2. When a config succeeds the IP check:
    - Pool rotates to the working config
    - Full dnsmasq config is regenerated with nftset entries

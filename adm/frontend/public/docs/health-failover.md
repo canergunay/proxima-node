@@ -162,8 +162,8 @@ retry_count >= ip_check_retries (default 3)?
       No                   Yes
       |                    |
       v                    v
-Wait for next         Run Domain Check
-scheduled check       immediately
+Re-check in 2 min     Run Domain Check
+(not a full interval) immediately
                            |
                      +-----+-----+
                      |           |
@@ -183,14 +183,19 @@ This two-stage verification is essential because IP check services (ipify, ifcon
 - **Incremented**: On each failed IP check (all fallback services failed)
 - **Reset to 0**: On successful IP check OR when domain check confirms tunnel is healthy
 - **Triggers escalation**: When counter reaches `ip_check_retries` threshold
+- **Retry cadence**: once the counter is above zero the slot is re-checked every **2 minutes** (`IP_RETRY_INTERVAL`), not after the full `ip_check_interval`. The long interval is for healthy slots; retries are cheap. Domain-check retries use a 5-minute fuse (`DOMAIN_RETRY_INTERVAL`).
 
 ---
 
 ## Failover Algorithm
 
-When both IP check retries are exhausted AND domain check confirms failure, Proxima executes the failover sequence.
+When both IP check retries are exhausted AND domain check confirms failure, Proxima **sweeps the pool**: it runs the rotation below for one key after another, on a background thread, and stops at the first key whose post-activation IP check passes. Only when every other key in the pool has been tried and none works does the slot enter bypass mode.
 
-### Step-by-Step Failover
+One rotation per detection cycle was the old behaviour, and it was a design flaw: after a failed rotation the counters were reset and the next key waited a full `ip_check_interval × ip_check_retries`. A five-key pool needed about seven hours to reach bypass, and the groups on that slot were a black hole the whole time — DNS resolved, nftables marked, tun2socks fed a tunnel that answered nothing.
+
+While a slot is being swept the scheduler does not schedule any other check for it; the Scheduled Jobs page shows it as *Sweeping pool*.
+
+### Step-by-Step Failover (one key)
 
 ```
 1. LOCK SLOT
@@ -236,25 +241,27 @@ When both IP check retries are exhausted AND domain check confirms failure, Prox
 ### Edge Cases
 
 - **Single-entry pool**: If the pool has only one key/config, rotation produces the same entry. Proxima logs a warning: `[SLOT-N] Pool has only 1 entry, cannot failover`. The container is still restarted (sometimes a restart alone fixes transient issues).
-- **All pool entries exhausted**: If every entry in the pool has been tried and all fail, bypass mode is activated (see below).
+- **All pool entries exhausted**: The sweep tries `pool_size − 1` keys (the one that just failed is not retried). If none passes, bypass mode is activated immediately (see below).
+- **Rotation that cannot advance**: If a rotation aborts before changing the active key (missing config, type mismatch, config write failure), the sweep stops rather than retrying the same entry; the slot goes to bypass and the error is logged.
 - **Concurrent failover attempts**: The per-slot lock ensures only one failover runs at a time. Additional attempts are silently skipped.
 
 ### Failover Timing
 
 ```
-IP check fails (attempt 1/3)          t=0
-IP check fails (attempt 2/3)          t=30m
-IP check fails (attempt 3/3)          t=60m
+IP check fails (attempt 1/3)          t=0        (up to ip_check_interval after the outage began)
+IP check fails (attempt 2/3)          t=2m
+IP check fails (attempt 3/3)          t=4m
   → Domain check triggered
   → Domains also fail
-  → FAILOVER starts                   t=60m
-    Lock acquired                     t=60m + 0s
-    Config written                    t=60m + 0.1s
-    Container restarted               t=60m + 2s
-    Wait 10s                          t=60m + 12s
-    Post-activation IP check          t=60m + 13s
-    Failover complete                 t=60m + 15s
+  → SWEEP starts                      t=4m
+    key 2: write, restart, wait 10s, IP check   ~1 min
+    key 3: …                                    ~1 min
+    key N: …
+  → first healthy key wins, or
+  → BYPASS after pool_size − 1 keys   t≈4m + (pool_size − 1) × 1m
 ```
+
+With a five-key pool a dead slot is either back on a working key or in bypass roughly ten minutes after the first failed check.
 
 ---
 
@@ -307,9 +314,10 @@ Bypass mode is a safety mechanism that keeps internet working when the VPN is co
 ### Activation
 
 ```
-Pool rotation exhausted (all entries tried)
-AND all IP checks fail
-AND all domain checks fail
+IP check retries exhausted AND domain check confirms
+      |
+      v
+Pool sweep: every other key tried, none passes
       |
       v
 BYPASS MODE ACTIVATED
@@ -333,8 +341,8 @@ When bypass mode is active for a slot:
 
 Bypass mode is not permanent. Proxima actively tries to recover:
 
-- **Recovery check interval**: Every 2 minutes
-- **Recovery check**: Try each pool config in order with IP check
+- **Recovery check interval**: Every 2 minutes the active key is probed with an IP check
+- **Pool sweep**: Every 10 minutes (`BYPASS_SWEEP_INTERVAL`), if the active key still fails, the whole pool is swept again — the block may have lifted for a different node first
 - **On success**:
   1. Activate the working config
   2. Regenerate dnsmasq config with nftset entries
