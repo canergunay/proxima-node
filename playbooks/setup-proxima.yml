@@ -109,13 +109,22 @@
 
     # awg-quick needs the awg CLI beside it and a systemd template to run
     # under; neither is packaged on Debian.
-    - name: Install the AmneziaWG command-line tools
+    #
+    # Only when the box has none. The vendored CLI is v1.0; once the installer
+    # has built the 3.1 kernel module it also installs the matching 3.1 tools,
+    # and a 1.0 CLI cannot configure a 3.1 module ("Unable to modify interface:
+    # Invalid argument"). This task used to overwrite that CLI on every run and
+    # the restart below then took the tunnel down — KLM, 2026-09-27 21:14,
+    # ADM lost the box it was updating. The installer owns the tools on a box
+    # that has a module; this task only seeds a bare one.
+    - name: Install the AmneziaWG command-line tools where there are none
       ansible.builtin.copy:
         src: "{{ awg_files }}/{{ item }}"
         dest: "/usr/bin/{{ item }}"
         owner: root
         group: root
         mode: "0755"
+        force: false
       loop: [awg, awg-quick]
       when: not skip_callhome | bool
       notify: Restart call-home tunnel
@@ -206,13 +215,22 @@
         mode: "0755"
       when: not skip_callhome | bool
 
-    - name: Run the call-home tunnel in userspace
+    # What this drop-in does and does not do. awg-quick always tries the
+    # kernel module first (`ip link add … type amneziawg`) and only runs the
+    # userspace daemon when that fails and /sys/module/amneziawg is absent —
+    # the variable names the fallback, it cannot force it. So on a box whose
+    # module loads, the tunnel is a kernel interface; after a kernel update
+    # that DKMS could not follow, the module is gone and the same unit comes
+    # up on amneziawg-go. That is the recovery property wanted here, reached
+    # by fallback rather than by pinning. What it requires is that the CLI
+    # matches the module when there is one — see the tools task above.
+    - name: Name the userspace fallback for the call-home tunnel
       ansible.builtin.copy:
         content: |
           # Managed by Ansible — playbooks/setup-proxima.yml.
-          # The call-home tunnel runs on amneziawg-go by design, also once the
-          # kernel module exists: the recovery path must not depend on DKMS
-          # rebuilding the module after a kernel update.
+          # awg-quick uses the kernel module when it loads and falls back to
+          # amneziawg-go when it does not (kernel updated, DKMS build missing).
+          # This names the fallback; it does not disable the module path.
           [Service]
           Environment=WG_QUICK_USERSPACE_IMPLEMENTATION=amneziawg-go
         dest: "/etc/systemd/system/awg-quick@{{ callhome_iface }}.service.d/userspace.conf"

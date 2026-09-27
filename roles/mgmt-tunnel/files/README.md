@@ -29,7 +29,21 @@ bare box the call-home tunnel comes up *before* the installer builds the
 kernel module, and there is no container to take a userspace build from.
 `playbooks/setup-proxima.yml` therefore extracts `amneziawg-go` once from the
 `proxima-awg-client` image on the ADM host into `cache/` (gitignored) and
-pushes it, and keeps the site tunnel in userspace permanently so the recovery
-path never depends on DKMS. Found on KLM, 2026-09-27; the earlier sentence
-here ("sites carry the module already") described boxes that had been
-provisioned on plain WireGuard first.
+pushes it. Found on KLM, 2026-09-27; the earlier sentence here ("sites carry
+the module already") described boxes that had been provisioned on plain
+WireGuard first.
+
+Two corrections from the same evening:
+
+- **The tunnel is not "userspace permanently".** `awg-quick` tries the kernel
+  module first and runs `amneziawg-go` only when `ip link add` fails and
+  `/sys/module/amneziawg` is absent; `WG_QUICK_USERSPACE_IMPLEMENTATION`
+  names the fallback, it cannot force it. On a site whose module loads the
+  call-home is a kernel interface; after a kernel update the module cannot
+  follow, the same unit comes up in userspace. That fallback is the recovery
+  property, and it is enough.
+- **The vendored `awg` is v1.0 and must never overwrite a newer one.** A box
+  with the 3.1 module has the 3.1 CLI beside it (the installer builds both
+  from one pinned release). Copying v1.0 over it and restarting the unit
+  produced `Unable to modify interface: Invalid argument` and took ADM's
+  only path to the box down mid-run. Both copy tasks now use `force: false`.

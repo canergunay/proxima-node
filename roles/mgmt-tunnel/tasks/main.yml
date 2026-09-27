@@ -46,13 +46,18 @@
 
 # The CLI and the unit are vendored — there is no apt repository for these
 # on Debian. See files/README.md for provenance and hashes.
-- name: Install the AmneziaWG command-line tools
+#
+# Seeded only where missing: the vendored CLI is v1.0, and a host that carries
+# the 3.1 kernel module carries the matching 3.1 tools with it. Overwriting
+# them on every run broke the tunnel it was configuring (KLM, 2026-09-27).
+- name: Install the AmneziaWG command-line tools where there are none
   ansible.builtin.copy:
     src: "{{ item }}"
     dest: "/usr/bin/{{ item }}"
     owner: root
     group: root
     mode: "0755"
+    force: false
   loop:
     - awg
     - awg-quick
