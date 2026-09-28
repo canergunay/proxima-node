@@ -313,7 +313,7 @@ tun2socks -device tun0 \
 | Parameter | Value | Notes |
 |-----------|-------|-------|
 | `-device` | `tun0` | TUN interface name |
-| `-proxy` | `socks5://127.0.0.1:1081` | gost SOCKS5 proxy (slot-1 default tunnel) |
+| `-proxy` | `socks5://127.0.0.1:1081` | SOCKS5 proxy of the slot (AWG/Outline/Xray clients all expose it on 1080; the default tunnel is the `default_vpn_slot`) |
 | `-loglevel` | `warning` | Uses logrus levels -- `warn` is NOT valid, must use `warning` |
 
 **Network setup:**

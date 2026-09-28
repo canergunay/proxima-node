@@ -1734,7 +1734,7 @@ Update one or more settings. All fields are optional; only provided fields are u
 | `domain_retries` | number | Positive integer |
 | `server_ip` | string | Valid IPv4 address |
 | `public_ip` | string | Valid IPv4 address |
-| `default_vpn_slot` | string | Must be an existing AWG slot ID |
+| `default_vpn_slot` | string | Must be an existing AWG, Outline or Xray slot ID; it is the catch-all tunnel for proxied traffic no group claims (since `189cc7a`; before that the first AWG slot was hard-wired) |
 | `deployment` | string | Max 5 characters (e.g., `"ERG"`, `"OFC"`) |
 | `dns_upstream` | string | Non-empty (e.g., `"8.8.8.8"`, `"127.0.0.1#5353"`) |
 | `total_vpn_bandwidth` | string | tc format (e.g., `"100mbit"`) or empty to remove |
