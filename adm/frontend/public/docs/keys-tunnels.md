@@ -644,7 +644,7 @@ Written to `/config/awg-slot-N.conf`. Note the sanitized output: `DNS`, `PostUp`
 | **QUIC/HTTP3** | Not supported | Not supported | Supported (when enabled) | Not supported |
 | **Tunnel chaining** | No | No | Yes (as parent) | Yes (as child via AWG) |
 
-**Recommendation:** Use AWG configs for DNS Mode. Use Outline (ssconf://) as a fallback for Russian LTE or when AWG UDP is blocked. Use VLESS+Reality when maximum DPI resistance is needed -- it can be chained through an AWG slot for double encapsulation. Plain ss:// keys are rarely needed -- prefer Outline for DPI resistance.
+**Recommendation:** AWG where the ISP still passes UDP; VLESS+Reality (Xray slots) where it does not. Since `189cc7a` an Xray slot is a full DNS Mode tunnel: it can carry groups, be the `default_vpn_slot`, and (since `90c3beb`) be published as a Direct profile — its SOCKS5 relays UDP as XUDP. Seven Sky sites (SHV, SVR) run on Xray slots since 2026-09-29 because the ISP drops inbound UDP from foreign hosts. Outline (ssconf://) remains a TCP fallback; plain ss:// keys are rarely needed.
 
 ### Health Check Differences
 
