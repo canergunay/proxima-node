@@ -1,9 +1,9 @@
 """One switched-off site must not hold up the sync of the others.
 
-KLM was powered down for weeks in 2026-09. Every one of its pending rows
-waited out a 30 s timeout inside the sync request, the request outlived the
-reverse proxy, and the operator was told the sync had failed — for SHV and
-SVR too, which had nothing wrong with them.
+While KLM was powered down (2026-09-29) every request of a user edit spent
+30 s failing to connect to it and came back marked failed, although SHV, SVR
+and ERG had been updated within a second. To the operator that read as
+"nothing syncs while one site is down".
 """
 
 import requests
@@ -93,6 +93,8 @@ def test_pushes_split_the_timeout(monkeypatch):
     SiteGate().call(SHV, "PUT", "/api/vpn/users/1", body={})
     connect, read = wire.calls[0][3]
     assert connect <= 5 < read
+    # Longer than the slowest healthy connect we have measured (SHV, 1.1 s).
+    assert connect >= 3
 
 
 def test_an_application_error_does_not_close_the_gate(monkeypatch):

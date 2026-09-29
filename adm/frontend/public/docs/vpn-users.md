@@ -161,7 +161,7 @@ A failure keeps the *intent*, which matters most for revocations — a queued re
 
 ### A site that does not answer
 
-A switched-off site holds up nobody but itself. The first request that gets no answer closes the gate for that site: the rest of its rows are set aside without touching the network, and the run goes on to the sites that are up. The cost of a dead site is one connect timeout (3 s) per run, not one full timeout per row.
+A switched-off site holds up nobody but itself. The first request that gets no answer closes the gate for that site: the rest of its rows are set aside without touching the network, and the run goes on to the sites that are up. The cost of a dead site is one connect timeout (5 s) per run, not one full timeout per row.
 
 Those rows come back as **waiting**, not failed — nothing was refused. The page shows them in amber with the site's name, and each row records why it has not been delivered. A refusal by a site that did answer (a bad value, an expired token) is still a failure and still red.
 
@@ -169,7 +169,7 @@ Nobody has to press Sync when the site returns. The scheduler retries every pend
 
 ADM remembers a site that did not answer for a minute, so that editing one user — several requests in a row — does not wait on the same dead site each time. The **Sync** button ignores that memory and asks the site again.
 
-Until 2026-09-29 none of this existed: each pending row of a powered-down site waited out a 30-second timeout inside the sync request, the request outlived the reverse proxy, and the operator was told the sync had failed for every site.
+Until 2026-09-29 none of this existed. With KLM powered down, every request of a user edit spent 30 seconds failing to connect to it and came back marked failed — although the other sites had been updated within a second. It read as "nothing syncs while one site is down", and the pending row then waited for somebody to press Sync.
 
 ---
 

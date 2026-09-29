@@ -33,8 +33,11 @@ PROBE_TIMEOUT: tuple[int, int] = (2, 8)
 # The same split for writes. A push may legitimately take a while on the site
 # (creating a user rewrites its WireGuard config), so the read half is long;
 # the connect half is what a dead site costs, and it is paid once per run —
-# see SiteGate.
-PUSH_TIMEOUT: tuple[int, int] = (3, 30)
+# see SiteGate. Wider than the probe's: SHV is reached over its public name
+# and took 1.1 s to connect when measured (2026-09-29), and five seconds
+# leaves room for two SYN retransmissions on a lossy line. A false "down"
+# here delays a change by a scheduler round; a probe's only greys out a card.
+PUSH_TIMEOUT: tuple[int, int] = (5, 30)
 
 # What call() reports when the site itself did not answer, as opposed to
 # answering with an error. Only these two say anything about the site.
@@ -176,11 +179,13 @@ _recently_down: dict[int, tuple[float, str]] = {}
 class SiteGate:
     """Remembers which sites did not answer, so nobody waits on them twice.
 
-    A sync run walks its rows one by one. Without this, every row belonging
-    to a switched-off site waited out the full timeout — KLM alone, powered
-    down, held the sync request for 30 s per user, the request outlived the
-    reverse proxy's patience, and the operator saw a failure although the
-    other sites had nothing wrong with them (2026-09-29).
+    A sync run walks its rows one by one, and every edit starts a run. While
+    KLM was powered down (2026-09-29) each request of an edit spent 30 s
+    failing to connect to it and came back marked failed — five requests,
+    two and a half minutes, a red message each time — although the other
+    sites had been updated within a second. With more than a couple of rows
+    queued for the dead site the request would also have outlived the
+    reverse proxy (90 s).
 
     The first call that gets no answer closes the gate for that site; the
     rest of its rows are set aside without touching the network. The memory
