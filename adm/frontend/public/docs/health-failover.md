@@ -328,6 +328,12 @@ BYPASS MODE ACTIVATED
       +-- Log: [SLOT-N] BYPASS MODE: All configs failed, traffic going direct
 ```
 
+### Which slots can enter bypass
+
+Only slots that carry groups: the catch-all tunnel (`default_vpn_slot`) and any slot a group is assigned to. Bypass is **site-wide** — it empties the dnsmasq nftset config and flushes the sets — so a slot that serves only pinned Direct-profile devices never triggers it. Such a slot stays *unhealthy* until a check passes; its devices are routed by `ip rule`, which bypass does not touch.
+
+When several group slots are in bypass, proxy routing is restored only when the last of them recovers.
+
 ### What Happens in Bypass Mode
 
 When bypass mode is active for a slot:

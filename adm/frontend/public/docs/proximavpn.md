@@ -236,6 +236,8 @@ Removing a peer from the UI deletes its entry from `wg1.conf` and reloads the Wi
 
 A **Direct profile** publishes one of the site's proxy slots to VPN users by name. A user who is granted it gets an ordinary AmneziaWG peer whose traffic — all of it — leaves through that slot's exit, with no domain routing, no groups and no arbiter in between. It is the plain answer to "I want to come out in Turkey", and the routing decision lives entirely on the site box.
 
+> **Switching a Direct slot off does not revoke anything.** A device is removed only when its profile is *unpublished* or its owner's grant is withdrawn in ADM. A slot that is merely disabled keeps its devices, and users who hold one still see the route in their client, marked unavailable. (Until `proxima` 29 Sep 2026 a disabled slot orphaned its devices and the next grant update deleted them.) Peers put back by hand or from a backup are loaded onto the running interface with `POST /api/vpn/reconcile`.
+
 Who may see which route is set centrally — see [VPN Users & Access](/docs/vpn-users.md#direct-routes). This section is what the site itself does.
 
 ### Publishing a slot
