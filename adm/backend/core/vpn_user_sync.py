@@ -14,6 +14,10 @@ keeps working on its own keys regardless of whether the owning account still
 exists — leaving the peers behind would mean "revoked" access that still
 carries traffic. Use disable (enabled=0) when the intent is to suspend an
 account without destroying its devices.
+
+A site that does not answer holds up nobody but itself. Its rows are set
+aside as *waiting* — still pending, retried by the scheduler — and the run
+goes on to the sites that are up. See SiteGate.
 """
 
 import json
@@ -29,7 +33,7 @@ from core.db import (
     mark_access_synced,
     update_vpn_user,
 )
-from core.proxima_client import call
+from core.proxima_client import SiteGate, waiting_note
 
 log = logging.getLogger("adm.vpn_user_sync")
 
@@ -74,7 +78,7 @@ def _password_is_ours(row: dict) -> bool:
     return changed > synced
 
 
-def _password_for_new_grant(row: dict, servers: dict) -> str:
+def _password_for_new_grant(row: dict, servers: dict, gate: SiteGate) -> str:
     """The hash to seed a brand-new account on a site with.
 
     ADM's stored hash is not always the current one: a user may have changed
@@ -105,7 +109,7 @@ def _password_for_new_grant(row: dict, servers: dict) -> str:
         srv = servers.get(a["vpn_server_id"])
         if not srv:
             continue
-        data, error = call(srv, "GET", "/api/vpn/users", timeout=20)
+        data, error = gate.call(srv, "GET", "/api/vpn/users")
         if error or not isinstance(data, list):
             continue
         for user in data:
@@ -117,9 +121,9 @@ def _password_for_new_grant(row: dict, servers: dict) -> str:
     return row["password_hash"]
 
 
-def _find_remote_by_username(server: dict, username: str) -> int | None:
+def _find_remote_by_username(server: dict, username: str, gate: SiteGate) -> int | None:
     """Look up an existing remote account by username."""
-    data, error = call(server, "GET", "/api/vpn/users", timeout=20)
+    data, error = gate.call(server, "GET", "/api/vpn/users")
     if error or not isinstance(data, list):
         return None
     for user in data:
@@ -128,14 +132,14 @@ def _find_remote_by_username(server: dict, username: str) -> int | None:
     return None
 
 
-def _push_delete(server: dict, row: dict) -> tuple[bool, str | None, str]:
+def _push_delete(server: dict, row: dict, gate: SiteGate) -> tuple[bool, str | None, str]:
     remote_id = row.get("remote_user_id")
     if remote_id is None:
         delete_user_access(row["user_id"], row["vpn_server_id"])
         return True, None, "removed"
 
-    _, error = call(
-        server, "DELETE", f"/api/vpn/users/{remote_id}?cascade=true", timeout=30
+    _, error = gate.call(
+        server, "DELETE", f"/api/vpn/users/{remote_id}?cascade=true"
     )
     # Already gone remotely is the desired end state, not a failure.
     if error and "not found" not in error.lower():
@@ -147,23 +151,25 @@ def _push_delete(server: dict, row: dict) -> tuple[bool, str | None, str]:
     return True, None, "removed"
 
 
-def _push_create(server: dict, row: dict, servers: dict) -> tuple[bool, str | None, str]:
+def _push_create(server: dict, row: dict, servers: dict,
+                 gate: SiteGate) -> tuple[bool, str | None, str]:
     body = {
         "username": row["username"],
-        "password_hash": _password_for_new_grant(row, servers),
+        "password_hash": _password_for_new_grant(row, servers, gate),
     }
     body.update(_remote_payload(row))
 
-    data, error = call(server, "POST", "/api/vpn/users", body=body, timeout=30)
+    data, error = gate.call(server, "POST", "/api/vpn/users", body=body)
 
     if error and "already exists" in error.lower():
         # Adopt the existing account rather than failing — this happens when a
         # previous run created it but could not record the id. Report it as an
         # adoption, not a creation: nothing new appeared on the instance.
-        remote_id = _find_remote_by_username(server, row["username"])
+        remote_id = _find_remote_by_username(server, row["username"], gate)
         if remote_id is None:
             return False, "Remote user exists but could not be located", "adopted"
-        ok, err, _ = _push_update(server, {**row, "remote_user_id": remote_id}, servers)
+        ok, err, _ = _push_update(server, {**row, "remote_user_id": remote_id},
+                                  servers, gate)
         return ok, err, "adopted"
 
     if error:
@@ -175,8 +181,8 @@ def _push_create(server: dict, row: dict, servers: dict) -> tuple[bool, str | No
 
     # Proxima creates users enabled; suspend right away when the grant says so.
     if not _effective_enabled(row):
-        _, err = call(server, "PUT", f"/api/vpn/users/{remote_id}",
-                      body={"enabled": False}, timeout=30)
+        _, err = gate.call(server, "PUT", f"/api/vpn/users/{remote_id}",
+                           body={"enabled": False})
         if err:
             return False, f"Created but could not disable: {err}", "created"
 
@@ -186,7 +192,8 @@ def _push_create(server: dict, row: dict, servers: dict) -> tuple[bool, str | No
     return True, None, "created"
 
 
-def _push_update(server: dict, row: dict, servers: dict) -> tuple[bool, str | None, str]:
+def _push_update(server: dict, row: dict, servers: dict,
+                 gate: SiteGate) -> tuple[bool, str | None, str]:
     remote_id = row["remote_user_id"]
     send_password = _password_is_ours(row)
     body = {"enabled": _effective_enabled(row)}
@@ -194,13 +201,14 @@ def _push_update(server: dict, row: dict, servers: dict) -> tuple[bool, str | No
         body["password_hash"] = row["password_hash"]
     body.update(_remote_payload(row))
 
-    _, error = call(server, "PUT", f"/api/vpn/users/{remote_id}", body=body, timeout=30)
+    _, error = gate.call(server, "PUT", f"/api/vpn/users/{remote_id}", body=body)
 
     if error and "not found" in error.lower():
         # Deleted on the instance behind ADM's back — recreate it.
         log.warning(f"[SYNC] '{row['username']}' missing on {row['server_name']}, "
                     "recreating")
-        ok, err, _ = _push_create(server, {**row, "remote_user_id": None}, servers)
+        ok, err, _ = _push_create(server, {**row, "remote_user_id": None},
+                                  servers, gate)
         return ok, err, "recreated"
 
     if error:
@@ -228,12 +236,13 @@ def reconcile_passwords() -> dict:
     learning it.
     """
     servers = {s["id"]: s for s in get_all_vpn_servers()}
+    gate = SiteGate()
 
     # Remote records per (server, username), fetched once.
     remote: dict[int, dict[str, dict]] = {}
     unreachable: list[str] = []
     for sid, srv in servers.items():
-        data, error = call(srv, "GET", "/api/vpn/users", timeout=20)
+        data, error = gate.call(srv, "GET", "/api/vpn/users")
         if error or not isinstance(data, list):
             unreachable.append(srv["name"])
             continue
@@ -272,8 +281,8 @@ def reconcile_passwords() -> dict:
             if record.get("password_hash") == winning_hash:
                 continue
             srv = servers[access["vpn_server_id"]]
-            _, error = call(srv, "PUT", f"/api/vpn/users/{record['id']}",
-                            body={"password_hash": winning_hash}, timeout=30)
+            _, error = gate.call(srv, "PUT", f"/api/vpn/users/{record['id']}",
+                                 body={"password_hash": winning_hash})
             target = f"{user['username']}@{access['server_name']}"
             if error:
                 skipped.append({"username": user["username"], "reason": error})
@@ -302,14 +311,20 @@ def reconcile_passwords() -> dict:
 
 def sync_pending(vpn_server_id: int | None = None,
                  user_id: int | None = None,
-                 allowed_server_ids: list[int] | None = None) -> dict:
+                 allowed_server_ids: list[int] | None = None,
+                 gate: SiteGate | None = None) -> dict:
     """Reconcile pending rows, optionally narrowed to a server or user.
 
     allowed_server_ids confines the push to what the caller is entitled to
     write. A site admin editing someone who also belongs to another site
     would otherwise flush that other site's pending changes too — an
     out-of-scope write they never asked for.
+
+    Rows of a site that does not answer come back under `deferred`, not
+    `failed`: nothing was refused, the change is still queued, and the sites
+    that are up were served regardless.
     """
+    gate = gate or SiteGate()
     rows = get_pending_access(vpn_server_id)
     if user_id is not None:
         rows = [r for r in rows if r["user_id"] == user_id]
@@ -324,6 +339,15 @@ def sync_pending(vpn_server_id: int | None = None,
         "created": [], "adopted": [], "updated": [], "recreated": [], "removed": [],
     }
     failed: list[dict] = []
+    deferred: list[dict] = []
+
+    def defer(row: dict, label: str, reason: str) -> None:
+        note = waiting_note(reason)
+        # The scheduler comes back to a waiting row every few minutes; do not
+        # rewrite the same sentence into the database each time.
+        if row.get("sync_error") != note:
+            mark_access_error(row["id"], note)
+        deferred.append({"target": label, "server": row["server_name"], "error": reason})
 
     for row in rows:
         server = servers.get(row["vpn_server_id"])
@@ -334,21 +358,40 @@ def sync_pending(vpn_server_id: int | None = None,
             failed.append({"target": label, "error": "VPN server missing"})
             continue
 
+        # A revocation that never reached the site needs no network at all;
+        # everything else waits if the site is already known to be down.
+        local_only = (row["sync_status"] == "pending_delete"
+                      and row.get("remote_user_id") is None)
+        reason = None if local_only else gate.down_reason(server)
+        if reason:
+            defer(row, label, reason)
+            continue
+
         if row["sync_status"] == "pending_delete":
-            ok, error, action = _push_delete(server, row)
+            ok, error, action = _push_delete(server, row, gate)
         elif row.get("remote_user_id") is None:
-            ok, error, action = _push_create(server, row, servers)
+            ok, error, action = _push_create(server, row, servers, gate)
         else:
-            ok, error, action = _push_update(server, row, servers)
+            ok, error, action = _push_update(server, row, servers, gate)
 
         if ok:
             done[action].append(label)
+        elif gate.is_down(server):
+            # This row is the one that found the site down.
+            defer(row, label, gate.down_reason(server))
         else:
             mark_access_error(row["id"], error or "Unknown error")
             failed.append({"target": label, "error": error, "action": action})
             log.warning(f"[SYNC] Failed {label} ({action}): {error}")
 
-    log.info("[SYNC] " + " ".join(f"{k}={len(v)}" for k, v in done.items())
-             + f" failed={len(failed)}")
+    unreachable = sorted({d["server"] for d in deferred})
+    summary = (" ".join(f"{k}={len(v)}" for k, v in done.items())
+               + f" failed={len(failed)} deferred={len(deferred)}"
+               + (f" (waiting for {', '.join(unreachable)})" if unreachable else ""))
+    if failed or any(done.values()):
+        log.info(f"[SYNC] {summary}")
+    else:
+        log.debug(f"[SYNC] {summary}")
 
-    return {**done, "failed": failed}
+    return {**done, "failed": failed, "deferred": deferred,
+            "unreachable_servers": unreachable}

@@ -47,6 +47,7 @@ from core.authz import (
     superadmin_only,
 )
 from core.vpn_user_import import apply_import, build_preview
+from core.proxima_client import SiteGate
 from core.vpn_user_sync import reconcile_passwords, sync_pending
 
 log = logging.getLogger("adm.vpn_users")
@@ -415,7 +416,10 @@ def sync_all():
     vpn_server_id = body.get("vpn_server_id")
     if vpn_server_id is not None and not get_vpn_server(vpn_server_id):
         return jsonify({"ok": False, "error": "VPN server not found"}), 404
-    return jsonify({"ok": True, "data": sync_pending(vpn_server_id=vpn_server_id)})
+    # Asked for by hand: find out now whether a site is back, rather than
+    # trusting what an earlier push remembered about it.
+    return jsonify({"ok": True, "data": sync_pending(vpn_server_id=vpn_server_id,
+                                                     gate=SiteGate(fresh=True))})
 
 
 @bp.post("/api/vpn-users/<int:user_id>/sync")

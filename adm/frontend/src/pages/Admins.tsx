@@ -73,11 +73,17 @@ export default function Admins({ onBack }: Props) {
       if (!data.ok) {
         setSnack({ msg: data.error, error: true });
       } else {
-        const failed = data.data.sync?.failed ?? [];
+        const failed = [
+          ...(data.data.sync?.failed ?? []),
+          ...(data.data.sync?.deferred ?? []),
+        ];
         if (failed.length) {
           setSnack({
             msg: t("panelAccess.partial", {
-              detail: failed.map((f: { error: string }) => f.error).join("; "),
+              detail: failed
+                .map((f: { target?: string; error: string }) =>
+                  f.target ? `${f.target}: ${f.error}` : f.error)
+                .join("; "),
             }),
             error: true,
           });

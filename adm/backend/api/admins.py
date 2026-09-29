@@ -246,7 +246,8 @@ def set_panel_access(admin_id: int):
 def sync_panel_access():
     """Retry every queued grant and revocation."""
     from core.admin_sync import sync_pending
-    return jsonify({"ok": True, "data": sync_pending()})
+    from core.proxima_client import SiteGate
+    return jsonify({"ok": True, "data": sync_pending(gate=SiteGate(fresh=True))})
 
 
 @bp.delete("/api/admins/<int:admin_id>")

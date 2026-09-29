@@ -159,6 +159,18 @@ Every change is pushed immediately and the result is reported. A push that fails
 
 A failure keeps the *intent*, which matters most for revocations — a queued removal must still be a removal when the site comes back, not a forgotten one.
 
+### A site that does not answer
+
+A switched-off site holds up nobody but itself. The first request that gets no answer closes the gate for that site: the rest of its rows are set aside without touching the network, and the run goes on to the sites that are up. The cost of a dead site is one connect timeout (3 s) per run, not one full timeout per row.
+
+Those rows come back as **waiting**, not failed — nothing was refused. The page shows them in amber with the site's name, and each row records why it has not been delivered. A refusal by a site that did answer (a bad value, an expired token) is still a failure and still red.
+
+Nobody has to press Sync when the site returns. The scheduler retries every pending row on its five-minute round, for VPN users and for panel administrators alike.
+
+ADM remembers a site that did not answer for a minute, so that editing one user — several requests in a row — does not wait on the same dead site each time. The **Sync** button ignores that memory and asks the site again.
+
+Until 2026-09-29 none of this existed: each pending row of a powered-down site waited out a 30-second timeout inside the sync request, the request outlived the reverse proxy, and the operator was told the sync had failed for every site.
+
 ---
 
 ## Administrators

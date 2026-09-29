@@ -69,6 +69,7 @@ def _loop() -> None:
             _check_alerts()
             _maybe_cleanup()
             _reconcile_vpn_passwords()
+            _retry_vpn_user_access()
             _retry_panel_access()
             _maybe_refresh_source()
             _maybe_refresh_site_tokens()
@@ -629,6 +630,31 @@ def _reconcile_vpn_passwords() -> None:
             log.info(f"Propagated {len(result['propagated'])} password change(s)")
     except Exception:
         log.exception("Password reconcile error")
+
+
+def _retry_vpn_user_access() -> None:
+    """Push any VPN user change still waiting on a site.
+
+    Every edit tries to reach its sites at once, so a row is only left
+    pending when that push did not get through — most often because the site
+    was switched off. Nothing came back to those rows until somebody pressed
+    Sync, and for a revocation that means devices that keep carrying traffic
+    on a site that has since come back. Does nothing when the queue is empty.
+    """
+    try:
+        from core.db import get_pending_access
+        if not get_pending_access():
+            return
+        from core.vpn_user_sync import sync_pending
+        result = sync_pending()
+        delivered = sum(len(result[k]) for k in
+                        ("created", "adopted", "updated", "recreated", "removed"))
+        if delivered or result["failed"]:
+            log.info(f"VPN user retry: delivered={delivered} "
+                     f"failed={len(result['failed'])} "
+                     f"waiting={len(result['deferred'])}")
+    except Exception:
+        log.exception("VPN user retry error")
 
 
 def _retry_panel_access() -> None:

@@ -33,7 +33,11 @@ const MIN_PASSWORD = 8;
 /** Mirrors USERNAME_RE in backend/api/vpn_users.py — keep the two in step. */
 const USERNAME_RE = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/;
 
-type SyncResult = { failed?: { target: string; error: string }[] } | undefined;
+type SyncResult = {
+  failed?: { target: string; error: string }[];
+  deferred?: { target: string; server: string; error: string }[];
+  unreachable_servers?: string[];
+} | undefined;
 
 /** The backend's own reason, not a generic "failed" — a 400 always carries one. */
 const apiError = (err: unknown): string | undefined =>
@@ -153,7 +157,14 @@ export default function VpnUserDialog({ user, servers, onClose, onSaved }: Props
         if (!data.ok) { setError(data.error); setSaving(false); return; }
         // Stay open and show the block to hand over.
         const failed = syncFailures(data.data.sync);
+        const waiting = data.data.sync?.deferred ?? [];
         if (failed) setPushError(t("vpnUsers.syncFailed", { detail: failed }));
+        else if (waiting.length) {
+          setPushError(t("vpnUsers.syncWaiting", {
+            n: waiting.length,
+            servers: (data.data.sync?.unreachable_servers ?? []).join(", "),
+          }));
+        }
         setIssued({ password: data.data.password });
         setSaving(false);
         return;

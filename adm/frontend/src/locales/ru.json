@@ -271,6 +271,7 @@
   "vpnUsers.syncNow": "Синхронизировать",
   "vpnUsers.syncDone": "Все изменения отправлены",
   "vpnUsers.syncFailed": "Ошибка отправки: {{detail}}",
+  "vpnUsers.syncWaiting": "Отправлено. {{n}} изменений ожидают площадку, которая не отвечает: {{servers}}. Они будут доставлены, когда она вернётся.",
   "vpnUsers.requestFailed": "Запрос не выполнен",
   "vpnUsers.revokeQueued": "Сервер недоступен — удаление будет повторено",
   "vpnUsers.revokeTitle": "Отозвать доступ",

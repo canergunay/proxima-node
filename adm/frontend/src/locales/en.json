@@ -271,6 +271,7 @@
   "vpnUsers.syncNow": "Sync now",
   "vpnUsers.syncDone": "All changes pushed",
   "vpnUsers.syncFailed": "Push failed: {{detail}}",
+  "vpnUsers.syncWaiting": "Pushed. {{n}} change(s) are waiting for a site that does not answer: {{servers}}. They will be delivered when it is back.",
   "vpnUsers.requestFailed": "Request failed",
   "vpnUsers.revokeQueued": "Server unreachable — removal will be retried",
   "vpnUsers.revokeTitle": "Revoke access",

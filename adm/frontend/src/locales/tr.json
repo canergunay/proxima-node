@@ -271,6 +271,7 @@
   "vpnUsers.syncNow": "Şimdi gönder",
   "vpnUsers.syncDone": "Tüm değişiklikler gönderildi",
   "vpnUsers.syncFailed": "Gönderim başarısız: {{detail}}",
+  "vpnUsers.syncWaiting": "Gönderildi. {{n}} değişiklik yanıt vermeyen sahayı bekliyor: {{servers}}. Saha geri geldiğinde iletilecek.",
   "vpnUsers.requestFailed": "İstek başarısız",
   "vpnUsers.revokeQueued": "Sunucuya ulaşılamadı — kaldırma yeniden denenecek",
   "vpnUsers.revokeTitle": "Yetkiyi kaldır",

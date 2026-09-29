@@ -7,6 +7,9 @@ arrangement already used for VPN users.
 
 Authentication itself stays on each box. A site whose ADM is unreachable
 still lets its admins in; only changes wait.
+
+The same holds the other way round: a site ADM cannot reach makes its own
+changes wait, and nobody else's — see SiteGate.
 """
 
 import logging
@@ -18,7 +21,7 @@ from core.db import (
     mark_admin_access_synced,
     delete_admin_access,
 )
-from core.proxima_client import request
+from core.proxima_client import SiteGate, waiting_note
 
 log = logging.getLogger("adm.admin_sync")
 
@@ -37,7 +40,7 @@ def _password_is_ours(row: dict) -> bool:
     return synced is None or changed > synced
 
 
-def _push_upsert(server: dict, row: dict) -> tuple[bool, str | None, bool]:
+def _push_upsert(server: dict, row: dict, gate: SiteGate) -> tuple[bool, str | None, bool]:
     """Create or update the account. Returns (ok, error, password_pushed)."""
     payload: dict = {"enabled": bool(row.get("admin_enabled", 1))}
     send_password = _password_is_ours(row)
@@ -45,7 +48,7 @@ def _push_upsert(server: dict, row: dict) -> tuple[bool, str | None, bool]:
         payload["password_hash"] = row["password_hash"]
 
     try:
-        r = request(server, "PUT", f"/api/admins/{row['username']}", body=payload)
+        r = gate.request(server, "PUT", f"/api/admins/{row['username']}", body=payload)
     except Exception as e:  # noqa: BLE001 — surfaced to the operator verbatim
         return False, str(e), False
 
@@ -58,7 +61,7 @@ def _push_upsert(server: dict, row: dict) -> tuple[bool, str | None, bool]:
     if r.status_code == 400 and not send_password:
         payload["password_hash"] = row["password_hash"]
         try:
-            r = request(server, "PUT", f"/api/admins/{row['username']}", body=payload)
+            r = gate.request(server, "PUT", f"/api/admins/{row['username']}", body=payload)
         except Exception as e:  # noqa: BLE001
             return False, str(e), False
         if r.status_code in (200, 201):
@@ -67,9 +70,9 @@ def _push_upsert(server: dict, row: dict) -> tuple[bool, str | None, bool]:
     return False, _error_of(r), False
 
 
-def _push_delete(server: dict, row: dict) -> tuple[bool, str | None]:
+def _push_delete(server: dict, row: dict, gate: SiteGate) -> tuple[bool, str | None]:
     try:
-        r = request(server, "DELETE", f"/api/admins/{row['username']}")
+        r = gate.request(server, "DELETE", f"/api/admins/{row['username']}")
     except Exception as e:  # noqa: BLE001
         return False, str(e)
 
@@ -88,12 +91,17 @@ def _error_of(r) -> str:
 
 def sync_pending(vpn_server_id: int | None = None,
                  admin_id: int | None = None,
-                 allowed_server_ids: list[int] | None = None) -> dict:
+                 allowed_server_ids: list[int] | None = None,
+                 gate: SiteGate | None = None) -> dict:
     """Reconcile pending grants and revocations.
 
     allowed_server_ids confines the push to what the caller may write, so
     editing one operator cannot flush another site's queued changes.
+
+    Rows of a site that does not answer come back under `deferred`: still
+    queued, retried by the scheduler, and no obstacle to the other sites.
     """
+    gate = gate or SiteGate()
     rows = get_pending_admin_access(vpn_server_id)
     if admin_id is not None:
         rows = [r for r in rows if r["admin_id"] == admin_id]
@@ -104,6 +112,13 @@ def sync_pending(vpn_server_id: int | None = None,
     granted: list[str] = []
     removed: list[str] = []
     failed: list[dict] = []
+    deferred: list[dict] = []
+
+    def defer(row: dict, label: str, reason: str) -> None:
+        note = waiting_note(reason)
+        if row.get("sync_error") != note:
+            mark_admin_access_error(row["id"], note)
+        deferred.append({"target": label, "server": row["server_name"], "error": reason})
 
     for row in rows:
         server = servers.get(row["vpn_server_id"])
@@ -114,24 +129,40 @@ def sync_pending(vpn_server_id: int | None = None,
             failed.append({"target": label, "error": "VPN server missing"})
             continue
 
+        reason = gate.down_reason(server)
+        if reason:
+            defer(row, label, reason)
+            continue
+
         if row["sync_status"] == "pending_delete":
-            ok, error = _push_delete(server, row)
+            ok, error = _push_delete(server, row, gate)
             if ok:
                 # Only now: until the site confirms, the instruction has to
                 # survive so a failed revocation is retried rather than lost.
                 delete_admin_access(row["admin_id"], row["vpn_server_id"])
                 removed.append(label)
         else:
-            ok, error, password_pushed = _push_upsert(server, row)
+            ok, error, password_pushed = _push_upsert(server, row, gate)
             if ok:
                 mark_admin_access_synced(row["id"], password_pushed=password_pushed)
                 granted.append(label)
 
-        if not ok:
-            mark_admin_access_error(row["id"], error or "Unknown error")
-            failed.append({"target": label, "error": error})
-            log.warning(f"[ADMIN-SYNC] Failed {label}: {error}")
+        if ok:
+            continue
+        if gate.is_down(server):
+            defer(row, label, gate.down_reason(server))
+            continue
+        mark_admin_access_error(row["id"], error or "Unknown error")
+        failed.append({"target": label, "error": error})
+        log.warning(f"[ADMIN-SYNC] Failed {label}: {error}")
 
-    log.info(f"[ADMIN-SYNC] granted={len(granted)} removed={len(removed)} "
-             f"failed={len(failed)}")
-    return {"granted": granted, "removed": removed, "failed": failed}
+    unreachable = sorted({d["server"] for d in deferred})
+    summary = (f"granted={len(granted)} removed={len(removed)} "
+               f"failed={len(failed)} deferred={len(deferred)}"
+               + (f" (waiting for {', '.join(unreachable)})" if unreachable else ""))
+    if granted or removed or failed:
+        log.info(f"[ADMIN-SYNC] {summary}")
+    else:
+        log.debug(f"[ADMIN-SYNC] {summary}")
+    return {"granted": granted, "removed": removed, "failed": failed,
+            "deferred": deferred, "unreachable_servers": unreachable}

@@ -111,6 +111,12 @@ function FilterCell({ active, onClear, title, children }: {
   );
 }
 
+type SyncResult = {
+  failed?: { target: string; error: string }[];
+  deferred?: { target: string; server: string; error: string }[];
+  unreachable_servers?: string[];
+};
+
 export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean }) {
   const { t } = useTranslation();
   const [users, setUsers] = useState<VpnUser[]>([]);
@@ -120,7 +126,7 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
   const [busy, setBusy] = useState<string | null>(null);
   const [dialogUser, setDialogUser] = useState<VpnUser | null | "new">(null);
   const [revoking, setRevoking] = useState<{ user: VpnUser; server: VpnServer } | null>(null);
-  const [snack, setSnack] = useState<{ msg: string; error?: boolean } | null>(null);
+  const [snack, setSnack] = useState<{ msg: string; error?: boolean; warn?: boolean } | null>(null);
 
   // Column state
   const [sortKey, setSortKey] = useState<SortKey>("username");
@@ -188,7 +194,18 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
     });
   }, [users, servers, fUser, fEnabled, fServer, sortKey, sortDir]);
 
-  const reportSync = (sync?: { failed?: { target: string; error: string }[] }) => {
+  /** A site that is switched off is not a failure: its changes stay queued
+   *  and ADM delivers them when it answers again. Say so, in a different
+   *  colour, instead of reporting the whole push as failed. */
+  const waitingSnack = (sync?: SyncResult) => ({
+    msg: t("vpnUsers.syncWaiting", {
+      n: (sync?.deferred ?? []).length,
+      servers: (sync?.unreachable_servers ?? []).join(", "),
+    }),
+    warn: true,
+  });
+
+  const reportSync = (sync?: SyncResult) => {
     const failed = sync?.failed ?? [];
     if (failed.length) {
       setSnack({
@@ -197,6 +214,8 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
         }),
         error: true,
       });
+    } else if ((sync?.deferred ?? []).length) {
+      setSnack(waitingSnack(sync));
     }
   };
 
@@ -258,9 +277,12 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
       const { data } = await api.post("/vpn-users/sync", {});
       if (data.ok) {
         const failed = data.data.failed ?? [];
+        const waiting = data.data.deferred ?? [];
         setSnack(failed.length
           ? { msg: t("vpnUsers.syncFailed", { detail: `${failed.length}` }), error: true }
-          : { msg: t("vpnUsers.syncDone") });
+          : waiting.length
+            ? waitingSnack(data.data)
+            : { msg: t("vpnUsers.syncDone") });
       }
     } catch {
       setSnack({ msg: t("vpnUsers.requestFailed"), error: true });
@@ -606,11 +628,14 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
 
       <Snackbar
         open={Boolean(snack)}
-        autoHideDuration={snack?.error ? 8000 : 3000}
+        autoHideDuration={snack?.error || snack?.warn ? 8000 : 3000}
         onClose={() => setSnack(null)}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
-        <Alert severity={snack?.error ? "error" : "success"} onClose={() => setSnack(null)}>
+        <Alert
+          severity={snack?.error ? "error" : snack?.warn ? "warning" : "success"}
+          onClose={() => setSnack(null)}
+        >
           {snack?.msg}
         </Alert>
       </Snackbar>
