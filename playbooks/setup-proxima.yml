@@ -292,6 +292,11 @@
       become: false
       register: src_rev
       changed_when: false
+      # Runs in check mode too. It only reads git, and the revision-recording
+      # task below indexes its output — so skipping it left that task indexing an
+      # empty list, and every --check died at the end instead of showing what the
+      # deploy would do.
+      check_mode: false
       when: not skip_proxima | bool
 
     - name: Copy the Proxima source
