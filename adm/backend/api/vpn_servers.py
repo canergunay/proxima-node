@@ -219,6 +219,25 @@ def update_vpn_server_endpoint(vpn_server_id: int):
             val = body[field]
             updates[field] = val.strip() if isinstance(val, str) else val
 
+    # How Ansible reaches the box. These have always been storable — they are in
+    # update_vpn_server()'s allowed set — but only the provisioning flow could
+    # set them, and that flow also installs, opens a call-home tunnel and claims
+    # the instance. A site that was installed by hand therefore had no way in:
+    # without ssh_host, write_hosts_yml() skips it as "registered by hand, not
+    # provisioned by ADM", and there is nothing else to set it with. This is the
+    # adopt path — set reachability on a row that already exists and leave the
+    # install alone.
+    for field in ("ssh_host", "ssh_user"):
+        if field in body:
+            val = body[field]
+            updates[field] = val.strip() if isinstance(val, str) else val
+    if "ssh_port" in body:
+        try:
+            port = int(body["ssh_port"] or 22)
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "ssh_port must be a number"}), 400
+        updates["ssh_port"] = port
+
     if "url" in updates:
         updates["url"] = updates["url"].rstrip("/")
     if "public_url" in updates:
@@ -242,6 +261,20 @@ def update_vpn_server_endpoint(vpn_server_id: int):
         return jsonify({"ok": False, "error": "No valid fields to update"}), 400
 
     update_vpn_server(vpn_server_id, updates)
+
+    # Ansible reads the inventory, not the database, and hosts.yml is generated.
+    # Changing reachability without regenerating would leave the play still
+    # pointed wherever this server was before — or absent, if it had no SSH
+    # fields until now.
+    if {"ssh_host", "ssh_port", "ssh_user"} & updates.keys():
+        try:
+            from core.db import get_all_servers
+            from core.inventory_writer import write_hosts_yml
+            write_hosts_yml(get_all_servers(), get_all_vpn_servers())
+        except Exception:
+            log.exception("[INVENTORY] Regeneration failed after editing %s",
+                          server["name"])
+
     return jsonify({"ok": True})
 
 
