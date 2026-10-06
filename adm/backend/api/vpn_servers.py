@@ -196,6 +196,13 @@ def get_vpn_server_detail(vpn_server_id: int):
         "url": server["url"],
         "public_url": server.get("public_url", ""),
         "has_token": bool(server.get("api_token_enc")),
+        # How Ansible reaches the box. Empty means the site is not in
+        # proxima_sites at all: write_hosts_yml() skips any server without an
+        # ssh_host, so without these there is no way to see, let alone change,
+        # why a site has no update path.
+        "ssh_host": server.get("ssh_host") or "",
+        "ssh_port": server.get("ssh_port") or 22,
+        "ssh_user": server.get("ssh_user") or "root",
         "created_at": server["created_at"],
         "updated_at": server["updated_at"],
     }

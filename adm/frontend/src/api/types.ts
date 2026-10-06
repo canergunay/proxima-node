@@ -157,6 +157,15 @@ export interface VpnServer {
   error: string | null;
 }
 
+/** How Ansible reaches the site, as the detail view reports it. Empty means the
+ *  site has no ssh_host and is therefore absent from proxima_sites — it has no
+ *  update path. */
+export interface VpnServerManagement {
+  ssh_host: string;
+  ssh_port: number;
+  ssh_user: string;
+}
+
 export interface ServiceStatus {
   id: string;
   accessible: boolean;

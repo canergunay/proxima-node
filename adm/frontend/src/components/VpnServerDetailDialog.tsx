@@ -15,7 +15,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import BlockIcon from "@mui/icons-material/Block";
 import { useTranslation } from "react-i18next";
 import api from "../api/client";
-import type { VpnServer, ProximaSlot, ProximaTunnel } from "../api/types";
+import type { VpnServer, VpnServerManagement, ProximaSlot, ProximaTunnel } from "../api/types";
 
 interface Props {
   vpnServer: VpnServer;
@@ -58,6 +58,14 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
   const [tokenMsg, setTokenMsg] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState(false);
 
+  // Management access. Separate from the token because it answers a different
+  // question: the token is how ADM talks to the panel, this is how Ansible
+  // reaches the box to deploy it.
+  const [mgmt, setMgmt] = useState<VpnServerManagement>({
+    ssh_host: "", ssh_port: 22, ssh_user: "root",
+  });
+  const [mgmtMsg, setMgmtMsg] = useState("");
+
   // Tunnel delete confirmation state (replaces window.confirm)
   const [deleteTunnelName, setDeleteTunnelName] = useState<string | null>(null);
 
@@ -96,6 +104,41 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
       fetchTunnels();
     }
   }, [open, isOnline, fetchSlots, fetchTunnels]);
+
+  const fetchMgmt = useCallback(async () => {
+    try {
+      const { data } = await api.get(`/vpn-servers/${serverId}`);
+      if (data.ok) {
+        setMgmt({
+          ssh_host: data.data.ssh_host || "",
+          ssh_port: data.data.ssh_port || 22,
+          ssh_user: data.data.ssh_user || "root",
+        });
+      }
+    } catch { /* handled by interceptor */ }
+  }, [serverId]);
+
+  useEffect(() => {
+    if (open) fetchMgmt();
+  }, [open, fetchMgmt]);
+
+  const handleSaveMgmt = async () => {
+    if (!mgmt.ssh_host.trim()) return;
+    setActionLoading(true);
+    setMgmtMsg("");
+    try {
+      const { data } = await api.put(`/vpn-servers/${serverId}`, {
+        ssh_host: mgmt.ssh_host.trim(),
+        ssh_port: Number(mgmt.ssh_port) || 22,
+        ssh_user: mgmt.ssh_user.trim() || "root",
+      });
+      if (data.ok) {
+        setMgmtMsg(t("vpnDetail.mgmtSaved"));
+        onRefresh();
+      }
+    } catch { /* handled by interceptor */ }
+    setActionLoading(false);
+  };
 
   const handleUpdateToken = async () => {
     if (!tokenInput.trim()) return;
@@ -311,6 +354,58 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block", wordBreak: "break-all" }}>
                   URL: {vpnServer.url}
                 </Typography>
+              </AccordionDetails>
+            </Accordion>
+
+            {/* Management access — how Ansible reaches the box */}
+            <Accordion sx={{ mt: 1 }}>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography variant="subtitle2">{t("vpnDetail.mgmtSection")}</Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1.5 }}>
+                  {mgmt.ssh_host
+                    ? t("vpnDetail.mgmtHintSet")
+                    : t("vpnDetail.mgmtHintUnset")}
+                </Typography>
+                <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start", flexWrap: "wrap" }}>
+                  <TextField
+                    label={t("vpnDetail.sshHost")}
+                    size="small"
+                    sx={{ flex: 2, minWidth: 160 }}
+                    value={mgmt.ssh_host}
+                    onChange={(e) => setMgmt({ ...mgmt, ssh_host: e.target.value })}
+                    placeholder="192.168.77.121"
+                  />
+                  <TextField
+                    label={t("common.port")}
+                    size="small"
+                    sx={{ width: 100 }}
+                    value={mgmt.ssh_port}
+                    onChange={(e) => setMgmt({ ...mgmt, ssh_port: Number(e.target.value) || 22 })}
+                  />
+                  <TextField
+                    label={t("vpnDetail.sshUser")}
+                    size="small"
+                    sx={{ flex: 1, minWidth: 110 }}
+                    value={mgmt.ssh_user}
+                    onChange={(e) => setMgmt({ ...mgmt, ssh_user: e.target.value })}
+                  />
+                  <Button
+                    variant="contained"
+                    size="small"
+                    onClick={handleSaveMgmt}
+                    disabled={actionLoading || !mgmt.ssh_host.trim()}
+                    sx={{ whiteSpace: "nowrap", height: 40 }}
+                  >
+                    {t("vpnDetail.mgmtSave")}
+                  </Button>
+                </Box>
+                {mgmtMsg && (
+                  <Typography variant="caption" color="success.main" sx={{ mt: 1, display: "block" }}>
+                    {mgmtMsg}
+                  </Typography>
+                )}
               </AccordionDetails>
             </Accordion>
           </Box>
