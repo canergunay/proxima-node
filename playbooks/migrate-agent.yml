@@ -8,10 +8,12 @@
 #
 # Usage:
 #   ansible-playbook playbooks/migrate-agent.yml -l erg-tr
-#   ansible-playbook playbooks/migrate-agent.yml              # all servers
+#   ansible-playbook playbooks/migrate-agent.yml              # all nodes
 
+# Node groups only: this installs proxima-agent and removes the old one, and a
+# site server never ran either.
 - name: Migrate zapret-agent to proxima-agent
-  hosts: all
+  hosts: vpn_exit:dpi_bypass
   gather_facts: true
 
   vars:

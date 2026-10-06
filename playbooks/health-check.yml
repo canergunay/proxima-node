@@ -2,12 +2,16 @@
 # Health check — verify all servers are healthy
 # Connects to each proxima-agent and checks service status.
 #
+# Only the node groups, because only they run proxima-agent. A site server
+# (proxima_sites) has no agent and no 5051, so "all" reported every site as
+# UNREACHABLE — a false alarm that looked like an outage.
+#
 # Usage:
-#   ansible-playbook playbooks/health-check.yml              # all servers
+#   ansible-playbook playbooks/health-check.yml              # all nodes
 #   ansible-playbook playbooks/health-check.yml -l vpn_exit  # only VPN exits
 
 - name: Health Check All Servers
-  hosts: all
+  hosts: vpn_exit:dpi_bypass
   become: false
   gather_facts: false
 

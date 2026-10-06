@@ -4,11 +4,14 @@
 # config.json is deliberately NOT touched — see roles/proxima-agent/tasks/deploy.yml.
 #
 # Usage:
-#   ansible-playbook playbooks/update-agent.yml              # all servers
+#   ansible-playbook playbooks/update-agent.yml              # all nodes
 #   ansible-playbook playbooks/update-agent.yml -l erg-pl    # single server
 
+# Node groups only. This deploys and restarts proxima-agent, which site servers
+# (proxima_sites) do not run — including them would install an agent on a live
+# site nobody asked for one on.
 - name: Update proxima-agent
-  hosts: all
+  hosts: vpn_exit:dpi_bypass
   gather_facts: false
 
   tasks:
