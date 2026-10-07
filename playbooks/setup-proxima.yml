@@ -373,7 +373,12 @@
       register: proxima_api
       retries: 12
       delay: 5
-      until: proxima_api.status == 200
+      until: proxima_api.status | default(0) == 200
+      # A plain GET against the box's own API. Checking it under --check is the
+      # point of the task — it answers "is this site actually serving?" without
+      # having deployed anything — and skipping it left `until` reading a status
+      # that was never set, so --check died here instead of finishing.
+      check_mode: false
       when: not skip_proxima | bool
 
     - name: Report
