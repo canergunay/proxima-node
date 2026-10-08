@@ -154,15 +154,15 @@ AWG configs follow the standard WireGuard `.conf` format with optional AmneziaWG
 
 ```ini
 [Interface]
-PrivateKey = gI6EdUSYvn8ugXOt8QQD6Yc+JyiZi6DPfSoKjB8mCW0=
-Address = 10.8.1.2/32
+PrivateKey = <client private key, generated per peer>
+Address = 10.14.14.18/32
 DNS = 1.1.1.1
 
 [Peer]
-PublicKey = HIgo9xNzJMWLKASShiTqIybxR0V1tB1YBjpBJ5F3C3c=
-PresharedKey = 2LpYeM75QOnOqyReaDSrt+cjFANBGEJxDMA+8HFmH08=
+PublicKey = <server public key>
+PresharedKey = <optional preshared key>
 AllowedIPs = 0.0.0.0/0
-Endpoint = 185.199.110.1:51820
+Endpoint = <server public IP>:51820
 PersistentKeepalive = 25
 
 # AmneziaWG extensions (optional)
@@ -604,15 +604,15 @@ Written to `/config/ss-slot-N.json` (e.g., `/config/ss-slot-1.json`) and read by
 
 ```ini
 [Interface]
-PrivateKey = gI6EdUSYvn8ugXOt8QQD6Yc+JyiZi6DPfSoKjB8mCW0=
-Address = 10.8.1.2/32
+PrivateKey = <client private key, generated per peer>
+Address = 10.14.14.18/32
 Table = off
 
 [Peer]
-PublicKey = HIgo9xNzJMWLKASShiTqIybxR0V1tB1YBjpBJ5F3C3c=
-PresharedKey = 2LpYeM75QOnOqyReaDSrt+cjFANBGEJxDMA+8HFmH08=
+PublicKey = <server public key>
+PresharedKey = <optional preshared key>
 AllowedIPs = 0.0.0.0/0
-Endpoint = 185.199.110.1:51820
+Endpoint = <server public IP>:51820
 PersistentKeepalive = 25
 Jc = 5
 Jmin = 40
