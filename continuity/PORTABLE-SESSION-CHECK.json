@@ -1,0 +1,21 @@
+{
+  "project": "proxima-node",
+  "checked_utc": "2026-10-04T21:08:56.468551+00:00",
+  "ok": true,
+  "corrupt_copy_rejected": true,
+  "visible_conversation_text_roundtrip": true,
+  "conversation_order_preserved": true,
+  "repeat_restore_did_not_overwrite": true,
+  "copied_folder": "C:\\Users\\caner\\AppData\\Local\\Temp\\opencode\\proxima-portable-kp6c5fkc\\different user project folder",
+  "provider_free_verify": true,
+  "provider_free_prepare": true,
+  "native_store_isolated": true,
+  "native_import_list_reexport": true,
+  "messages": 150,
+  "original_session_id": "ses_ef85bcbbaffeDgds1h1Rt3rWcp",
+  "restored_session_id": "ses_4cb2b466b0d0cf4b2e0b91dfc8",
+  "inflight_tools_not_reexecuted": true,
+  "live_store_imported": false,
+  "model_invoked": false,
+  "ui_tab_layout_tested": false
+}

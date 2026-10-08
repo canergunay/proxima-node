@@ -1,0 +1,10 @@
+{
+  "project": "proxima-node",
+  "local_startup_links_ok": true,
+  "session_files_ok": true,
+  "latest_user_portability_requests_present": true,
+  "goc_unchanged": true,
+  "python_syntax_ok": true,
+  "native_restore_checked": true,
+  "application_build_tested": false
+}

@@ -1,0 +1,3 @@
+# Folder copies include these snapshots; Git should not publish chat contents.
+/snapshots/
+/restore/

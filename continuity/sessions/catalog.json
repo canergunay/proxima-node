@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "sessions": [
+    {
+      "key": "ses_ef85bcbbaffeDgds1h1Rt3rWcp",
+      "title": "GOC.md kapsamındaki proje geçmişi göçü",
+      "origin_id": "ses_ef85bcbbaffeDgds1h1Rt3rWcp",
+      "source_workspace": "D:\\Nextcloud\\Projects\\proxima",
+      "project_key": "proxima-node",
+      "scope": "shared multi-root workspace conversation; use this folder's CONTINUITY for project state",
+      "captured_utc": "20261004T205914610172Z",
+      "messages": 150,
+      "native": "snapshots/ses_ef85bcbbaffeDgds1h1Rt3rWcp/20261004T205914610172Z/opencode.json",
+      "transcript": "snapshots/ses_ef85bcbbaffeDgds1h1Rt3rWcp/20261004T205914610172Z/transcript.md",
+      "sha256": {
+        "native": "f270ae33ebb076fdf5eac22912d7c302c7e5bdfac15bbd04854c766d31963652",
+        "transcript": "4ce53f67fc2de8e099b0e9e946626b3d81b2474d057a53ed37760a361b2dd7e7"
+      },
+      "native_sanitized": true,
+      "visible_text_guarded": true,
+      "source_changed": false
+    }
+  ],
+  "project_key": "proxima-node"
+}

@@ -1,5 +1,11 @@
 # proxima-node
 
+**Continuing from a copied folder:** read [AGENTS.md](AGENTS.md) and
+[CONTINUITY.md](CONTINUITY.md) for local setup and the current handoff.
+Old AI histories and sibling repositories are not startup requirements.
+[Saved conversations](continuity/sessions/INDEX.md) are kept separate from
+project state; [restore instructions](continuity/SESSIONS.md) travel with them.
+
 Infrastructure-as-Code for [Proxima](https://github.com/canergunay/proxima) server nodes — VPN exit servers and DPI bypass nodes.
 
 Manages provisioning, configuration, credential rotation, and lifecycle of all Proxima server infrastructure via Ansible roles and playbooks.
