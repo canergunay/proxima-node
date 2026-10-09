@@ -51,6 +51,8 @@
               - "{{ target_release_dir }}"
               - --revision
               - "{{ web_ui_revision }}"
+          environment:
+            DOCKER_BUILDKIT: "0"
           register: web_result
           changed_when: web_result.rc == 0
           failed_when: false
