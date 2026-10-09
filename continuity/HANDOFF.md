@@ -14,6 +14,16 @@ independent QA passed for ERG canary. Earlier historical HostConfig attribution
 remains unresolved; the new method does not modify HostConfig. Final live
 publication results follow actual serial execution.
 
+**Final live result:** Proxima UI0e765b8 is published on ERG/SHV/SVR. Independent
+read-only checks confirm raw Config/HostConfig, ID/Image/StartedAt, full mounts/
+networks and backend manifests equal fresh snapshots; all40 management +8 portal
+files per site pass HTTP/hash and DNS queries pass. Only later peer fetch
+timestamps changed in config. ADM UI362a746 stays live, public index/main hashes
+verified and no ADM restart after source operations commits25ec5ee.
+SVR op89 failed only metadata reporting after publisher success; status retained.
+KLM op90 unreachable/changed0; KLM offline through known paths before this work,
+last positive sampleOct6. No KLM mutation. Do not close the entire rollout.
+
 **Subsequent authorized deployment:** release **362a746** is live. Canonical
 deploy script staged the new frontend, retained static.prev and restarted ADM;
 service active and public HTTP 200. Served index/main-bundle hashes match files.

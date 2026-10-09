@@ -6,6 +6,21 @@
 
 ### Deployment checkpoint — current, 2026-10-09
 
+**Final reachable-site outcome:** ADM UI362a746 public hashes verified. Proxima
+UI0e765b8 published restart-free on ERG/SHV/SVR; raw runtime/ID/StartedAt,
+backend manifests and network/mount settings match fresh complete snapshots.
+All management40/portal8 HTTP hashes per site and DNS checks passed. Later peer
+profile-fetch timestamps advanced normally; other config semantics unchanged.
+
+Canonical managed playbook/parser commits6e85301/4783a41/25ec5ee were pulled
+without restarting ADM. SVR operation89 FAILED at metadata reporting after
+successful publisher exit0; do not rewrite its status or rerun publication.
+The native-stdin/Python-repr issue was reproduced and fixed with a JSON envelope.
+KLM operation90 UNREACHABLE, changed0; last online2026-10-06T23:00:29Z, no live
+call-home handshake. KLM remains pending, no network workaround or site mutation.
+Operation37 remains unchanged. Punchlist connector unauthorized; local handoff
+is current, tracker backfill pending. See the new restart-free session note.
+
 Can subsequently authorized commit/push/deploy and SSH. ADM **362a746** is
 published and deployed via `adm/deploy.sh`; service active, local/public HTTP
 200. Public index and main bundle hashes match the deployed build. Previous
