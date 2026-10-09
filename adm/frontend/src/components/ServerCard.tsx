@@ -35,15 +35,15 @@ export default function ServerCard({ server, onClick, onEdit }: Props) {
   const isOnline = server.online;
 
   return (
-    <Card variant="outlined">
-      <CardActionArea onClick={onClick}>
-        <CardContent>
-          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 1, mb: 1 }}>
+    <Card variant="outlined" sx={{ width: "100%", borderRadius: 2, bgcolor: "background.paper", "&:hover": { borderColor: "primary.main" } }}>
+      <CardActionArea onClick={onClick} sx={{ height: "100%", display: "flex", alignItems: "flex-start" }}>
+        <CardContent sx={{ width: "100%", p: 2.5, "&:last-child": { pb: 2.5 } }}>
+          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 1.5, mb: 1.5 }}>
             <Box sx={{ minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere" }}>
-              <Typography variant="subtitle1" fontWeight={700}>
+              <Typography variant="subtitle1" fontWeight={700} sx={{ fontSize: "1.05rem", lineHeight: 1.4, mb: 0.5 }}>
                 {server.display_name}
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" color="text.secondary" sx={{ fontFamily: "monospace", fontSize: "0.8rem" }}>
                 {server.ip}
               </Typography>
             </Box>
@@ -85,7 +85,7 @@ export default function ServerCard({ server, onClick, onEdit }: Props) {
           </Box>
 
           {status && (
-            <Box sx={{ mt: 1.5, minWidth: 0, overflowWrap: "anywhere" }}>
+            <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: "divider", minWidth: 0, overflowWrap: "anywhere" }}>
               {status.public_ip && (
                 <Typography variant="caption" color="text.secondary" display="block">
                   {t("server.publicIp")}: {status.public_ip}
@@ -96,7 +96,7 @@ export default function ServerCard({ server, onClick, onEdit }: Props) {
                   {t("server.uptime")}: {formatUptime(status.uptime)}
                 </Typography>
               )}
-              <Box sx={{ mt: 1, display: "flex", gap: 2 }}>
+              <Box sx={{ mt: 1.5, display: "flex", gap: 1.5, p: 1.5, bgcolor: "action.hover", borderRadius: 1.5 }}>
                 <Box sx={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
                   <Typography variant="caption" color="text.secondary">
                     {t("server.disk")} {status.disk?.used_pct?.toFixed(0) ?? "—"}%

@@ -44,13 +44,7 @@
 
         - name: Publish web assets without restarting services
           ansible.builtin.command:
-            argv:
-              - python3
-              - "{{ target_release_dir }}/publish-web-assets.py"
-              - --stage
-              - "{{ target_release_dir }}"
-              - --revision
-              - "{{ web_ui_revision }}"
+            argv: "{{ ['python3', target_release_dir + '/publish-web-assets.py', '--stage', target_release_dir, '--revision', web_ui_revision] + (['--previous-release', web_previous_release_dir] if web_previous_release_dir is defined else []) }}"
           environment:
             DOCKER_BUILDKIT: "0"
           register: web_result

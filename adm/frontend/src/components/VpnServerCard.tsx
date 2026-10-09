@@ -137,11 +137,11 @@ export default function VpnServerCard({ server, sourceRevision, onClick, onEdit,
   }
 
   return (
-    <Card variant="outlined">
-      <CardActionArea onClick={onClick}>
-        <CardContent>
-          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 1, mb: 1 }}>
-            <Typography variant="subtitle1" fontWeight={700} sx={{ minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere" }}>
+    <Card variant="outlined" sx={{ width: "100%", borderRadius: 2, bgcolor: "background.paper", "&:hover": { borderColor: "primary.main" } }}>
+      <CardActionArea onClick={onClick} sx={{ height: "100%", display: "flex", alignItems: "flex-start" }}>
+        <CardContent sx={{ width: "100%", p: 2.5, "&:last-child": { pb: 2.5 } }}>
+          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 1.5, mb: 1.5 }}>
+            <Typography variant="subtitle1" fontWeight={700} sx={{ minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere", fontSize: "1.05rem", lineHeight: 1.4 }}>
               {server.display_name}
             </Typography>
             <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 0.5, width: "100%", minWidth: 0, flexShrink: 0, "& .MuiIconButton-root": { flexShrink: 0 }, "& .MuiChip-root": { flexShrink: 0, maxWidth: "100%", height: "auto", minHeight: 24 }, "& .MuiChip-label": { whiteSpace: "normal", overflowWrap: "anywhere" } }}>
@@ -302,7 +302,7 @@ export default function VpnServerCard({ server, sourceRevision, onClick, onEdit,
           )}
 
           {status && (
-            <Box sx={{ mt: 0.5, minWidth: 0, overflowWrap: "anywhere" }}>
+            <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: "divider", minWidth: 0, overflowWrap: "anywhere" }}>
               <Typography variant="caption" color="text.secondary" display="block">
                 {t("vpnServer.serverIp")}: {status.server_ip}
               </Typography>
@@ -348,7 +348,7 @@ export default function VpnServerCard({ server, sourceRevision, onClick, onEdit,
 
           {/* System metrics bars */}
           {status?.system && (
-            <Box sx={{ display: "flex", gap: 2, mt: 1 }}>
+            <Box sx={{ display: "flex", gap: 1.5, mt: 1.5, p: 1.5, bgcolor: "action.hover", borderRadius: 1.5 }}>
               <Box sx={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
                 <Typography variant="caption" color="text.secondary">
                   {t("server.disk")} {status.system.disk?.used_pct?.toFixed(0) ?? "—"}%

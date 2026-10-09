@@ -134,12 +134,12 @@ export default function Dashboard({ role }: { role: AdminRole }) {
   };
 
   return (
-    <Box>
-      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2, flexWrap: "wrap", gap: 1 }}>
-        <Typography variant="h5" fontWeight={700}>
+    <Box sx={{ minWidth: 0 }}>
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2, flexWrap: "wrap", gap: 2, p: { xs: 2, sm: 2.5 }, bgcolor: "background.paper", border: 1, borderColor: "divider", borderRadius: 2 }}>
+        <Typography variant="h5" fontWeight={700} sx={{ letterSpacing: "-0.02em" }}>
           {t("dashboard.title")}
         </Typography>
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, width: { xs: "100%", sm: "auto" }, "& > .MuiButton-root": { width: { xs: "100%", sm: "auto" } } }}>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, width: { xs: "100%", sm: "auto" }, "& > .MuiButton-root": { width: { xs: "100%", sm: "auto" }, minHeight: 36 } }}>
           {/* Only the server tabs use this toolbar; Users and Monitoring
               bring their own. */}
           {isSuperadmin && tab < 2 && (
@@ -193,7 +193,7 @@ export default function Dashboard({ role }: { role: AdminRole }) {
         onChange={handleTabChange}
         variant="scrollable"
         scrollButtons="auto"
-        sx={{ mb: 2, borderBottom: 1, borderColor: "divider" }}
+        sx={{ mb: 3, borderBottom: 1, borderColor: "divider", "& .MuiTab-root": { minHeight: 52, px: { xs: 2, sm: 3 }, fontWeight: 600 }, "& .MuiTabs-indicator": { height: 3, borderRadius: "3px 3px 0 0" } }}
       >
         <Tab label={t("dashboard.tabExitServers")} sx={{ display: isSuperadmin ? undefined : "none" }} />
         <Tab label={t("dashboard.tabVpnServers")} sx={{ display: isSuperadmin ? undefined : "none" }} />
@@ -215,7 +215,7 @@ export default function Dashboard({ role }: { role: AdminRole }) {
           ) : (
             <Grid container spacing={2}>
               {servers.map((server) => (
-                <Grid key={server.id} size={{ xs: 12, sm: 6, md: 4 }}>
+                <Grid key={server.id} size={{ xs: 12, sm: 6, md: 4 }} sx={{ display: "flex", minWidth: 0 }}>
                   <ServerCard
                     server={server}
                     onClick={() => setSelectedId(server.id)}
@@ -265,7 +265,7 @@ export default function Dashboard({ role }: { role: AdminRole }) {
           ) : (
             <Grid container spacing={2}>
               {vpnServers.map((server) => (
-                <Grid key={server.id} size={{ xs: 12, sm: 6, md: 4 }}>
+                <Grid key={server.id} size={{ xs: 12, sm: 6, md: 4 }} sx={{ display: "flex", minWidth: 0 }}>
                   <VpnServerCard
                     server={server}
                     sourceRevision={sourceRevision}
