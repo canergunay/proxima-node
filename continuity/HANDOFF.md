@@ -5,6 +5,33 @@ for originals and not permission to execute historical work.
 
 ## Current product work — cosmetic web batch, 2026-10-09
 
+**Current decision:** Can reaffirmed autonomous rollout preserving the working
+current state. Restart-free static publication replaces the earlier recreation
+approach. The versioned `playbooks/publish-proxima-web.yml` uses the Proxima
+publisher, fresh complete snapshots and safe metadata parser; no installer,
+call-home, VPN or service restart. Isolated Docker/PWA/recovery rehearsal and
+independent QA passed for ERG canary. Earlier historical HostConfig attribution
+remains unresolved; the new method does not modify HostConfig. Final live
+publication results follow actual serial execution.
+
+**Subsequent authorized deployment:** release **362a746** is live. Canonical
+deploy script staged the new frontend, retained static.prev and restarted ADM;
+service active and public HTTP 200. Served index/main-bundle hashes match files.
+Proxima release **0e765b8** was pushed but is not released across sites: ERG's
+web-only overlay failed runtime preservation. Exact old backend/image and 70
+other container IDs were recovered, management/portal/status return 200 and DNS
+works, but HostConfig differs from the initial aggregate fingerprint. Field-level
+original data is unavailable; hold remaining sites and do not report full runtime
+rollback. Source/auth/app builds cannot resolve that runtime evidence gap.
+
+Subsequent read-only investigation proved the protected Config discrepancy is
+unique-key Env ordering only, reproducing the exact overlay hash without changing
+values; independent QA confirmed. HostConfig remains unexplained: current
+settings match retained Compose/daemon source, but complete original inspect was
+not saved. Retained-artifact search and36,424 bounded candidates did not reconstruct
+the original. No new deployment occurred; Proxima rollout still held. Detailed
+source/evidence note is in Proxima continuity/sessions/notes/2026-10-09-hostconfig-readonly-investigation.md.
+
 Can authorized phased presentation-only implementation with separate agents and
 an orchestrator. Proxima Punchlist UI parent PROX-32; P1 PROX-36, continuous QA
 PROX-37. First ADM patch touches only `sx` in Dashboard/ServerCard/VpnServerCard.

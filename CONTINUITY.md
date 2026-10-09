@@ -4,6 +4,22 @@
 
 ## Active cosmetic web work — 2026-10-09
 
+### Deployment checkpoint — current, 2026-10-09
+
+Can subsequently authorized commit/push/deploy and SSH. ADM **362a746** is
+published and deployed via `adm/deploy.sh`; service active, local/public HTTP
+200. Public index and main bundle hashes match the deployed build. Previous
+static output remains in `adm/backend/static.prev` for rollback. No ADM backend
+product-code delta was introduced by this cosmetic release.
+
+Proxima **0e765b8** is pushed but its rollout is blocked. ERG frontend-only canary
+recovered the original backend image/files and all 70 other running container
+IDs; panel/portal/status HTTP 200 and DNS NOERROR. HostConfig differs from the
+initial aggregate snapshot, with no original field-level snapshot to identify
+the change. Independent QA recommends holding SHV/SVR/KLM. No managed-site
+publication operation was started. ADM inventory discovery also found pre-existing
+operation 37 (`enable_singbox`) still marked running; it was not altered or closed.
+
 Can authorized agent-delegated, orchestrated cosmetic changes to ADM and Proxima
 web only. Punchlist Proxima UI roadmap: PROX-32, P0–P4 PROX-33/36/35/34/37.
 The full portable roadmap lives in Proxima `continuity/WEB-UI-ROADMAP.md`; master

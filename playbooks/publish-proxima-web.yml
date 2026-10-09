@@ -1,0 +1,86 @@
+---
+# The controller release stage must be root-owned and private (0700).
+# Use the reviewed publisher and archives; the publisher verifies the manifest
+# against web_ui_revision and retains durable evidence outside ephemeral staging.
+- name: Proxima restart-free web publication
+  hosts: proxima_sites
+  gather_facts: false
+  serial: 1
+  become: true
+  any_errors_fatal: true
+  vars:
+    target_release_dir: "/tmp/proxima-web-hot-{{ web_ui_revision }}"
+  tasks:
+    - name: Validate release inputs
+      ansible.builtin.assert:
+        that:
+          - web_ui_revision is match('^[0-9a-f]{40}$')
+          - adm_release_dir == '/tmp/proxima-web-' + web_ui_revision
+        quiet: true
+
+    - name: Publish from private ephemeral staging
+      block:
+        - name: Create private target stage
+          ansible.builtin.file:
+            path: "{{ target_release_dir }}"
+            state: directory
+            owner: root
+            group: root
+            mode: '0700'
+
+        - name: Copy versioned publisher and verified payload
+          ansible.builtin.copy:
+            src: "{{ adm_release_dir }}/{{ item }}"
+            dest: "{{ target_release_dir }}/{{ item }}"
+            owner: root
+            group: root
+            mode: '0600'
+          loop:
+            - publish-web-assets.py
+            - admin.tar
+            - portal.tar
+            - manifest.json
+          no_log: true
+
+        - name: Publish web assets without restarting services
+          ansible.builtin.command:
+            argv:
+              - python3
+              - "{{ target_release_dir }}/publish-web-assets.py"
+              - --stage
+              - "{{ target_release_dir }}"
+              - --revision
+              - "{{ web_ui_revision }}"
+          register: web_result
+          changed_when: web_result.rc == 0
+          failed_when: false
+          no_log: true
+
+        # Keep raw stdout in no_log memory/stdin, never in a controller file.
+        - name: Parse and allowlist publisher JSON on the ADM controller
+          ansible.builtin.command:
+            argv:
+              - python3
+              - "{{ playbook_dir }}/../scripts/web-release-metadata.py"
+            stdin: "{{ web_result.stdout | default('') }}"
+          delegate_to: localhost
+          become: true
+          register: safe_result
+          changed_when: false
+          failed_when: false
+          no_log: true
+
+        - name: Report bounded safe JSON metadata
+          ansible.builtin.debug:
+            msg: "{{ {'site': inventory_hostname, 'ui_revision': web_ui_revision, 'exit_code': web_result.rc, 'publisher': (safe_result.stdout | from_json) if safe_result.rc == 0 else {'error_code': 'publisher_metadata_invalid'}} | to_json }}"
+
+        - name: Stop rollout on publisher or metadata failure
+          ansible.builtin.fail:
+            msg: "Web publication failed; inspect the publisher's private durable evidence."
+          when: web_result.rc != 0 or safe_result.rc != 0
+      always:
+        - name: Remove ephemeral target stage
+          ansible.builtin.file:
+            path: "{{ target_release_dir }}"
+            state: absent
+          no_log: true

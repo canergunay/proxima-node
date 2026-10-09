@@ -34,6 +34,17 @@ into changing interaction semantics. No commit/push/SSH/deployment performed.
 
 ## Next
 
+### Subsequent authorized publication
+
+Can authorized commit/push/deploy/SSH. ADM **362a746** deployed with the canonical
+`adm/deploy.sh` staging/swap/restart flow. Public adm.prxa.net returns200;
+index SHAfe46388a and main bundle SHA0a8fe4b9 match server static output. Service
+active; static.prev retained. Proxima **0e765b8** pushed but rollout blocked after
+ERG canary runtime fingerprint mismatch. Exact old image/backend restored, other
+70 container IDs stable, panel/portal/status200 and DNSNOERROR; HostConfig difference
+remains unexplained. Managed SVR/KLM deploy not invoked. Inventory discovery found
+pre-existing operation37 still running; no status modification was made.
+
 Broader rendered page/state audit, restrained cosmetic foundations and local
 dialog/matrix/monitoring/docs batches. Preserve all APIs, handlers, polling,
 permissions, tabs and form behavior. Tracker items remain open for Can's closure.
