@@ -58,13 +58,14 @@
           failed_when: false
           no_log: true
 
-        # Keep raw stdout in no_log memory/stdin, never in a controller file.
+        # Explicit JSON serialization prevents Ansible from passing a Python
+        # dictionary repr as stdin. Keep raw output in no_log memory only.
         - name: Parse and allowlist publisher JSON on the ADM controller
           ansible.builtin.command:
             argv:
               - python3
               - "{{ playbook_dir }}/../scripts/web-release-metadata.py"
-            stdin: "{{ web_result.stdout | default('') }}"
+            stdin: "{{ {'publisher_stdout': web_result.stdout | default('')} | to_json }}"
           delegate_to: localhost
           become: true
           register: safe_result

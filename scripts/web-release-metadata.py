@@ -1,4 +1,8 @@
-"""Reduce publisher JSON to validated public diagnostics; never echo raw input."""
+"""Allowlist direct publisher JSON or a one-level publisher_stdout JSON envelope.
+
+The envelope payload may be JSON text or an already parsed object. Never accept
+Python repr input, recursively unwrap envelopes, or echo raw input/errors.
+"""
 import json
 import re
 import sys
@@ -10,6 +14,12 @@ def safe_metadata(raw):
     value = json.loads(raw, parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
     if not isinstance(value, dict):
         raise ValueError('Object required')
+    if 'publisher_stdout' in value:
+        value = value['publisher_stdout']
+        if isinstance(value, str):
+            value = json.loads(value, parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
+        if not isinstance(value, dict):
+            raise ValueError('Publisher object required')
     result = {}
     for key in ('code', 'error_code', 'status', 'outcome'):
         item = value.get(key)
