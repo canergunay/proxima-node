@@ -38,8 +38,8 @@ export default function ServerCard({ server, onClick, onEdit }: Props) {
     <Card variant="outlined">
       <CardActionArea onClick={onClick}>
         <CardContent>
-          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
-            <Box>
+          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 1, mb: 1 }}>
+            <Box sx={{ minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere" }}>
               <Typography variant="subtitle1" fontWeight={700}>
                 {server.display_name}
               </Typography>
@@ -47,7 +47,7 @@ export default function ServerCard({ server, onClick, onEdit }: Props) {
                 {server.ip}
               </Typography>
             </Box>
-            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.5 }}>
+            <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 0.5, width: "100%", minWidth: 0, flexShrink: 0, "& .MuiIconButton-root": { flexShrink: 0 }, "& .MuiChip-root": { flexShrink: 0, maxWidth: "100%", height: "auto", minHeight: 24 }, "& .MuiChip-label": { whiteSpace: "normal", overflowWrap: "anywhere" } }}>
               <Tooltip title={t("editServer.title")} placement="top">
                 <IconButton
                   size="small"
@@ -73,7 +73,7 @@ export default function ServerCard({ server, onClick, onEdit }: Props) {
             </Box>
           </Box>
 
-          <Box sx={{ display: "flex", gap: 1, mb: 1 }}>
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 1, "& .MuiChip-root": { maxWidth: "100%", height: "auto", minHeight: 24 }, "& .MuiChip-label": { whiteSpace: "normal", overflowWrap: "anywhere" } }}>
             {server.location && (
               <Chip label={server.location} size="small" />
             )}
@@ -85,7 +85,7 @@ export default function ServerCard({ server, onClick, onEdit }: Props) {
           </Box>
 
           {status && (
-            <Box sx={{ mt: 1.5 }}>
+            <Box sx={{ mt: 1.5, minWidth: 0, overflowWrap: "anywhere" }}>
               {status.public_ip && (
                 <Typography variant="caption" color="text.secondary" display="block">
                   {t("server.publicIp")}: {status.public_ip}
@@ -97,7 +97,7 @@ export default function ServerCard({ server, onClick, onEdit }: Props) {
                 </Typography>
               )}
               <Box sx={{ mt: 1, display: "flex", gap: 2 }}>
-                <Box sx={{ flex: 1 }}>
+                <Box sx={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
                   <Typography variant="caption" color="text.secondary">
                     {t("server.disk")} {status.disk?.used_pct?.toFixed(0) ?? "—"}%
                   </Typography>
@@ -108,7 +108,7 @@ export default function ServerCard({ server, onClick, onEdit }: Props) {
                     sx={{ height: 4, borderRadius: 2 }}
                   />
                 </Box>
-                <Box sx={{ flex: 1 }}>
+                <Box sx={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
                   <Typography variant="caption" color="text.secondary">
                     {t("server.memory")} {status.memory?.used_pct?.toFixed(0) ?? "—"}%
                   </Typography>
@@ -119,7 +119,7 @@ export default function ServerCard({ server, onClick, onEdit }: Props) {
                     sx={{ height: 4, borderRadius: 2 }}
                   />
                 </Box>
-                <Box sx={{ flex: 1 }}>
+                <Box sx={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
                   <Typography variant="caption" color="text.secondary">
                     {t("server.cpu")} {status.cpu?.used_pct?.toFixed(0) ?? "—"}%
                   </Typography>
@@ -135,7 +135,7 @@ export default function ServerCard({ server, onClick, onEdit }: Props) {
           )}
 
           {server.error && (
-            <Typography variant="caption" color="error" sx={{ mt: 1, display: "block" }}>
+            <Typography variant="caption" color="error" sx={{ mt: 1, display: "block", overflowWrap: "anywhere" }}>
               {server.error}
             </Typography>
           )}

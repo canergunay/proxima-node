@@ -2,6 +2,29 @@
 
 ## Starting from a copied folder
 
+## Active cosmetic web work — 2026-10-09
+
+Can authorized agent-delegated, orchestrated cosmetic changes to ADM and Proxima
+web only. Punchlist Proxima UI roadmap: PROX-32, P0–P4 PROX-33/36/35/34/37.
+The full portable roadmap lives in Proxima `continuity/WEB-UI-ROADMAP.md`; master
+plan Section 24. Maintain this ADM handoff locally rather than importing site
+runtime assumptions. Current audit found a clean pre-change tree at `a392738`.
+
+First local ADM batch: presentation-only `sx` in Dashboard, ServerCard and
+VpnServerCard. Wrapping actions, stacked card headers, readable long text/chips
+and metric shrink safeguards; all handlers/API/polling/permissions retained.
+Independent QA first rejected compressed desktop status labels, then accepted
+the corrected batch after fresh visual checks. Pre/post production builds passed;
+437 en/tr/ru keys matched. Synthetic isolated component checks covered 48 remedy
+cases (eight widths, three locales, two server tabs), 168 readable chip samples,
+480 successful actionability trials and no page overflow. Full app-shell/auth,
+live backend and deployment behavior were not tested. Existing nested-button
+console warning remains outside this cosmetic patch. No commit/push/SSH/deploy.
+
+Next: complete evidence-led cross-page review, then page hierarchy/spacing and
+dialog/matrix/monitoring/docs cosmetic batches. See the dated
+[session note](continuity/sessions/notes/2026-10-09-web-ui-cosmetics.md) and HANDOFF.
+
 Open [the session catalog](continuity/sessions/INDEX.md) to choose a conversation;
 [session instructions](continuity/SESSIONS.md) explain native restoration and
 cross-agent readable continuation. Project state remains in this file and HANDOFF.

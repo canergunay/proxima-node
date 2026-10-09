@@ -3,6 +3,23 @@
 Reviewed October 4, 2026. This file is a small retrieval aid, not a substitute
 for originals and not permission to execute historical work.
 
+## Current product work — cosmetic web batch, 2026-10-09
+
+Can authorized phased presentation-only implementation with separate agents and
+an orchestrator. Proxima Punchlist UI parent PROX-32; P1 PROX-36, continuous QA
+PROX-37. First ADM patch touches only `sx` in Dashboard/ServerCard/VpnServerCard.
+Header/action wrapping, stacked groups, text/chip containment and metric shrink
+preserve all state, APIs, permission checks, handlers and polling.
+
+Production build passed before and after changes; locale parity 437 keys passed.
+Independent QA accepted after correcting an introduced desktop chip-compression
+regression. Fresh synthetic browser remedy evidence: 48 cases, 168 chip samples,
+480 actionable button checks; no document overflow or fragmented/clipped labels.
+Existing nested-button React warning remains. Full shell/auth and real backend
+were excluded; no live infrastructure access or deployment occurred. Next work
+is broader visual evidence and small cosmetics-only foundation/page batches.
+See `sessions/notes/2026-10-09-web-ui-cosmetics.md` for artifacts and boundaries.
+
 ## Source convention
 
 `memory/<name>:L` means the original file under

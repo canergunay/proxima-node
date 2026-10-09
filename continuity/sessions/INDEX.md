@@ -16,3 +16,4 @@ Each entry is a separate snapshot, not the authoritative project backlog.
 ## Agent-neutral continuation notes
 
 - [2026-10-04-portable-workspace](notes/2026-10-04-portable-workspace.md)
+- [2026-10-09-web-ui-cosmetics](notes/2026-10-09-web-ui-cosmetics.md)

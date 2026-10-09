@@ -139,7 +139,7 @@ export default function Dashboard({ role }: { role: AdminRole }) {
         <Typography variant="h5" fontWeight={700}>
           {t("dashboard.title")}
         </Typography>
-        <Box sx={{ display: "flex", gap: 1 }}>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, width: { xs: "100%", sm: "auto" }, "& > .MuiButton-root": { width: { xs: "100%", sm: "auto" } } }}>
           {/* Only the server tabs use this toolbar; Users and Monitoring
               bring their own. */}
           {isSuperadmin && tab < 2 && (
@@ -299,7 +299,7 @@ export default function Dashboard({ role }: { role: AdminRole }) {
               {t("vpnServer.updateTitle", { name: updatingVpn?.display_name ?? "" })}
             </DialogTitle>
             <DialogContent>
-              {updateError && <Alert severity="error" sx={{ mb: 2 }}>{updateError}</Alert>}
+              {updateError && <Alert severity="error" sx={{ mb: 2, overflowWrap: "anywhere", "& .MuiAlert-message": { minWidth: 0 } }}>{updateError}</Alert>}
               {!updateError && !updateOp && (
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 2 }}>
                   <CircularProgress size={18} />

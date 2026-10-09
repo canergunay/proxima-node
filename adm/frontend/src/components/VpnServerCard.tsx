@@ -140,11 +140,11 @@ export default function VpnServerCard({ server, sourceRevision, onClick, onEdit,
     <Card variant="outlined">
       <CardActionArea onClick={onClick}>
         <CardContent>
-          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
-            <Typography variant="subtitle1" fontWeight={700} sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
+          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 1, mb: 1 }}>
+            <Typography variant="subtitle1" fontWeight={700} sx={{ minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere" }}>
               {server.display_name}
             </Typography>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexShrink: 0 }}>
+            <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 0.5, width: "100%", minWidth: 0, flexShrink: 0, "& .MuiIconButton-root": { flexShrink: 0 }, "& .MuiChip-root": { flexShrink: 0, maxWidth: "100%", height: "auto", minHeight: 24 }, "& .MuiChip-label": { whiteSpace: "normal", overflowWrap: "anywhere" } }}>
               {linkUrl && (
                 <Tooltip title={linkUrl} placement="top">
                   <IconButton
@@ -253,7 +253,7 @@ export default function VpnServerCard({ server, sourceRevision, onClick, onEdit,
           )}
 
           {status && (
-            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 1, alignItems: "center" }}>
+            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 1, alignItems: "center", "& .MuiChip-root": { maxWidth: "100%", height: "auto", minHeight: 24 }, "& .MuiChip-label": { whiteSpace: "normal", overflowWrap: "anywhere" } }}>
               {/* Slot health chip */}
               {totalSlots > 0 && (
                 <Chip
@@ -265,7 +265,7 @@ export default function VpnServerCard({ server, sourceRevision, onClick, onEdit,
               )}
               {/* Slot dots (compact) — only show enabled + checked slots */}
               {status.slots && Object.keys(status.slots).length > 0 && (
-                <Box sx={{ display: "flex", gap: 0.3, alignItems: "center" }}>
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.3, alignItems: "center", minWidth: 0 }}>
                   {sortedSlots(status.slots)
                     .filter(([, slot]) => isSlotEnabled(slot) && slot.health?.last_ip_ok !== null && slot.health?.last_ip_ok !== undefined)
                     .map(([id, slot]) => (
@@ -302,7 +302,7 @@ export default function VpnServerCard({ server, sourceRevision, onClick, onEdit,
           )}
 
           {status && (
-            <Box sx={{ mt: 0.5 }}>
+            <Box sx={{ mt: 0.5, minWidth: 0, overflowWrap: "anywhere" }}>
               <Typography variant="caption" color="text.secondary" display="block">
                 {t("vpnServer.serverIp")}: {status.server_ip}
               </Typography>
@@ -313,7 +313,7 @@ export default function VpnServerCard({ server, sourceRevision, onClick, onEdit,
               )}
               {/* A server ADM never deployed reports no revision — which is
                   itself worth showing, rather than implying it is current. */}
-              <Box sx={{ mt: 0.5 }}>
+              <Box sx={{ mt: 0.5, display: "flex", flexWrap: "wrap", "& .MuiChip-root": { maxWidth: "100%", height: "auto", minHeight: 24 }, "& .MuiChip-label": { whiteSpace: "normal", overflowWrap: "anywhere" } }}>
                 {!status.version ? (
                   <Chip size="small" variant="outlined" label={t("vpnServer.unmanaged")} />
                 ) : sourceRevision && status.version.commit !== sourceRevision.commit ? (
@@ -349,7 +349,7 @@ export default function VpnServerCard({ server, sourceRevision, onClick, onEdit,
           {/* System metrics bars */}
           {status?.system && (
             <Box sx={{ display: "flex", gap: 2, mt: 1 }}>
-              <Box sx={{ flex: 1 }}>
+              <Box sx={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
                 <Typography variant="caption" color="text.secondary">
                   {t("server.disk")} {status.system.disk?.used_pct?.toFixed(0) ?? "—"}%
                 </Typography>
@@ -361,7 +361,7 @@ export default function VpnServerCard({ server, sourceRevision, onClick, onEdit,
                   sx={{ height: 4, borderRadius: 2 }}
                 />
               </Box>
-              <Box sx={{ flex: 1 }}>
+              <Box sx={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
                 <Typography variant="caption" color="text.secondary">
                   {t("server.memory")} {status.system.memory?.used_pct?.toFixed(0) ?? "—"}%
                 </Typography>
@@ -373,7 +373,7 @@ export default function VpnServerCard({ server, sourceRevision, onClick, onEdit,
                   sx={{ height: 4, borderRadius: 2 }}
                 />
               </Box>
-              <Box sx={{ flex: 1 }}>
+              <Box sx={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
                 <Typography variant="caption" color="text.secondary">
                   {t("server.cpu")} {status.system.cpu?.used_pct?.toFixed(0) ?? "—"}%
                 </Typography>
@@ -398,7 +398,7 @@ export default function VpnServerCard({ server, sourceRevision, onClick, onEdit,
               journal saw (ERG + SHV, 2026-09-18). The scheduler renews tokens
               ahead of time; when it could not, say so where someone looks. */}
           {server.token_state === "expired" && (
-            <Typography variant="caption" color="error" sx={{ mt: 1, display: "block" }}>
+            <Typography variant="caption" color="error" sx={{ mt: 1, display: "block", overflowWrap: "anywhere" }}>
               {t("vpnServer.tokenExpired", {
                 date: server.token_expires_at ? new Date(server.token_expires_at * 1000).toLocaleDateString() : "?",
               })}
@@ -423,7 +423,7 @@ export default function VpnServerCard({ server, sourceRevision, onClick, onEdit,
           )}
 
           {server.error && server.has_token && (
-            <Typography variant="caption" color="error" sx={{ mt: 1, display: "block" }}>
+            <Typography variant="caption" color="error" sx={{ mt: 1, display: "block", overflowWrap: "anywhere" }}>
               {server.error}
             </Typography>
           )}
