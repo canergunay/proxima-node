@@ -29,6 +29,7 @@ changes are observed but exact attribution remains separate. Preserve current
 state; do not claim perpetual byte equality or roll it back to old snapshots.
 
 Next: remaining UI batches, each published incrementally after local acceptance.
-Deployment tracker comments await restored connector access: latest item reads
-returned transport errors, so no successful remote backfill is claimed.
+Deployment tracker comments were subsequently backfilled successfully to
+PROX-32/35/37 after Can reported Connected and fresh reads confirmed access.
+No further live deployment or server check in that tracker reconciliation.
 No broad all-product/client/device/security claim from this deployment evidence.

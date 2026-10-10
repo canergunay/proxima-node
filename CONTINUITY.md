@@ -4,6 +4,15 @@
 
 ## Active cosmetic web work — 2026-10-10
 
+### Managed Groups publication — 2026-10-10
+
+Proxima UI9d8b950 Groups batch is published restart-free on ERG/SHV/SVR.
+Managed SVR operation92 is DONE. ADM UI/service was not redeployed for this
+Proxima-only batch and remains7bd28ef. Independent live QA verified fresh
+runtime/backend/static/config/ID baselines,46 management+9 portal hashes/site,
+status/DNS, and queried92 from current service DB read-only. PROX-43 DONE;
+parent P3 active. KLM deferred. Details in the new managed Groups note.
+
 ### Published Dashboard pilot and fresh recheck — 2026-10-10
 
 ADM7bd28ef is committed/pushed/live via canonical deploy.sh; public index/three

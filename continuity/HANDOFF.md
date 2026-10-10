@@ -5,6 +5,12 @@ for originals and not permission to execute historical work.
 
 ## Current product work — cosmetic web batch, 2026-10-09
 
+**Latest managed publication, 2026-10-10:** Proxima9d8b950 Groups cosmetics
+published ERG/SHV/SVR without restarting site services. SVR operation92 DONE;
+ADM7bd28ef remains unchanged. Current-baseline config/runtime/backend/static
+checks and final independent read-only gate passed. PROX-43 closed; remaining
+page phases continue. See `sessions/notes/2026-10-10-groups-publication.md`.
+
 **2026-10-10 live update:** Dashboard UI7bd28ef deployed/public hashes verified.
 Managed Proxima repeat-publication uses the exact preceding snapshot; source
 0a8b7ea is published ERG/SHV/SVR and SVR operation91 DONE. Can explicitly
