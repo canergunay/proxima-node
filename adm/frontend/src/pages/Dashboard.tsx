@@ -52,6 +52,9 @@ export default function Dashboard({ role }: { role: AdminRole }) {
   const [updateOpId, setUpdateOpId] = useState<number | null>(null);
   const [updateOp, setUpdateOp] = useState<{ status: string; output?: string } | null>(null);
   const [updateError, setUpdateError] = useState("");
+  // Covers the POST and the gap before the first poll, not only "running".
+  const updateBusy = updatingVpn !== null && !updateError
+    && (updateOp === null || updateOp.status === "running");
 
   const fetchServers = useCallback(async () => {
     try {
@@ -84,7 +87,7 @@ export default function Dashboard({ role }: { role: AdminRole }) {
     setUpdateError("");
     try {
       const { data } = await api.post(`/vpn-servers/${server.id}/update`, {});
-      if (data.ok) setUpdateOpId(data.data.operation_id);
+      if (data.ok && Number.isInteger(data.data?.operation_id) && data.data.operation_id > 0) setUpdateOpId(data.data.operation_id);
       else setUpdateError(data.error || t("common.error"));
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })
@@ -286,7 +289,7 @@ export default function Dashboard({ role }: { role: AdminRole }) {
               // Closing mid-deploy would only hide it: the operation keeps
               // running on the server either way, so say so rather than
               // pretending the dialog is the deploy.
-              if (updateOp?.status === "running") return;
+              if (updateBusy) return;
               setUpdatingVpn(null);
               setUpdateOpId(null);
               setUpdateOp(null);
@@ -312,7 +315,7 @@ export default function Dashboard({ role }: { role: AdminRole }) {
             </DialogContent>
             <DialogActions>
               <Button
-                disabled={updateOp?.status === "running"}
+                disabled={updateBusy}
                 onClick={() => {
                   setUpdatingVpn(null);
                   setUpdateOpId(null);

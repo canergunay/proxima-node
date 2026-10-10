@@ -1,0 +1,79 @@
+---
+# Coordinated two-module API overlay followed by restart-free web publication.
+- name: Publish bounded Proxima feature
+  hosts: proxima_sites
+  gather_facts: false
+  serial: 1
+  become: true
+  any_errors_fatal: true
+  vars:
+    target_release_dir: "/tmp/proxima-web-feature-{{ web_ui_revision }}"
+  tasks:
+    - name: Validate approved release inputs
+      ansible.builtin.assert:
+        that:
+          - web_ui_revision is match('^[0-9a-f]{40}$')
+          - adm_release_dir == '/tmp/proxima-web-' + web_ui_revision
+        quiet: true
+    - name: Publish bounded feature from private stage
+      block:
+        - name: Create private stage
+          ansible.builtin.file:
+            path: "{{ target_release_dir }}"
+            state: directory
+            owner: root
+            group: root
+            mode: '0700'
+        - name: Copy approved release files
+          ansible.builtin.copy:
+            src: "{{ adm_release_dir }}/{{ item }}"
+            dest: "{{ target_release_dir }}/{{ item }}"
+            owner: root
+            group: root
+            mode: '0600'
+          loop:
+            - publish-feature-overlay.py
+            - publish-web-assets.py
+            - backend.tar
+            - backend-manifest.json
+            - admin.tar
+            - portal.tar
+            - manifest.json
+          no_log: true
+        - name: Apply exact backend delta and restart only Proxima
+          ansible.builtin.command:
+            argv: ['python3', '{{ target_release_dir }}/publish-feature-overlay.py', '--stage', '{{ target_release_dir }}', '--revision', '{{ web_ui_revision }}']
+          environment:
+            DOCKER_BUILDKIT: '0'
+          register: feature_result
+          no_log: true
+        - name: Publish compatible web assets after API verification
+          ansible.builtin.command:
+            argv: ['python3', '{{ target_release_dir }}/publish-web-assets.py', '--stage', '{{ target_release_dir }}', '--revision', '{{ web_ui_revision }}']
+          environment:
+            DOCKER_BUILDKIT: '0'
+          register: web_result
+          failed_when: false
+          no_log: true
+        - name: Allowlist publisher metadata on controller
+          ansible.builtin.command:
+            argv: ['python3', '{{ playbook_dir }}/../scripts/web-release-metadata.py']
+            stdin: "{{ {'publisher_stdout': web_result.stdout | default('')} | to_json }}"
+          delegate_to: localhost
+          register: safe_result
+          changed_when: false
+          failed_when: false
+          no_log: true
+        - name: Report safe release outcome
+          ansible.builtin.debug:
+            msg: "{{ {'site': inventory_hostname, 'publisher': (safe_result.stdout | from_json) if safe_result.rc == 0 else {'error_code': 'publisher_metadata_invalid'}} | to_json }}"
+        - name: Stop on web or metadata failure
+          ansible.builtin.fail:
+            msg: 'Web publication failed; backend remains compatible with the preceding UI. Inspect private release evidence before retrying.'
+          when: web_result.rc != 0 or safe_result.rc != 0
+      always:
+        - name: Remove ephemeral stage
+          ansible.builtin.file:
+            path: "{{ target_release_dir }}"
+            state: absent
+          no_log: true
