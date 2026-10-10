@@ -18,3 +18,5 @@ Each entry is a separate snapshot, not the authoritative project backlog.
 - [2026-10-04-portable-workspace](notes/2026-10-04-portable-workspace.md)
 - [2026-10-09-restart-free-web-publication](notes/2026-10-09-restart-free-web-publication.md)
 - [2026-10-09-web-ui-cosmetics](notes/2026-10-09-web-ui-cosmetics.md)
+- [2026-10-10-dashboard-deployment](notes/2026-10-10-dashboard-deployment.md)
+- [2026-10-10-dashboard-pilot](notes/2026-10-10-dashboard-pilot.md)

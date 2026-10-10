@@ -5,6 +5,25 @@ for originals and not permission to execute historical work.
 
 ## Current product work — cosmetic web batch, 2026-10-09
 
+**2026-10-10 live update:** Dashboard UI7bd28ef deployed/public hashes verified.
+Managed Proxima repeat-publication uses the exact preceding snapshot; source
+0a8b7ea is published ERG/SHV/SVR and SVR operation91 DONE. Can explicitly
+authorized deployment/SSH. Chained publication/rollback rehearsal passed before
+canary; current service venv is required for the ADM operation wrapper. No
+operation37/89/90 rewrite, no KLM work. Fresh final checks and subsequent config
+drift boundaries are recorded in the new deployment note; small accepted UI
+batches should be published incrementally from now on.
+
+**2026-10-10 local update:** the Dashboard cosmetic pilot is implemented in
+Dashboard.tsx, ServerCard.tsx and VpnServerCard.tsx. Header panel, card alignment,
+spacing and metric groups only. Post-edit production build and437-key locale
+parity passed; current ADM source hashes match full-App synthetic screenshot
+evidence. Independent general-agent regression/security reviews and final QA
+accepted the bounded pilot. The unavailable named Bugbot/security-review agents
+were not run. PROX-39 records the pre-existing update-dialog early-dismissal
+observability issue. No functional fix or live change. See
+`sessions/notes/2026-10-10-dashboard-pilot.md`; broader UI renewal continues.
+
 **Current decision:** Can reaffirmed autonomous rollout preserving the working
 current state. Restart-free static publication replaces the earlier recreation
 approach. The versioned `playbooks/publish-proxima-web.yml` uses the Proxima

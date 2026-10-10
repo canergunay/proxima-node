@@ -2,7 +2,35 @@
 
 ## Starting from a copied folder
 
-## Active cosmetic web work — 2026-10-09
+## Active cosmetic web work — 2026-10-10
+
+### Published Dashboard pilot and fresh recheck — 2026-10-10
+
+ADM7bd28ef is committed/pushed/live via canonical deploy.sh; public index/three
+bundle hashes and active service verified, previous UI privately retained.
+Proxima0a8b7ea published restart-free on ERG/SHV/SVR; managed SVR operation91
+DONE. Native optional argv/JSON envelope and Ansible syntax checks passed;
+metadata9/wrapper10 tests passed. Use current ADM service venv for the operation
+wrapper: system Python failed imports before creating an operation. Existing37
+and historical89/90 untouched; KLM explicitly deferred.
+Fresh user-requested checks at14:01–14:02UTC passed runtime/backend/static/DNS
+and ADM identity. Later configuration changed through peer/self-service and
+other paths; do not claim perpetual byte equality or erase that work. Details:
+`continuity/sessions/notes/2026-10-10-dashboard-deployment.md`. Incremental
+publication is now the requested pattern for later accepted cosmetic batches.
+
+### Earlier local-only Dashboard checkpoint — 2026-10-10
+
+Current cosmetic pilot changes Dashboard, ServerCard and VpnServerCard only:
+header/action panel, tab spacing, coherent card heights/surfaces and metric
+grouping. Build and437-key en/tr/ru parity passed. Actual App-shell synthetic
+evidence216 cross-product cases, retained ADM subset; independent diff/security
+reviews found no introduced issue. Final QA accepted scope after a separate
+Proxima desktop chip correction. Existing ADM early deployment-dialog dismissal
+is now LOW BUG PROX-39; not fixed in cosmetics. Details in the new pilot note.
+PROX-36 is DONE with Can's current authorization; broader renewal remains open.
+No commit/push/SSH/publication in this batch. Next ADM work: remaining foundation
+and page/dialog batches, preserving current behavior. KLM remains deferred.
 
 ### Deployment checkpoint — current, 2026-10-09
 
