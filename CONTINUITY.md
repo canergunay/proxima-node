@@ -4,6 +4,15 @@
 
 ## Active cosmetic web work — 2026-10-10
 
+### Current feature/UI outcome — 2026-10-11
+
+ADM7414433 dialog guard deployed/public hashes verified; PROX-39 DONE.
+Managed Proxima feature86b52b8 via publish-proxima-feature.yml: only2backend
+modules over exact live images, raw runtime cloned, API verified before UI.
+SVR operation93 DONE; subsequent toolbar a218e26 hot release operation94 DONE.
+ERG/SHV/SVR live verification passed; KLM deferred. No full-main catch-up.
+PROX-20/22/26 also closed; IPv6 work44 separate. See the new feature/UI note.
+
 ### Managed Groups publication — 2026-10-10
 
 Proxima UI9d8b950 Groups batch is published restart-free on ERG/SHV/SVR.

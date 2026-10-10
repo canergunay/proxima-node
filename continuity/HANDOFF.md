@@ -1,5 +1,11 @@
 # ADM handoff — evidence and boundaries
 
+Latest2026-10-11: ADM7414433 update-dialog guard live, public4hashes verified.
+SVR bounded backend feature86b52b8 operation93DONE and toolbar a218e26
+operation94DONE; canonical feature playbook coordinates API-before-UI.
+Two backend modules only, existing service settings/addresses/config preserved.
+Details: sessions/notes/2026-10-11-feature-ui-release.md. KLM deferred.
+
 Reviewed October 4, 2026. This file is a small retrieval aid, not a substitute
 for originals and not permission to execute historical work.
 
