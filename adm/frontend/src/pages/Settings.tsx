@@ -59,9 +59,9 @@ export default function Settings({ onBack }: Props) {
   };
 
   return (
-    <Box>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 3 }}>
-        <IconButton onClick={onBack}>
+    <Box sx={{ minWidth: 0, maxWidth: 900, display: "grid", gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "minmax(0, 1fr) minmax(0, 1.5fr)" }, gap: 3, alignItems: "start", "& .MuiAlert-message": { minWidth: 0, overflowWrap: "anywhere" } }}>
+      <Box sx={{ display: "flex", gridColumn: "1 / -1", alignItems: "center", gap: 1, pb: 2, borderBottom: 1, borderColor: "divider" }}>
+        <IconButton onClick={onBack} sx={{ width: 40, height: 40 }}>
           <ArrowBackIcon />
         </IconButton>
         <Typography variant="h5" fontWeight={700}>
@@ -69,9 +69,9 @@ export default function Settings({ onBack }: Props) {
         </Typography>
       </Box>
 
-      <Card sx={{ maxWidth: 500, mb: 3 }}>
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
+      <Card sx={{ minWidth: 0, border: 1, borderColor: "divider" }}>
+        <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+          <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }} gutterBottom>
             {t("settings.language")}
           </Typography>
           <FormControl fullWidth size="small">
@@ -89,9 +89,9 @@ export default function Settings({ onBack }: Props) {
         </CardContent>
       </Card>
 
-      <Card sx={{ maxWidth: 500 }}>
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
+      <Card sx={{ minWidth: 0, border: 1, borderColor: "divider" }}>
+        <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+          <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }} gutterBottom>
             {t("settings.changePassword")}
           </Typography>
           {message && <Alert severity="success" sx={{ mb: 2 }}>{message}</Alert>}
@@ -128,7 +128,7 @@ export default function Settings({ onBack }: Props) {
               type="submit"
               variant="contained"
               disabled={loading || !currentPassword || !newPassword || !confirmPassword}
-              sx={{ mt: 2 }}
+              sx={{ mt: 2, minHeight: 40, width: { xs: "100%", sm: "auto" } }}
             >
               {t("settings.save")}
             </Button>
