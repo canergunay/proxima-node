@@ -4,6 +4,11 @@
 
 ## Active cosmetic web work — 2026-10-10
 
+Latest2026-10-11: ProximaVPN page UI **dba79b2**, managed SVR **100 DONE**;
+ERG/SHV/SVR published restart-free. Runtime/backend/config/IDs, 62 management
+and 9 portal HTTP hashes, status and DNS passed. PROX-49 DONE, broader P3 active;
+ADM7414433 unchanged, KLM deferred. Note2026-10-11-vpn-page-publication.md.
+
 Latest2026-10-11: ProximaAdminsUIbe32c04 managedSVR99DONE, all3sites
 restart-free/runtime/config/backend/60management+9portal hashes/healthPASS.
 ADM7414433 unchanged; PROX-48DONE, broaderP3active; nextProximaVPN. KLMdeferred.

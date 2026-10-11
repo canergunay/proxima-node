@@ -1,5 +1,10 @@
 # ADM handoff — evidence and boundaries
 
+Latest2026-10-11: managed ProximaVPN cosmetic page release **dba79b2**,
+SVR operation **100 DONE**, ERG/SHV/SVR live read-only checks passed without
+restart. ADM UI7414433 unchanged; KLM deferred. Exact managed snapshot and
+verification limits: `sessions/notes/2026-10-11-vpn-page-publication.md`.
+
 Latest2026-10-11: ADM7414433 update-dialog guard live, public4hashes verified.
 SVR bounded backend feature86b52b8 operation93DONE and toolbar a218e26
 operation94DONE; canonical feature playbook coordinates API-before-UI.
