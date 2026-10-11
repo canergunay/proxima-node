@@ -1,5 +1,13 @@
 # ADM handoff — evidence and boundaries
 
+Latest2026-10-11: ADM Monitoring UI **e011eae** live, **PROX-56 DONE**.
+Canonical staging/swap/approved panel restart; active service and loopback/public
+4 static hashes verified. Backend32/container72/ERG Proxima raw runtime unchanged.
+Local cp1252 output failure happened after remote execution; verification used
+UTF-8, deployment not rerun. static.prev retained. Next ADM VPN Users presentation.
+Proxima site UI f260a40 retained; KLM deferred. Details:
+`sessions/notes/2026-10-11-monitoring-cosmetics.md`.
+
 Latest2026-10-11: Portal Login UI **f260a40**, managed SVR operation
 **105 DONE**; all3 sites verified restart-free. PROX-55 DONE, widerP3 active;
 ADM7414433 unchanged; KLM deferred. Next ADM Monitoring review. Evidence:

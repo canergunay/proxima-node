@@ -27,6 +27,7 @@ Each entry is a separate snapshot, not the authoritative project backlog.
 - [2026-10-11-keys-publication](notes/2026-10-11-keys-publication.md)
 - [2026-10-11-latency-publication](notes/2026-10-11-latency-publication.md)
 - [2026-10-11-logs-publication](notes/2026-10-11-logs-publication.md)
+- [2026-10-11-monitoring-cosmetics](notes/2026-10-11-monitoring-cosmetics.md)
 - [2026-10-11-portal-login-publication](notes/2026-10-11-portal-login-publication.md)
 - [2026-10-11-portal-publication](notes/2026-10-11-portal-publication.md)
 - [2026-10-11-scheduler-publication](notes/2026-10-11-scheduler-publication.md)

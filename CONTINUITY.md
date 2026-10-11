@@ -4,6 +4,20 @@
 
 ## Active cosmetic web work — 2026-10-10
 
+### ADM Monitoring delivered — 2026-10-11
+
+ADM UI **e011eae** is live through canonical deployment; **PROX-56 DONE**.
+MonitoringTab.tsx only: chart surfaces/responsive grids, wrapped series filters,
+aligned alert fields/actions and readable local history table. Original metric,
+filter/range/tooltip and alert/Telegram behavior preserved. Build/437-key parity,
+98 full-App synthetic cases and independent local QA passed.
+Actual checks: ADM active after approved panel restart, loopback/public index+
+3 bundle hashes match,32 backend files/72 running container IDs and protected
+ERG Proxima runtime unchanged; static.prev retained. Local output encoding failed
+after remote execution; read-only verification confirmed success, no deploy retry.
+Proxima site UI remains f260a40; KLM deferred. Next ADM VPN Users presentation.
+Details: `continuity/sessions/notes/2026-10-11-monitoring-cosmetics.md`.
+
 Latest2026-10-11: Portal Login UI **f260a40**, managed SVR **105 DONE**;
 ERG/SHV/SVR restart-free. Runtime/backend/config/IDs,69 management+11 portal
 HTTP hashes/status/DNS passed. PROX-55 DONE; ADM7414433 unchanged; KLM deferred.
