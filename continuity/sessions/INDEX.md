@@ -22,6 +22,7 @@ Each entry is a separate snapshot, not the authoritative project backlog.
 - [2026-10-10-dashboard-pilot](notes/2026-10-10-dashboard-pilot.md)
 - [2026-10-10-groups-publication](notes/2026-10-10-groups-publication.md)
 - [2026-10-11-admins-publication](notes/2026-10-11-admins-publication.md)
+- [2026-10-11-entry-publication](notes/2026-10-11-entry-publication.md)
 - [2026-10-11-feature-ui-release](notes/2026-10-11-feature-ui-release.md)
 - [2026-10-11-keys-publication](notes/2026-10-11-keys-publication.md)
 - [2026-10-11-latency-publication](notes/2026-10-11-latency-publication.md)
