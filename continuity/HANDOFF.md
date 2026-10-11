@@ -1,5 +1,18 @@
 # ADM handoff — evidence and boundaries
 
+Latest2026-10-11: ADM Settings UI **50db405** live,
+**PROX-58 READY_FOR_REVIEW** pending Can's visual confirmation.
+Canonical approved panel restart; active service and loopback/public4 static
+hashes verified. Backend32/container72/ERG Proxima runtime unchanged;
+static.prev retained. No actual password mutation. Next ADM Admins presentation.
+Site UI f260a40 retained; KLM deferred. Details:
+`sessions/notes/2026-10-11-adm-settings-cosmetics.md`.
+
+Workflow steering: use READY_FOR_REVIEW when waiting for Can's approval, answer
+or verification; state what he must check. Machine QA/publication alone does not
+close a pending human review. PROX-2/30 review/input waits updated; PROX-50 kept
+OPEN for dedicated offline-site sync diagnosis. Wider UI phases remain active.
+
 Latest2026-10-11: ADM VPN Users UI **f1452ce** live, **PROX-57 DONE**.
 Canonical staging/swap/approved panel restart; active service and loopback/public
 4 static hashes verified. Backend32/container72/ERG Proxima raw runtime unchanged;

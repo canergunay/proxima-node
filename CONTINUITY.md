@@ -4,6 +4,24 @@
 
 ## Active cosmetic web work — 2026-10-10
 
+### ADM Settings delivered — 2026-10-11
+
+ADM UI **50db405** live, **PROX-58 READY_FOR_REVIEW** pending Can's visual
+confirmation. Settings.tsx presentation only:
+deliberate desktop language/password columns, narrow stacking, wrapped errors
+and aligned controls/cards. Password/language/state/storage behavior preserved.
+Build/437-key parity,55 synthetic cases and independent bounded-page QA passed.
+Canonical publication with approved panel restart succeeded; actual service,
+loopback/public4 hashes/backend32/container72/ERG Proxima runtime passed;
+static.prev retained. No real password change. Proxima site UI remainsf260a40,
+KLM deferred; next ADM Admins table/dialog/permission presentation. Evidence:
+`continuity/sessions/notes/2026-10-11-adm-settings-cosmetics.md`.
+
+Can's updated workflow: READY_FOR_REVIEW for approval/answer/verification waits,
+with the exact human action in the item comment. QA/publication and human
+acceptance are distinct. PROX-2/30 also wait for native review/device evidence;
+they remain unreleased. PROX-50 offline-site sync report remains OPEN for diagnosis.
+
 ### ADM VPN Users delivered — 2026-10-11
 
 ADM UI **f1452ce** live, **PROX-57 DONE**. Three presentation files: bounded
