@@ -4,6 +4,11 @@
 
 ## Active cosmetic web work — 2026-10-10
 
+Latest2026-10-11: User portal main-page UI **c8c42c0**, managed SVR **104 DONE**;
+ERG/SHV/SVR restart-free. Runtime/backend/config/IDs,69 management+10 portal
+HTTP hashes/status/DNS passed. PROX-54 DONE; ADM7414433 unchanged; KLM deferred.
+Next portal Login review, then ADM batches. Note2026-10-11-portal-publication.md.
+
 Latest2026-10-11: Login/Setup UI **79e48b2**, managed SVR **103 DONE**;
 ERG/SHV/SVR restart-free. Runtime/backend/config/IDs,69 management+9 portal
 HTTP hashes/status/DNS passed. PROX-53 DONE; ADM7414433 unchanged; KLM deferred.
