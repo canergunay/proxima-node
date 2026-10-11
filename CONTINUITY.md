@@ -4,6 +4,11 @@
 
 ## Active cosmetic web work — 2026-10-10
 
+Latest2026-10-11: Scheduled Jobs UI **c2ef50e**, managed SVR **101 DONE**;
+ERG/SHV/SVR restart-free, runtime/backend/config/IDs,64 management+9 portal
+HTTP hashes/status/DNS passed. PROX-51 DONE; ADM7414433 unchanged; KLM deferred.
+Next proposed Proxima page: Latency Audit. Note2026-10-11-scheduler-publication.md.
+
 Latest2026-10-11: ProximaVPN page UI **dba79b2**, managed SVR **100 DONE**;
 ERG/SHV/SVR published restart-free. Runtime/backend/config/IDs, 62 management
 and 9 portal HTTP hashes, status and DNS passed. PROX-49 DONE, broader P3 active;

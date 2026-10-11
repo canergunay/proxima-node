@@ -1,5 +1,10 @@
 # ADM handoff — evidence and boundaries
 
+Latest2026-10-11: Scheduled Jobs cosmetic UI **c2ef50e**, managed SVR
+operation **101 DONE**, verified ERG/SHV/SVR without restart. PROX-51 DONE;
+ADM7414433 unchanged, KLM deferred. Exact snapshot/evidence:
+`sessions/notes/2026-10-11-scheduler-publication.md`.
+
 Latest2026-10-11: managed ProximaVPN cosmetic page release **dba79b2**,
 SVR operation **100 DONE**, ERG/SHV/SVR live read-only checks passed without
 restart. ADM UI7414433 unchanged; KLM deferred. Exact managed snapshot and
