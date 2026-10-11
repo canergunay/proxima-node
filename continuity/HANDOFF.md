@@ -1,5 +1,10 @@
 # ADM handoff — evidence and boundaries
 
+Latest2026-10-11: Portal Login UI **f260a40**, managed SVR operation
+**105 DONE**; all3 sites verified restart-free. PROX-55 DONE, widerP3 active;
+ADM7414433 unchanged; KLM deferred. Next ADM Monitoring review. Evidence:
+`sessions/notes/2026-10-11-portal-login-publication.md`.
+
 Latest2026-10-11: User portal main-page UI **c8c42c0**, managed SVR
 operation **104 DONE**; all3 sites verified restart-free. PROX-54 DONE,
 widerP3 active; ADM7414433 unchanged; KLM deferred. Evidence:
