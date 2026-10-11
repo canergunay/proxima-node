@@ -4,6 +4,10 @@
 
 ## Active cosmetic web work — 2026-10-10
 
+Latest2026-10-11: managed Proxima Keys UI63eecc3 published SVR95DONE;
+ERG/SHV/SVR verification passed without restart. ADM7414433 unchanged.
+PROX-45 closed; parentP3 active. KLM deferred; nextwebpageLogs.
+
 ### Current feature/UI outcome — 2026-10-11
 
 ADM7414433 dialog guard deployed/public hashes verified; PROX-39 DONE.
