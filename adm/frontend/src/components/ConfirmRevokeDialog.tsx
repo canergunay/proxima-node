@@ -19,7 +19,7 @@ export default function ConfirmRevokeDialog({ username, serverName, onCancel, on
   const { t } = useTranslation();
 
   return (
-    <Dialog open onClose={onCancel} maxWidth="xs" fullWidth>
+    <Dialog open onClose={onCancel} maxWidth="xs" fullWidth sx={{ "& .MuiDialogContent-root": { overflowWrap: "anywhere" } }}>
       <DialogTitle>{t("vpnUsers.revokeTitle")}</DialogTitle>
       <DialogContent>
         <Typography sx={{ mb: 2 }}>
@@ -30,7 +30,7 @@ export default function ConfirmRevokeDialog({ username, serverName, onCancel, on
           {t("vpnUsers.revokeAlternative")}
         </Typography>
       </DialogContent>
-      <DialogActions>
+      <DialogActions sx={{ p: 2, gap: 1, flexWrap: "wrap", "& .MuiButton-root": { minHeight: 40 } }}>
         <Button onClick={onCancel}>{t("common.cancel")}</Button>
         <Button color="error" variant="contained" onClick={onConfirm}>
           {t("vpnUsers.revokeConfirm")}

@@ -301,8 +301,8 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
   const selectSx = { minWidth: 120, "& .MuiSelect-select": { py: 0.5, fontSize: 13 } };
 
   return (
-    <Box>
-      <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap", mb: 2 }}>
+    <Box sx={{ minWidth: 0 }}>
+      <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap", mb: 2, pb: 2, borderBottom: 1, borderColor: "divider", "& .MuiButton-root": { minHeight: 40 } }}>
         <Typography variant="body2" color="text.secondary">
           {filtersOn
             ? t("vpnUsers.countFiltered", { shown: visible.length, total: users.length })
@@ -336,7 +336,7 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
       </Box>
 
       {summary?.errors?.length ? (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert severity="error" sx={{ mb: 2, "& .MuiAlert-message": { minWidth: 0, overflowWrap: "anywhere" } }}>
           {summary.errors.map((e) => `${e.username}@${e.server_name}: ${e.sync_error}`).join(" · ")}
         </Alert>
       ) : null}
@@ -344,11 +344,23 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
       {servers.length === 0 ? (
         <Typography color="text.secondary">{t("dashboard.noVpnServers")}</Typography>
       ) : (
-        <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
-          <Table size="small" stickyHeader>
+        <TableContainer component={Paper} sx={{ overflowX: "auto", border: 1, borderColor: "divider", scrollPaddingLeft: 240 }}>
+          <Table
+            size="small"
+            stickyHeader
+            sx={{
+              minWidth: 400 + servers.length * 220,
+              "& th:first-of-type, & td:first-of-type": {
+                position: "sticky", left: 0, zIndex: 1, bgcolor: "background.paper",
+                borderRight: 1, borderRightColor: "divider",
+              },
+              "& th:first-of-type": { zIndex: 3 },
+              "& tbody .MuiIconButton-root": { width: 32, height: 32 },
+            }}
+          >
             <TableHead>
               <TableRow>
-                <TableCell sx={{ minWidth: 200 }}>
+                <TableCell sx={{ minWidth: 240, width: 240 }}>
                   <TableSortLabel
                     active={sortKey === "username"}
                     direction={sortKey === "username" ? sortDir : "asc"}
@@ -357,7 +369,7 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
                     {t("vpnUsers.user")}
                   </TableSortLabel>
                 </TableCell>
-                <TableCell sx={{ minWidth: 120 }}>
+                <TableCell sx={{ minWidth: 160, width: 160 }}>
                   <TableSortLabel
                     active={sortKey === "enabled"}
                     direction={sortKey === "enabled" ? sortDir : "asc"}
@@ -367,11 +379,12 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
                   </TableSortLabel>
                 </TableCell>
                 {servers.map((s) => (
-                  <TableCell key={s.id} align="center" sx={{ minWidth: 150 }}>
+                  <TableCell key={s.id} align="center" sx={{ minWidth: 220, width: 220 }}>
                     <TableSortLabel
                       active={sortKey === `server:${s.id}`}
                       direction={sortKey === `server:${s.id}` ? sortDir : "asc"}
                       onClick={() => toggleSort(`server:${s.id}`)}
+                      sx={{ maxWidth: 180, whiteSpace: "normal", overflowWrap: "anywhere" }}
                     >
                       {s.display_name}
                     </TableSortLabel>
@@ -445,7 +458,7 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
                               {t("vpnUsers.filterAll")}
                             </Box>
                           ) : (
-                            <Box sx={{ display: "flex", gap: 0.5, justifyContent: "center" }}>
+                            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, justifyContent: "center" }}>
                               {sel.map((f) => <FilterIcon key={f} kind={f} />)}
                             </Box>
                           )
@@ -477,12 +490,13 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
                       sx={{
                         background: "none", border: 0, p: 0, cursor: "pointer",
                         color: "primary.main", textAlign: "left", font: "inherit",
+                        maxWidth: 208, overflowWrap: "anywhere", fontWeight: 600,
                       }}
                     >
                       {u.username}
                     </Box>
                     {u.full_name && (
-                      <Typography variant="caption" sx={{ display: "block", color: "text.secondary" }}>
+                      <Typography variant="caption" sx={{ display: "block", maxWidth: 208, overflowWrap: "anywhere", color: "text.secondary" }}>
                         {u.full_name}
                       </Typography>
                     )}

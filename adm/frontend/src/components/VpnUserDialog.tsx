@@ -219,7 +219,7 @@ export default function VpnUserDialog({ user, servers, onClose, onSaved }: Props
     (!isNew || passwordLen >= MIN_PASSWORD);
 
   return (
-    <Dialog open onClose={issued ? onSaved : onClose} maxWidth="md" fullWidth>
+    <Dialog open onClose={issued ? onSaved : onClose} maxWidth="md" fullWidth sx={{ "& .MuiDialogTitle-root": { overflowWrap: "anywhere" }, "& .MuiAlert-message": { minWidth: 0, overflowWrap: "anywhere" } }}>
       <DialogTitle>{isNew ? t("vpnUsers.addUser") : username}</DialogTitle>
       <DialogContent dividers>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
@@ -316,7 +316,7 @@ export default function VpnUserDialog({ user, servers, onClose, onSaved }: Props
             <Divider />
 
             <Box>
-              <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 700 }}>
                 {t("vpnUsers.serverAccess")}
               </Typography>
               <Grid container spacing={2}>
@@ -327,11 +327,11 @@ export default function VpnUserDialog({ user, servers, onClose, onSaved }: Props
                     <Grid key={s.id} size={{ xs: 12, md: 6 }}>
                       <Paper
                         variant="outlined"
-                        sx={{ p: 1.5, opacity: d.granted ? 1 : 0.6, height: "100%" }}
+                        sx={{ p: 1.5, minWidth: 0, overflowWrap: "anywhere", opacity: d.granted ? 1 : 0.6, height: "100%", "& .MuiFormControlLabel-label": { minWidth: 0 } }}
                       >
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
                           <FormControlLabel
-                            sx={{ flexGrow: 1, mr: 0 }}
+                            sx={{ flex: { xs: "1 1 100%", sm: 1 }, minWidth: 0, mx: 0 }}
                             control={
                               <Checkbox
                                 checked={d.granted}
@@ -347,14 +347,14 @@ export default function VpnUserDialog({ user, servers, onClose, onSaved }: Props
                         </Box>
 
                         {d.granted ? (
-                          <Stack spacing={1} sx={{ pl: 4, pt: 0.5 }}>
+                          <Stack spacing={1} sx={{ pl: { xs: 0, sm: 4 }, pt: 0.5, minWidth: 0 }}>
                             <TextField
                               size="small"
                               label={t("vpnUsers.maxPeers")}
                               value={d.max_peers}
                               onChange={(e) => setDraft(s.id, { max_peers: e.target.value.replace(/\D/g, "") })}
                               placeholder={t("vpnUsers.unlimited")}
-                              sx={{ width: 160 }}
+                              sx={{ width: 160, maxWidth: "100%" }}
                             />
                             <FormControlLabel
                               control={
@@ -374,6 +374,7 @@ export default function VpnUserDialog({ user, servers, onClose, onSaved }: Props
                                   {serverProfiles[String(s.id)].map((p) => (
                                     <FormControlLabel
                                       key={p.slot_id}
+                                      sx={{ mx: 0, minWidth: 0 }}
                                       control={
                                         <Checkbox
                                           size="small"
@@ -388,8 +389,8 @@ export default function VpnUserDialog({ user, servers, onClose, onSaved }: Props
                                         />
                                       }
                                       label={
-                                        <Stack direction="row" spacing={1} alignItems="center">
-                                          <Typography variant="body2">{p.label}</Typography>
+                                        <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: "wrap", minWidth: 0 }}>
+                                          <Typography variant="body2" sx={{ minWidth: 0, overflowWrap: "anywhere" }}>{p.label}</Typography>
                                           {p.last_ip_ok === false && (
                                             <Chip
                                               size="small"
@@ -424,7 +425,7 @@ export default function VpnUserDialog({ user, servers, onClose, onSaved }: Props
           </Stack>
         )}
       </DialogContent>
-      <DialogActions>
+      <DialogActions sx={{ p: 2, gap: 1, flexWrap: "wrap", "& .MuiButton-root": { minHeight: 40 } }}>
         {issued ? (
           <Button variant="contained" onClick={onSaved}>{t("common.close")}</Button>
         ) : (
