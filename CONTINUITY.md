@@ -4,6 +4,10 @@
 
 ## Active cosmetic web work — 2026-10-10
 
+Latest2026-10-11: Logs UI6bd0823 managedSVR96DONE, ERG/SHV/SVR verified
+restart-free,54management+9portal HTTP hashes and runtime/config/health preserved.
+ADM7414433 unchanged. PROX-46 DONE; nextwebscreenSettings. KLM deferred.
+
 Latest2026-10-11: managed Proxima Keys UI63eecc3 published SVR95DONE;
 ERG/SHV/SVR verification passed without restart. ADM7414433 unchanged.
 PROX-45 closed; parentP3 active. KLM deferred; nextwebpageLogs.
