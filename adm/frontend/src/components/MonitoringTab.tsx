@@ -98,8 +98,8 @@ const MetricChart = memo(function MetricChart({
   title, data, series, highlightId, formatAxis, formatLabel, peakLabel,
 }: MetricChartProps) {
   return (
-    <Box sx={{ flex: 1, minWidth: { xs: "100%", sm: 300 }, minHeight: 260 }}>
-      <Typography variant="subtitle2" sx={{ mb: 1 }}>{title}</Typography>
+    <Box sx={{ minWidth: 0, minHeight: 260, p: 1.5, border: 1, borderColor: "divider", borderRadius: 1.5, bgcolor: "background.paper" }}>
+      <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>{title}</Typography>
       <ResponsiveContainer width="100%" height={240} debounce={120}>
         <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#444" vertical={false} />
@@ -212,6 +212,7 @@ const SeriesFilter = memo(function SeriesFilter({
                 sx={{
                   width: 10,
                   height: 10,
+                  flexShrink: 0,
                   borderRadius: "50%",
                   border: `2px solid ${s.color}`,
                   bgcolor: off ? "transparent" : s.color,
@@ -219,10 +220,14 @@ const SeriesFilter = memo(function SeriesFilter({
               />
             }
             sx={{
+              maxWidth: { xs: "100%", sm: 360 },
+              height: "auto",
+              minHeight: 32,
               borderColor: off ? "divider" : s.color,
               opacity: off ? 0.5 : 1,
-              "& .MuiChip-label": { textDecoration: off ? "line-through" : "none" },
+              "& .MuiChip-label": { textDecoration: off ? "line-through" : "none", whiteSpace: "normal", overflowWrap: "anywhere", py: 0.5 },
               "& .MuiChip-deleteIcon": {
+                flexShrink: 0,
                 fontSize: 15,
                 opacity: solo ? 1 : 0.45,
                 "&:hover": { opacity: 1 },
@@ -232,7 +237,7 @@ const SeriesFilter = memo(function SeriesFilter({
         );
       })}
       {hidden.size > 0 && (
-        <Button size="small" onClick={onShowAll} sx={{ minWidth: 0, ml: 0.5 }}>
+        <Button size="small" onClick={onShowAll} sx={{ minWidth: 0, minHeight: 32, ml: 0.5 }}>
           {t("monitoring.showAllSeries")}
         </Button>
       )}
@@ -418,9 +423,9 @@ export default function MonitoringTab() {
   };
 
   return (
-    <Box>
+    <Box sx={{ minWidth: 0 }}>
       {/* Time range selector */}
-      <Box sx={{ display: "flex", gap: 1, mb: 3 }}>
+      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 3, p: 1.5, border: 1, borderColor: "divider", borderRadius: 1.5 }}>
         {(["24h", "7d", "30d"] as TimeRange[]).map((r) => (
           <Chip
             key={r}
@@ -433,7 +438,7 @@ export default function MonitoringTab() {
       </Box>
 
       {/* Exit Server Charts */}
-      <Typography variant="h6" sx={{ mb: 2 }}>{t("monitoring.exitServers")}</Typography>
+      <Typography variant="h6" sx={{ mb: 2, fontWeight: 700 }}>{t("monitoring.exitServers")}</Typography>
       {metricsLoading ? (
         <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
           <CircularProgress />
@@ -450,7 +455,7 @@ export default function MonitoringTab() {
             onShowAll={exitFilter.showAll}
             onHover={exitFilter.setHoverId}
           />
-          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+          <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "minmax(0, 1fr)", sm: "repeat(2, minmax(0, 1fr))", lg: "repeat(3, minmax(0, 1fr))" } }}>
             {[
               { label: t("monitoring.diskUsage"), data: exitData.disk },
               { label: t("monitoring.memoryUsage"), data: exitData.memory },
@@ -472,7 +477,7 @@ export default function MonitoringTab() {
       )}
 
       {/* VPN Server Charts */}
-      <Typography variant="h6" sx={{ mb: 2, mt: 2 }}>{t("monitoring.vpnServers")}</Typography>
+      <Typography variant="h6" sx={{ mb: 2, mt: 2, fontWeight: 700 }}>{t("monitoring.vpnServers")}</Typography>
       {vpnMetricsLoading ? (
         <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
           <CircularProgress />
@@ -489,7 +494,7 @@ export default function MonitoringTab() {
             onShowAll={vpnFilter.showAll}
             onHover={vpnFilter.setHoverId}
           />
-          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+          <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "minmax(0, 1fr)", sm: "repeat(2, minmax(0, 1fr))", lg: "repeat(3, minmax(0, 1fr))" } }}>
             {[
               { label: t("monitoring.diskUsage"), data: vpnData.disk },
               { label: t("monitoring.memoryUsage"), data: vpnData.memory },
@@ -517,7 +522,7 @@ export default function MonitoringTab() {
         </AccordionSummary>
         <AccordionDetails>
           {alertConfig && (
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 2, maxWidth: 500 }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0, 1fr)", sm: "repeat(2, minmax(0, 1fr))" }, gap: 2, maxWidth: 760 }}>
               <FormControlLabel
                 control={
                   <Switch
@@ -526,6 +531,7 @@ export default function MonitoringTab() {
                   />
                 }
                 label={t("monitoring.alertsEnabled")}
+                sx={{ gridColumn: "1 / -1", mx: 0 }}
               />
               <TextField
                 label={t("monitoring.telegramBotToken")}
@@ -540,7 +546,7 @@ export default function MonitoringTab() {
                 value={configForm.telegram_chat_id || ""}
                 onChange={(e) => setConfigForm({ ...configForm, telegram_chat_id: e.target.value })}
               />
-              <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+              <Box sx={{ display: "grid", gridColumn: "1 / -1", gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", sm: "repeat(4, minmax(0, 1fr))" }, gap: 2 }}>
                 <TextField
                   label={t("monitoring.diskThreshold")}
                   size="small"
@@ -548,7 +554,7 @@ export default function MonitoringTab() {
                   value={configForm.disk_threshold ?? 90}
                   onChange={(e) => setConfigForm({ ...configForm, disk_threshold: parseFloat(e.target.value) })}
                   slotProps={{ htmlInput: { min: 1, max: 100 } }}
-                  sx={{ width: 130 }}
+                  sx={{ width: "100%", minWidth: 0 }}
                 />
                 <TextField
                   label={t("monitoring.memoryThreshold")}
@@ -557,7 +563,7 @@ export default function MonitoringTab() {
                   value={configForm.memory_threshold ?? 90}
                   onChange={(e) => setConfigForm({ ...configForm, memory_threshold: parseFloat(e.target.value) })}
                   slotProps={{ htmlInput: { min: 1, max: 100 } }}
-                  sx={{ width: 130 }}
+                  sx={{ width: "100%", minWidth: 0 }}
                 />
                 <TextField
                   label={t("monitoring.cpuThreshold")}
@@ -566,7 +572,7 @@ export default function MonitoringTab() {
                   value={configForm.cpu_threshold ?? 80}
                   onChange={(e) => setConfigForm({ ...configForm, cpu_threshold: parseFloat(e.target.value) })}
                   slotProps={{ htmlInput: { min: 1, max: 100 } }}
-                  sx={{ width: 130 }}
+                  sx={{ width: "100%", minWidth: 0 }}
                 />
                 <TextField
                   label={t("monitoring.offlineMinutes")}
@@ -575,10 +581,10 @@ export default function MonitoringTab() {
                   value={configForm.offline_minutes ?? 5}
                   onChange={(e) => setConfigForm({ ...configForm, offline_minutes: parseInt(e.target.value) })}
                   slotProps={{ htmlInput: { min: 1, max: 60 } }}
-                  sx={{ width: 130 }}
+                  sx={{ width: "100%", minWidth: 0 }}
                 />
               </Box>
-              <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+              <Box sx={{ display: "flex", gridColumn: "1 / -1", flexWrap: "wrap", gap: 1, alignItems: "center", "& .MuiButton-root": { minHeight: 40 } }}>
                 <Button variant="contained" size="small" onClick={handleSaveConfig} disabled={configSaving}>
                   {t("monitoring.saveConfig")}
                 </Button>
@@ -610,13 +616,13 @@ export default function MonitoringTab() {
           ) : alerts.length === 0 ? (
             <Typography variant="body2" color="text.secondary">{t("monitoring.noAlerts")}</Typography>
           ) : (
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
+            <TableContainer sx={{ border: 1, borderColor: "divider", borderRadius: 1.5, overflowX: "auto" }}>
+              <Table size="small" sx={{ minWidth: 900, tableLayout: "fixed" }}>
+                <TableHead sx={{ bgcolor: "action.hover" }}>
                   <TableRow>
-                    <TableCell sx={{ whiteSpace: "nowrap" }}>{t("monitoring.alertTime")}</TableCell>
-                    <TableCell sx={{ whiteSpace: "nowrap" }}>{t("monitoring.alertServer")}</TableCell>
-                    <TableCell>{t("monitoring.alertType")}</TableCell>
+                    <TableCell sx={{ whiteSpace: "nowrap", width: 180 }}>{t("monitoring.alertTime")}</TableCell>
+                    <TableCell sx={{ width: 240 }}>{t("monitoring.alertServer")}</TableCell>
+                    <TableCell sx={{ width: 180 }}>{t("monitoring.alertType")}</TableCell>
                     <TableCell>{t("monitoring.alertMessage")}</TableCell>
                   </TableRow>
                 </TableHead>
@@ -628,7 +634,7 @@ export default function MonitoringTab() {
                           {new Date(a.sent_at * 1000).toLocaleString()}
                         </Typography>
                       </TableCell>
-                      <TableCell sx={{ whiteSpace: "nowrap" }}>{a.server_name || "—"}</TableCell>
+                      <TableCell sx={{ overflowWrap: "anywhere" }}>{a.server_name || "—"}</TableCell>
                       <TableCell>
                         <Chip
                           label={a.alert_type}
@@ -644,7 +650,7 @@ export default function MonitoringTab() {
                         />
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2" sx={{ maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis" }}>
+                        <Typography variant="body2" sx={{ overflowWrap: "anywhere" }}>
                           {a.message}
                         </Typography>
                       </TableCell>
