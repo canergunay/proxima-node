@@ -4,6 +4,19 @@
 
 ## Active cosmetic web work — 2026-10-10
 
+### ADM VPN Users delivered — 2026-10-11
+
+ADM UI **f1452ce** live, **PROX-57 DONE**. Three presentation files: bounded
+matrix names/pinned user identity, wrapped server/profile/revoke dialogs and
+responsive footer/card layout. Original roles, grants, validation, payloads and
+sync semantics preserved. Build/437-key parity,112 synthetic cases and independent
+local QA passed. Canonical publication with approved panel restart succeeded;
+actual loopback/public4 hashes/service/backend32/container72/ERG Proxima runtime
+passed, static.prev retained. No real account/access mutation test.
+Proxima site UI remains f260a40; KLM deferred; wider phases active. Next ADM
+Settings presentation, then Admins/remaining dialogs/docs. Evidence:
+`continuity/sessions/notes/2026-10-11-vpn-users-cosmetics.md`.
+
 ### ADM Monitoring delivered — 2026-10-11
 
 ADM UI **e011eae** is live through canonical deployment; **PROX-56 DONE**.

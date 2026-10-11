@@ -1,5 +1,12 @@
 # ADM handoff — evidence and boundaries
 
+Latest2026-10-11: ADM VPN Users UI **f1452ce** live, **PROX-57 DONE**.
+Canonical staging/swap/approved panel restart; active service and loopback/public
+4 static hashes verified. Backend32/container72/ERG Proxima raw runtime unchanged;
+static.prev retained. No actual grant/ACL mutations. Next ADM Settings presentation.
+Proxima site UI f260a40 retained; KLM deferred. Details:
+`sessions/notes/2026-10-11-vpn-users-cosmetics.md`.
+
 Latest2026-10-11: ADM Monitoring UI **e011eae** live, **PROX-56 DONE**.
 Canonical staging/swap/approved panel restart; active service and loopback/public
 4 static hashes verified. Backend32/container72/ERG Proxima raw runtime unchanged.
