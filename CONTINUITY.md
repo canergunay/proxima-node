@@ -4,6 +4,15 @@
 
 ## Active cosmetic web work — 2026-10-10
 
+Latest2026-10-11: correctedSettingsUIcc886cd managedSVR98DONE, all3sites
+runtime/backend/58management+9portal/health verified. Firstdesktopdesign rejected
+byCan; new3address/2DNS/DDNS2x2 proposal accepted. SHVfirsttryrolledback;
+peerfetch-onlydrift diagnosed, freshsnapshotretry passed; JSONnotrestored.
+
+Latest2026-10-11: ProximaSettingsUIcde45dd managedSVR97DONE; ERG/SHV/SVR
+runtime/config/backend/56management+9portal hashes/health preserved, no restart.
+ADM7414433 unchanged, PROX-47 DONE; nextProximawebpageAdmins. KLM deferred.
+
 Latest2026-10-11: Logs UI6bd0823 managedSVR96DONE, ERG/SHV/SVR verified
 restart-free,54management+9portal HTTP hashes and runtime/config/health preserved.
 ADM7414433 unchanged. PROX-46 DONE; nextwebscreenSettings. KLM deferred.
