@@ -1,5 +1,10 @@
 # ADM handoff — evidence and boundaries
 
+Latest2026-10-11: Latency Audit cosmetic UI **636be89**, managed SVR
+operation **102 DONE**, ERG/SHV/SVR live verification passed without restart.
+PROX-52 DONE, broaderP3 active; ADM7414433 unchanged, KLM deferred. Evidence:
+`sessions/notes/2026-10-11-latency-publication.md`.
+
 Latest2026-10-11: Scheduled Jobs cosmetic UI **c2ef50e**, managed SVR
 operation **101 DONE**, verified ERG/SHV/SVR without restart. PROX-51 DONE;
 ADM7414433 unchanged, KLM deferred. Exact snapshot/evidence:

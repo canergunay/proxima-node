@@ -4,6 +4,11 @@
 
 ## Active cosmetic web work — 2026-10-10
 
+Latest2026-10-11: Latency Audit UI **636be89**, managed SVR **102 DONE**;
+ERG/SHV/SVR restart-free, runtime/backend/config/IDs and66 management+9 portal
+HTTP hashes/status/DNS passed. PROX-52 DONE; ADM7414433 unchanged; KLM deferred.
+Next Proxima management batch: Login/Setup. Note2026-10-11-latency-publication.md.
+
 Latest2026-10-11: Scheduled Jobs UI **c2ef50e**, managed SVR **101 DONE**;
 ERG/SHV/SVR restart-free, runtime/backend/config/IDs,64 management+9 portal
 HTTP hashes/status/DNS passed. PROX-51 DONE; ADM7414433 unchanged; KLM deferred.
