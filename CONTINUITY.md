@@ -4,6 +4,10 @@
 
 ## Active cosmetic web work — 2026-10-10
 
+Latest2026-10-11: ProximaAdminsUIbe32c04 managedSVR99DONE, all3sites
+restart-free/runtime/config/backend/60management+9portal hashes/healthPASS.
+ADM7414433 unchanged; PROX-48DONE, broaderP3active; nextProximaVPN. KLMdeferred.
+
 Latest2026-10-11: correctedSettingsUIcc886cd managedSVR98DONE, all3sites
 runtime/backend/58management+9portal/health verified. Firstdesktopdesign rejected
 byCan; new3address/2DNS/DDNS2x2 proposal accepted. SHVfirsttryrolledback;
