@@ -1,5 +1,13 @@
 # ADM handoff — evidence and boundaries
 
+Latest2026-10-12: detail dialogs **42fc0b0** live, **PROX-60 READY_FOR_REVIEW**.
+Lean local gate: one build/437 parity/eight targeted views/four baseline/brief QA;
+isolated dialogs, not full-App integration. One after-gate passed service/static/
+backend32/container72/ERG Proxima runtime; canonical Mounts check, no retry.
+Can requests proportional verification for low-impact cosmetics; no exhaustive
+matrices by default. Next ADM Documentation, then remaining forms/dialogs.
+Details: `sessions/notes/2026-10-12-detail-dialogs.md`.
+
 Latest2026-10-12: ADM Admins **14ec9ca** live; **PROX-59 READY_FOR_REVIEW**
 for Can's visual confirmation. Canonical approved panel restart, final service/
 loopback/public4 hashes/backend32/container72/ERG Proxima runtime pass. Runtime

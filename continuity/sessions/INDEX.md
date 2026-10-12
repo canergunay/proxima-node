@@ -37,3 +37,4 @@ Each entry is a separate snapshot, not the authoritative project backlog.
 - [2026-10-11-vpn-page-publication](notes/2026-10-11-vpn-page-publication.md)
 - [2026-10-11-vpn-users-cosmetics](notes/2026-10-11-vpn-users-cosmetics.md)
 - [2026-10-12-adm-admins-cosmetics](notes/2026-10-12-adm-admins-cosmetics.md)
+- [2026-10-12-detail-dialogs](notes/2026-10-12-detail-dialogs.md)

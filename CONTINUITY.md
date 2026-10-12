@@ -4,6 +4,19 @@
 
 ## Active cosmetic web work — 2026-10-10
 
+### Detail dialogs published — 2026-10-12, lean verification
+
+ADM **42fc0b0** live; **PROX-60 READY_FOR_REVIEW** for Can's visual confirmation.
+Exit/VPN detail presentation only: headings/copy labels/public-IP and SSH grids,
+long table text/local scroll and footer spacing. One local build/437-key parity,
+four baseline+eight targeted dialog views and a brief independent review passed.
+One live after-check passed service/public+loopback4 hashes/backend32/container72/
+ERG Proxima runtime/static.prev; canonical Mounts comparison, no retry. No real
+operational mutations. Next ADM Documentation, then remaining forms/dialogs.
+Can questioned excessive smoke volume: low-impact cosmetics use proportionate
+build/parity/critical visuals/source review; broaden only for concrete risk/failure.
+Evidence: `continuity/sessions/notes/2026-10-12-detail-dialogs.md`.
+
 ### ADM Admins published — 2026-10-12, human review pending
 
 ADM UI **14ec9ca** live; **PROX-59 READY_FOR_REVIEW** awaits Can's visual
