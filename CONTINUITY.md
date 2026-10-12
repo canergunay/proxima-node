@@ -4,6 +4,17 @@
 
 ## Active cosmetic web work — 2026-10-10
 
+### Provisioning/setup published — 2026-10-12
+
+ADM **c2abe67** live; **PROX-64 READY_FOR_REVIEW**. Two presentation files:
+compact desktop provisioning grid/mobile stack, setup headings/range labels/
+footer/error wrapping. Operation lifecycle/payloads/password/close rules retained.
+Build437 parity/four isolated scenarios/two baseline/brief QA pass; mock setup
+start/poll tested running-close protection, no real installation. One deploy/
+after-gate passed service/public+loopback5 hashes/backend32/container72/ERG Proxima
+runtime/static.prev. Next EditServer form and remaining inventory/dialog views.
+Evidence: `continuity/sessions/notes/2026-10-12-provisioning-setup.md`.
+
 ### Entry/registration forms published — 2026-10-12
 
 ADM **cc21806** live; **PROX-62 READY_FOR_REVIEW**. Login/AddVpnServerDialog

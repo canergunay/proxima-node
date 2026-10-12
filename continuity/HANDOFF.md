@@ -1,5 +1,12 @@
 # ADM handoff — evidence and boundaries
 
+Latest2026-10-12: provisioning/setup **c2abe67** live; **PROX-64 READY_FOR_REVIEW**.
+Build437 parity/four focused scenarios/brief QA; existing lifecycle unchanged,
+running-close guard checked with mock operation only. One after-gate passed
+service/static5 hashes/backend32/container72/ERG Proxima runtime/static.prev;
+no real provisioning. Next EditServer/remaining inventory dialogs. Details:
+`sessions/notes/2026-10-12-provisioning-setup.md`.
+
 Latest2026-10-12: entry/registration **cc21806** live; **PROX-62 READY_FOR_REVIEW**.
 Two style-only files, build437 parity/four isolated views/brief QA pass. SSH
 initially timed out; Can's retry request recovered the original route. One deploy
