@@ -107,11 +107,11 @@ export default function EditServerDialog({ open, kind, server, onClose, onSaved 
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth sx={{ "& .MuiDialogTitle-root, & .MuiAlert-message": { minWidth: 0, overflowWrap: "anywhere" } }}>
       <DialogTitle>{t("editServer.title")}</DialogTitle>
       <DialogContent>
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
-          {error && <Alert severity="error">{error}</Alert>}
+        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0, 1fr)", sm: "repeat(2, minmax(0, 1fr))" }, gap: 2, mt: 1, minWidth: 0 }}>
+          {error && <Alert severity="error" sx={{ gridColumn: "1 / -1" }}>{error}</Alert>}
           {fields.map((f) => (
             <TextField
               key={f.key}
@@ -121,14 +121,15 @@ export default function EditServerDialog({ open, kind, server, onClose, onSaved 
               required={f.required}
               size="small"
               fullWidth
+              sx={{ minWidth: 0, gridColumn: kind === "vpn" && !["display_name", "name"].includes(f.key) ? "1 / -1" : undefined }}
             />
           ))}
-          <Alert severity="info" sx={{ mt: 0.5 }}>
+          <Alert severity="info" sx={{ mt: 0.5, gridColumn: "1 / -1" }}>
             {t("editServer.nameNote")}
           </Alert>
         </Box>
       </DialogContent>
-      <DialogActions>
+      <DialogActions sx={{ p: 2, gap: 1, flexWrap: "wrap", "& .MuiButton-root": { minHeight: 40 } }}>
         <Button onClick={onClose} disabled={loading}>{t("common.cancel")}</Button>
         <Button onClick={handleSave} variant="contained" disabled={loading}>
           {t("common.save")}

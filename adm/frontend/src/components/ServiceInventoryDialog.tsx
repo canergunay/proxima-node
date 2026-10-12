@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   Alert, Box, Chip, CircularProgress, Dialog, DialogContent, DialogTitle,
-  Table, TableBody, TableCell, TableHead, TableRow, Typography,
+  Table, TableBody, TableCell, TableHead, TableRow, TableContainer, Typography,
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import api from "../api/client";
@@ -69,7 +69,7 @@ export default function ServiceInventoryDialog(
   const unexpected = data?.services.filter((s) => !s.expected) ?? [];
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth sx={{ "& .MuiDialogTitle-root, & .MuiAlert-message": { minWidth: 0, overflowWrap: "anywhere" }, "& .MuiChip-root": { maxWidth: "100%", height: "auto", minHeight: 24 }, "& .MuiChip-label": { whiteSpace: "normal", overflowWrap: "anywhere", py: 0.5 } }}>
       <DialogTitle>{t("services.title", { name: serverName })}</DialogTitle>
       <DialogContent dividers>
         {loading && (
@@ -113,52 +113,54 @@ export default function ServiceInventoryDialog(
               </Alert>
             )}
 
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>{t("services.service")}</TableCell>
-                  <TableCell>{t("services.port")}</TableCell>
-                  <TableCell>{t("services.exposure")}</TableCell>
-                  <TableCell>{t("services.state")}</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {data.services.map((s) => (
-                  <TableRow key={`${s.port}-${s.proto}`} hover>
-                    <TableCell>
-                      {s.name}
-                      {s.detail && (
-                        <Typography variant="caption" color="text.secondary"
-                                    sx={{ display: "block" }}>
-                          {s.detail}
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell sx={{ whiteSpace: "nowrap" }}>
-                      {s.port}/{s.proto}
-                    </TableCell>
-                    <TableCell>
-                      <Chip size="small" label={t(`services.exposure_${s.exposure}`)}
-                            color={EXPOSURE_COLOR[s.exposure] ?? "default"}
-                            variant={s.exposure === "public" ? "filled" : "outlined"} />
-                    </TableCell>
-                    <TableCell>
-                      {s.listening === null
-                        ? "—"
-                        : s.listening
-                          ? <Chip size="small" color="success" variant="outlined"
-                                  label={t("services.listening")} />
-                          : <Chip size="small" color="error"
-                                  label={t("services.notListening")} />}
-                    </TableCell>
+            <TableContainer sx={{ overflowX: "auto", border: 1, borderColor: "divider", borderRadius: 1.5 }}>
+              <Table size="small" sx={{ minWidth: 700, tableLayout: "fixed" }}>
+                <TableHead sx={{ bgcolor: "action.hover" }}>
+                  <TableRow>
+                    <TableCell sx={{ width: "44%" }}>{t("services.service")}</TableCell>
+                    <TableCell sx={{ width: 80 }}>{t("services.port")}</TableCell>
+                    <TableCell sx={{ width: 150 }}>{t("services.exposure")}</TableCell>
+                    <TableCell sx={{ width: 140 }}>{t("services.state")}</TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHead>
+                <TableBody>
+                  {data.services.map((s) => (
+                    <TableRow key={`${s.port}-${s.proto}`} hover>
+                      <TableCell sx={{ overflowWrap: "anywhere" }}>
+                        {s.name}
+                        {s.detail && (
+                          <Typography variant="caption" color="text.secondary"
+                                      sx={{ display: "block" }}>
+                            {s.detail}
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>
+                        {s.port}/{s.proto}
+                      </TableCell>
+                      <TableCell>
+                        <Chip size="small" label={t(`services.exposure_${s.exposure}`)}
+                              color={EXPOSURE_COLOR[s.exposure] ?? "default"}
+                              variant={s.exposure === "public" ? "filled" : "outlined"} />
+                      </TableCell>
+                      <TableCell>
+                        {s.listening === null
+                          ? "—"
+                          : s.listening
+                            ? <Chip size="small" color="success" variant="outlined"
+                                    label={t("services.listening")} />
+                            : <Chip size="small" color="error"
+                                    label={t("services.notListening")} />}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
 
             {data.containers.length > 0 && (
               <Box sx={{ mt: 3 }}>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
                   {t("services.containers", { count: data.containers.length })}
                 </Typography>
                 <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
