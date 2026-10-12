@@ -298,7 +298,7 @@ export default function Dashboard({ role }: { role: AdminRole }) {
             fullWidth
             maxWidth="md"
           >
-            <DialogTitle>
+            <DialogTitle sx={{ overflowWrap: "anywhere" }}>
               {t("vpnServer.updateTitle", { name: updatingVpn?.display_name ?? "" })}
             </DialogTitle>
             <DialogContent>
@@ -313,7 +313,7 @@ export default function Dashboard({ role }: { role: AdminRole }) {
                 <OutputViewer output={updateOp.output || ""} status={updateOp.status} />
               )}
             </DialogContent>
-            <DialogActions>
+            <DialogActions sx={{ p: 2, gap: 1, flexWrap: "wrap", "& .MuiButton-root": { minHeight: 40 } }}>
               <Button
                 disabled={updateBusy}
                 onClick={() => {
