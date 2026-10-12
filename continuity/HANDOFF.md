@@ -1,5 +1,12 @@
 # ADM handoff — evidence and boundaries
 
+Latest2026-10-12: edit/inventory **e4b06e2** live; **PROX-67 READY_FOR_REVIEW**.
+Two presentation files, build437 parity/four targeted views/brief exact-source QA.
+One after-gate passed service/static5 hashes/backend32/container72/ERG Proxima
+runtime/static.prev; no real update/probe. Next operation-output/update-dialog
+appearance check and human acceptance consolidation. Details:
+`sessions/notes/2026-10-12-edit-inventory.md`.
+
 Latest2026-10-12: provisioning/setup **c2abe67** live; **PROX-64 READY_FOR_REVIEW**.
 Build437 parity/four focused scenarios/brief QA; existing lifecycle unchanged,
 running-close guard checked with mock operation only. One after-gate passed

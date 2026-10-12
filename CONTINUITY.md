@@ -4,6 +4,16 @@
 
 ## Active cosmetic web work — 2026-10-10
 
+### Edit/inventory published — 2026-10-12
+
+ADM **e4b06e2** live; **PROX-67 READY_FOR_REVIEW**. Edit field grid/error/footer
+and inventory metadata/local table readability only; update and observation
+semantics preserved. Build/437-key parity/four isolated views/brief QA passed.
+One deploy/after-check passed service/5 file hashes/backend32/container72/ERG
+Proxima runtime/static.prev. No actual update or service probe by verification.
+Next bounded operation-output/update-dialog appearance check, then pending visual
+acceptance consolidation. Evidence: `continuity/sessions/notes/2026-10-12-edit-inventory.md`.
+
 ### Provisioning/setup published — 2026-10-12
 
 ADM **c2abe67** live; **PROX-64 READY_FOR_REVIEW**. Two presentation files:
