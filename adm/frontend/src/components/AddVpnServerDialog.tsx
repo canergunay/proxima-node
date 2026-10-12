@@ -65,10 +65,10 @@ export default function AddVpnServerDialog({ open, onClose, onCreated }: Props) 
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth sx={{ "& .MuiDialogTitle-root": { overflowWrap: "anywhere" } }}>
       <DialogTitle>{t("addVpn.title")}</DialogTitle>
       <DialogContent>
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
+        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0, 1fr)", sm: "repeat(2, minmax(0, 1fr))" }, gap: 2, pt: 1, minWidth: 0 }}>
           <TextField
             label={t("addVpn.name")}
             placeholder={t("addVpn.namePlaceholder")}
@@ -88,6 +88,7 @@ export default function AddVpnServerDialog({ open, onClose, onCreated }: Props) 
           />
           <TextField
             label={t("addVpn.url")}
+            sx={{ gridColumn: "1 / -1" }}
             placeholder={t("addVpn.urlPlaceholder")}
             value={url}
             onChange={(e) => setUrl(e.target.value)}
@@ -97,6 +98,7 @@ export default function AddVpnServerDialog({ open, onClose, onCreated }: Props) 
           />
           <TextField
             label={t("addVpn.publicUrl")}
+            sx={{ gridColumn: "1 / -1" }}
             placeholder={t("addVpn.publicUrlPlaceholder")}
             value={publicUrl}
             onChange={(e) => setPublicUrl(e.target.value)}
@@ -106,6 +108,7 @@ export default function AddVpnServerDialog({ open, onClose, onCreated }: Props) 
           />
           <TextField
             label={t("addVpn.apiToken")}
+            sx={{ gridColumn: "1 / -1" }}
             value={apiToken}
             onChange={(e) => setApiToken(e.target.value)}
             size="small"
@@ -115,11 +118,11 @@ export default function AddVpnServerDialog({ open, onClose, onCreated }: Props) 
             helperText={t("addVpn.apiTokenHelp")}
           />
           {error && (
-            <Box sx={{ color: "error.main", fontSize: "0.875rem" }}>{error}</Box>
+            <Box sx={{ gridColumn: "1 / -1", color: "error.main", fontSize: "0.875rem", overflowWrap: "anywhere" }}>{error}</Box>
           )}
         </Box>
       </DialogContent>
-      <DialogActions>
+      <DialogActions sx={{ p: 2, gap: 1, flexWrap: "wrap", "& .MuiButton-root": { minHeight: 40 } }}>
         <Button onClick={onClose} disabled={loading}>
           {t("common.cancel")}
         </Button>

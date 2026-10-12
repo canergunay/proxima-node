@@ -41,15 +41,17 @@ export default function Login({ isSetup, onLogin }: Props) {
   return (
     <Box
       sx={{
-        minHeight: "100vh",
+        minHeight: "100dvh",
+        px: 2,
+        py: 3,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         bgcolor: "background.default",
       }}
     >
-      <Card sx={{ width: 400, maxWidth: "90vw" }}>
-        <CardContent sx={{ p: 4 }}>
+      <Card sx={{ width: 400, maxWidth: "100%", minWidth: 0, border: 1, borderColor: "divider" }}>
+        <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
           <Typography variant="h5" gutterBottom fontWeight={700}>
             {isSetup ? t("setup.title") : t("login.title")}
           </Typography>
@@ -58,7 +60,7 @@ export default function Login({ isSetup, onLogin }: Props) {
               {t("setup.subtitle")}
             </Typography>
           )}
-          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+          {error && <Alert severity="error" sx={{ mb: 2, "& .MuiAlert-message": { minWidth: 0, overflowWrap: "anywhere" } }}>{error}</Alert>}
           <form onSubmit={handleSubmit}>
             <TextField
               fullWidth
@@ -84,7 +86,7 @@ export default function Login({ isSetup, onLogin }: Props) {
               fullWidth
               size="large"
               disabled={loading || !username || !password}
-              sx={{ mt: 2 }}
+              sx={{ mt: 2, minHeight: 48 }}
             >
               {isSetup ? t("setup.submit") : t("login.submit")}
             </Button>
