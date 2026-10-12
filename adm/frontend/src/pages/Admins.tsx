@@ -24,6 +24,15 @@ interface Props {
 
 const MIN_PASSWORD = 8;
 
+const dialogSx = {
+  "& .MuiDialogTitle-root, & .MuiDialogContent-root": { overflowWrap: "anywhere" },
+  "& .MuiAlert-message": { minWidth: 0, overflowWrap: "anywhere" },
+  "& .MuiDialogActions-root": {
+    p: 2, gap: 1, flexWrap: "wrap",
+    "& .MuiButton-root": { minHeight: 40 },
+  },
+};
+
 export default function Admins({ onBack }: Props) {
   const { t } = useTranslation();
   const [admins, setAdmins] = useState<Admin[]>([]);
@@ -128,10 +137,10 @@ export default function Admins({ onBack }: Props) {
   }
 
   return (
-    <Box>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+    <Box sx={{ minWidth: 0 }}>
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "auto minmax(0, 1fr) auto", sm: "auto minmax(0, 1fr) auto auto" }, alignItems: "center", gap: 1, mb: 2, pb: 2, borderBottom: 1, borderColor: "divider", "& .MuiIconButton-root": { width: 40, height: 40 } }}>
         <IconButton onClick={onBack}><ArrowBackIcon /></IconButton>
-        <Typography variant="h5" fontWeight={700} sx={{ flexGrow: 1 }}>
+        <Typography variant="h5" fontWeight={700} sx={{ minWidth: 0, overflowWrap: "anywhere" }}>
           {t("admins.title")}
         </Typography>
         {pendingCount > 0 && (
@@ -143,7 +152,7 @@ export default function Admins({ onBack }: Props) {
             </span>
           </Tooltip>
         )}
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setEditing("new")}>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setEditing("new")} sx={{ minHeight: 40, gridColumn: { xs: "1 / -1", sm: "auto" } }}>
           {t("admins.addAdmin")}
         </Button>
       </Box>
@@ -151,26 +160,26 @@ export default function Admins({ onBack }: Props) {
       <Alert severity="info" sx={{ mb: 2 }}>{t("admins.roleExplainer")}</Alert>
       <Alert severity="info" sx={{ mb: 2 }}>{t("panelAccess.explainer")}</Alert>
 
-      <TableContainer component={Paper}>
-        <Table size="small">
-          <TableHead>
+      <TableContainer component={Paper} sx={{ border: 1, borderColor: "divider", overflowX: "auto", scrollPaddingLeft: 220 }}>
+        <Table size="small" sx={{ minWidth: 820 + servers.length * 180, tableLayout: "fixed", "& th:first-of-type, & td:first-of-type": { position: "sticky", left: 0, zIndex: 1, bgcolor: "background.paper", borderRight: 1, borderRightColor: "divider" }, "& th:first-of-type": { zIndex: 3 }, "& .MuiIconButton-root": { width: 32, height: 32 }, "& .MuiChip-root": { maxWidth: "100%", height: "auto", minHeight: 24 }, "& .MuiChip-label": { whiteSpace: "normal", overflowWrap: "anywhere", py: 0.5 } }}>
+          <TableHead sx={{ "& th": { bgcolor: "background.paper", fontWeight: 600 } }}>
             <TableRow>
-              <TableCell>{t("admins.username")}</TableCell>
-              <TableCell>{t("admins.role")}</TableCell>
-              <TableCell>{t("admins.servers")}</TableCell>
-              <TableCell>{t("vpnUsers.status")}</TableCell>
+              <TableCell sx={{ width: 220 }}>{t("admins.username")}</TableCell>
+              <TableCell sx={{ width: 160 }}>{t("admins.role")}</TableCell>
+              <TableCell sx={{ width: 220 }}>{t("admins.servers")}</TableCell>
+              <TableCell sx={{ width: 120 }}>{t("vpnUsers.status")}</TableCell>
               {servers.map((s) => (
-                <TableCell key={s.id} align="center" sx={{ whiteSpace: "nowrap" }}>
+                <TableCell key={s.id} align="center" sx={{ width: 180, overflowWrap: "anywhere" }}>
                   {s.display_name}
                 </TableCell>
               ))}
-              <TableCell align="right">{t("common.actions")}</TableCell>
+              <TableCell align="right" sx={{ width: 96 }}>{t("common.actions")}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {admins.map((a) => (
               <TableRow key={a.id} hover>
-                <TableCell>{a.username}</TableCell>
+                <TableCell sx={{ overflowWrap: "anywhere", fontWeight: 600 }}>{a.username}</TableCell>
                 <TableCell>
                   <Chip
                     size="small"
@@ -182,7 +191,7 @@ export default function Admins({ onBack }: Props) {
                   {a.role === "superadmin"
                     ? <Typography variant="body2" color="text.secondary">{t("admins.allServers")}</Typography>
                     : a.scope.map((id) => (
-                        <Chip key={id} size="small" variant="outlined" label={serverName(id)} sx={{ mr: 0.5 }} />
+                        <Chip key={id} size="small" variant="outlined" label={serverName(id)} sx={{ mr: 0.5, mb: 0.5 }} />
                       ))}
                 </TableCell>
                 <TableCell>
@@ -228,7 +237,7 @@ export default function Admins({ onBack }: Props) {
                     </TableCell>
                   );
                 })}
-                <TableCell align="right">
+                <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
                   <Tooltip title={t("common.save")}>
                     <IconButton size="small" onClick={() => setEditing(a)}>
                       <EditIcon fontSize="small" />
@@ -255,7 +264,7 @@ export default function Admins({ onBack }: Props) {
         />
       )}
 
-      <Dialog open={!!deleting} onClose={() => setDeleting(null)} maxWidth="xs" fullWidth>
+      <Dialog open={!!deleting} onClose={() => setDeleting(null)} maxWidth="xs" fullWidth sx={dialogSx}>
         <DialogTitle>{t("admins.deleteTitle")}</DialogTitle>
         <DialogContent>
           <Typography>{t("admins.deleteBody", { username: deleting?.username })}</Typography>
@@ -266,7 +275,7 @@ export default function Admins({ onBack }: Props) {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={!!revoking} onClose={() => setRevoking(null)} maxWidth="xs" fullWidth>
+      <Dialog open={!!revoking} onClose={() => setRevoking(null)} maxWidth="xs" fullWidth sx={dialogSx}>
         <DialogTitle>{t("panelAccess.revokeTitle")}</DialogTitle>
         <DialogContent>
           <Typography>
@@ -353,7 +362,7 @@ function AdminDialog({ admin, servers, onClose, onSaved }: {
   };
 
   return (
-    <Dialog open onClose={issued ? onSaved : onClose} maxWidth="sm" fullWidth>
+    <Dialog open onClose={issued ? onSaved : onClose} maxWidth="sm" fullWidth sx={dialogSx}>
       <DialogTitle>{isNew ? t("admins.addAdmin") : username}</DialogTitle>
       <DialogContent dividers>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
@@ -409,11 +418,12 @@ function AdminDialog({ admin, servers, onClose, onSaved }: {
             </Typography>
 
             {role === "admin" && (
-              <Box>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>{t("admins.servers")}</Typography>
+              <Box sx={{ display: "flex", flexDirection: "column", minWidth: 0, gap: 0.5, p: 1.5, border: 1, borderColor: "divider", borderRadius: 1.5 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>{t("admins.servers")}</Typography>
                 {servers.map((s) => (
                   <FormControlLabel
                     key={s.id}
+                    sx={{ mx: 0, minWidth: 0, "& .MuiFormControlLabel-label": { minWidth: 0, overflowWrap: "anywhere" }, "& .MuiCheckbox-root": { flexShrink: 0 } }}
                     control={
                       <Checkbox checked={scope.includes(s.id)} onChange={() => toggleServer(s.id)} />
                     }
