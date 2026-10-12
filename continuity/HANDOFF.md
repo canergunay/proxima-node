@@ -1,5 +1,12 @@
 # ADM handoff — evidence and boundaries
 
+Latest2026-10-12: Documentation **5b0f931** live; **PROX-61 READY_FOR_REVIEW**.
+Long URLs contained and both fenced-code formats retain lines/text. Lean gate:
+build437 parity/4+2 focused views/brief QA; one after-check passed service,
+loopback/public5 hashes/backend32/container72/ERG Proxima runtime/static.prev.
+No command execution or broad matrix. Next remaining login/provisioning/add forms.
+Details: `sessions/notes/2026-10-12-documentation.md`.
+
 Latest2026-10-12: detail dialogs **42fc0b0** live, **PROX-60 READY_FOR_REVIEW**.
 Lean local gate: one build/437 parity/eight targeted views/four baseline/brief QA;
 isolated dialogs, not full-App integration. One after-gate passed service/static/

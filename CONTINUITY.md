@@ -4,6 +4,17 @@
 
 ## Active cosmetic web work — 2026-10-10
 
+### Documentation published — 2026-10-12
+
+ADM **5b0f931** live; **PROX-61 READY_FOR_REVIEW**. Docs.tsx contains long
+URLs and fixes untagged fenced-code blocks while retaining exact text/navigation/
+fetch/plugins. Final build437 parity, four focused views plus two table-correction
+views and brief source-bound QA passed. One live after-check passed service,
+index/3 bundles/introduction.md hashes on loopback/public (5 per origin), backend32/
+container72/ERG Proxima runtime/static.prev; no retry. Next remaining ADM login,
+provisioning and add forms. Evidence:
+`continuity/sessions/notes/2026-10-12-documentation.md`.
+
 ### Detail dialogs published — 2026-10-12, lean verification
 
 ADM **42fc0b0** live; **PROX-60 READY_FOR_REVIEW** for Can's visual confirmation.
