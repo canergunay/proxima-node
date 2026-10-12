@@ -1,5 +1,12 @@
 # ADM handoff — evidence and boundaries
 
+Latest2026-10-13: update dialog **41a2294** live; **PROX-68 READY_FOR_REVIEW**.
+Two sx edits only; no update/log lifecycle change. Build437 parity/four focused
+mock states/brief QA and one after-gate pass. Current eight UI reviews waiting
+for Can: PROX-58/59/60/61/62/64/67/68. Do not invent another cosmetic slice;
+collect specific findings/acceptance. Broader phases remain active; no full
+mutation/security proof. Details: `sessions/notes/2026-10-13-update-output.md`.
+
 Latest2026-10-12: edit/inventory **e4b06e2** live; **PROX-67 READY_FOR_REVIEW**.
 Two presentation files, build437 parity/four targeted views/brief exact-source QA.
 One after-gate passed service/static5 hashes/backend32/container72/ERG Proxima

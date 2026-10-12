@@ -42,3 +42,4 @@ Each entry is a separate snapshot, not the authoritative project backlog.
 - [2026-10-12-edit-inventory](notes/2026-10-12-edit-inventory.md)
 - [2026-10-12-entry-registration](notes/2026-10-12-entry-registration.md)
 - [2026-10-12-provisioning-setup](notes/2026-10-12-provisioning-setup.md)
+- [2026-10-13-update-output](notes/2026-10-13-update-output.md)

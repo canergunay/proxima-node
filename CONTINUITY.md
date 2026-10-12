@@ -4,6 +4,18 @@
 
 ## Active cosmetic web work — 2026-10-10
 
+### Update dialog published — 2026-10-13, visual acceptance next
+
+ADM **41a2294** live; **PROX-68 READY_FOR_REVIEW**. Exactly two Dashboard sx
+changes fix long update headings/footer spacing. OutputViewer already fits and
+is unchanged. Build437 parity/four full-App mock states/brief QA and one live
+after-gate passed service/static5 hashes/backend32/container72/ERG Proxima runtime.
+Pending/running close guards and exact stripped log text checked; no real site
+update from fixtures. Next Can's visual acceptance, not more generic polish.
+Fresh UI review queue: PROX-58/59/60/61/62/64/67/68. Parent phases stay active;
+native/functional/network work separate. Details/checklist:
+`continuity/sessions/notes/2026-10-13-update-output.md`.
+
 ### Edit/inventory published — 2026-10-12
 
 ADM **e4b06e2** live; **PROX-67 READY_FOR_REVIEW**. Edit field grid/error/footer
