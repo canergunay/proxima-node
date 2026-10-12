@@ -4,6 +4,21 @@
 
 ## Active cosmetic web work — 2026-10-10
 
+### ADM Admins published — 2026-10-12, human review pending
+
+ADM UI **14ec9ca** live; **PROX-59 READY_FOR_REVIEW** awaits Can's visual
+confirmation. Admins.tsx presentation only: responsive header, bounded matrix/
+pinned identity, wrapped scope/site labels and account/delete/revoke dialogs.
+Build/437-key parity,112 synthetic cases and independent source-bound QA passed.
+Canonical approved panel restart succeeded. Final public/loopback4 hashes,
+service/backend32/container72/ERG Proxima runtime checks passed; static.prev
+retained. Initial runtime hash failures were Mounts-order false positives:
+independent diagnosis and12 guard tests support the bounded verifier correction,
+without another deployment or original-baseline replacement. Site UI f260a40
+retained; no real account/access mutations; KLM deferred. Next remaining ADM
+server dialogs/docs. Evidence:
+`continuity/sessions/notes/2026-10-12-adm-admins-cosmetics.md`.
+
 ### ADM Settings delivered — 2026-10-11
 
 ADM UI **50db405** live, **PROX-58 READY_FOR_REVIEW** pending Can's visual

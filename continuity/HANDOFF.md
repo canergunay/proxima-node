@@ -1,5 +1,14 @@
 # ADM handoff — evidence and boundaries
 
+Latest2026-10-12: ADM Admins **14ec9ca** live; **PROX-59 READY_FOR_REVIEW**
+for Can's visual confirmation. Canonical approved panel restart, final service/
+loopback/public4 hashes/backend32/container72/ERG Proxima runtime pass. Runtime
+verifier originally treated Mounts enumeration order as identity; independent
+exact-digest reconstruction plus12 tests established the bounded correction.
+No redeploy/baseline replacement or real access mutation. Site UI f260a40
+retained; KLM deferred. Next remaining server dialogs/docs. Details:
+`sessions/notes/2026-10-12-adm-admins-cosmetics.md`.
+
 Latest2026-10-11: ADM Settings UI **50db405** live,
 **PROX-58 READY_FOR_REVIEW** pending Can's visual confirmation.
 Canonical approved panel restart; active service and loopback/public4 static
