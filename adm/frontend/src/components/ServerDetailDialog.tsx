@@ -49,8 +49,8 @@ function CopyField({ label, value, mono }: { label: string; value: string | null
   };
 
   return (
-    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-      <Typography variant="body2" color="text.secondary" sx={{ minWidth: { xs: 70, sm: 100 }, flexShrink: 0 }}>
+    <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0, 1fr) auto", sm: "minmax(100px, 160px) minmax(0, 1fr) auto" }, alignItems: "center", gap: 1, mb: 1 }}>
+      <Typography variant="body2" color="text.secondary" sx={{ minWidth: 0, gridColumn: { xs: "1 / -1", sm: "auto" }, overflowWrap: "anywhere" }}>
         {label}
       </Typography>
       <Typography
@@ -58,6 +58,7 @@ function CopyField({ label, value, mono }: { label: string; value: string | null
         fontFamily={mono !== false ? "monospace" : undefined}
         sx={{
           flex: 1,
+          minWidth: 0,
           overflow: "hidden",
           textOverflow: "ellipsis",
           whiteSpace: "nowrap",
@@ -67,7 +68,7 @@ function CopyField({ label, value, mono }: { label: string; value: string | null
         {value}
       </Typography>
       <Tooltip title={copied ? t("detail.copied") : t("common.copy")}>
-        <IconButton size="small" onClick={handleCopy}>
+        <IconButton size="small" onClick={handleCopy} sx={{ width: 32, height: 32 }}>
           <ContentCopyIcon fontSize="small" />
         </IconButton>
       </Tooltip>
@@ -318,9 +319,9 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
   if (!server) return null;
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
+    <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth sx={{ "& .MuiDialogTitle-root, & .MuiAlert-message": { overflowWrap: "anywhere", minWidth: 0 } }}>
       <DialogTitle>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+        <Box sx={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 1, overflowWrap: "anywhere", "& .MuiChip-root, & .MuiIconButton-root": { flexShrink: 0 } }}>
           {server.display_name}
           <Chip label={server.status} size="small" />
           <Box sx={{ flex: 1 }} />
@@ -544,13 +545,13 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
           )}
 
           {/* Public IP override for NAT'd servers */}
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1.5 }}>
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0, 1fr)", sm: "minmax(0, 1fr) auto" }, alignItems: "start", gap: 1, mt: 1.5 }}>
             <TextField
               label={t("detail.publicIp")}
               value={publicIp}
               onChange={(e) => { setPublicIp(e.target.value); setPublicIpSaved(false); }}
               size="small"
-              sx={{ flex: 1 }}
+              sx={{ minWidth: 0 }}
               helperText={t("detail.publicIpHelp")}
               placeholder="46.138.254.119"
             />
@@ -559,7 +560,7 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
               size="small"
               onClick={savePublicIp}
               disabled={publicIpSaving || publicIp === (server.public_ip || "")}
-              sx={{ minWidth: 80, alignSelf: "flex-start", mt: 0.5 }}
+              sx={{ minWidth: 80, minHeight: 40 }}
             >
               {publicIpSaved ? t("detail.publicIpSaved") : t("common.save")}
             </Button>
@@ -647,7 +648,7 @@ export default function ServerDetailDialog({ serverId, open, onClose, onRefresh 
           </>
         )}
       </DialogContent>
-      <DialogActions sx={{ flexWrap: "wrap", gap: 0.5 }}>
+      <DialogActions sx={{ p: 2, flexWrap: "wrap", gap: 1, "& .MuiButton-root": { minHeight: 40 } }}>
         {(server.status === "new" || server.status === "error") && !preflight && (
           <Button
             variant="contained"

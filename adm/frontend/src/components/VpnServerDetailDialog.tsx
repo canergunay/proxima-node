@@ -242,8 +242,8 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
   const status = vpnServer.proxima_status;
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth sx={{ "& .MuiDialogTitle-root, & .MuiAlert-message": { minWidth: 0, overflowWrap: "anywhere" } }}>
+      <DialogTitle sx={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
         {vpnServer.display_name}
         <Chip
           icon={<CircleIcon sx={{ fontSize: 10, color: isOnline ? "#4caf50" : undefined }} />}
@@ -251,7 +251,7 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
           size="small"
           variant="outlined"
           color={isOnline ? "success" : "default"}
-          sx={{ ml: "auto" }}
+          sx={{ ml: "auto", flexShrink: 0 }}
         />
       </DialogTitle>
 
@@ -267,7 +267,7 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
           <Box>
             {status && (
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, mb: 2 }}>
-                <Box sx={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "minmax(0, 1fr)", sm: "repeat(3, minmax(0, 1fr))" }, overflowWrap: "anywhere" }}>
                   <Box>
                     <Typography variant="caption" color="text.secondary">{t("vpnDetail.serverIp")}</Typography>
                     <Typography variant="body2">{status.server_ip}</Typography>
@@ -368,11 +368,11 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
                     ? t("vpnDetail.mgmtHintSet")
                     : t("vpnDetail.mgmtHintUnset")}
                 </Typography>
-                <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start", flexWrap: "wrap" }}>
+                <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", sm: "minmax(0, 2fr) 100px minmax(0, 1fr) auto" }, gap: 1, alignItems: "start" }}>
                   <TextField
                     label={t("vpnDetail.sshHost")}
                     size="small"
-                    sx={{ flex: 2, minWidth: 160 }}
+                    sx={{ minWidth: 0, gridColumn: { xs: "1 / -1", sm: "auto" } }}
                     value={mgmt.ssh_host}
                     onChange={(e) => setMgmt({ ...mgmt, ssh_host: e.target.value })}
                     placeholder="192.168.77.121"
@@ -380,14 +380,14 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
                   <TextField
                     label={t("common.port")}
                     size="small"
-                    sx={{ width: 100 }}
+                    sx={{ width: "100%", minWidth: 0 }}
                     value={mgmt.ssh_port}
                     onChange={(e) => setMgmt({ ...mgmt, ssh_port: Number(e.target.value) || 22 })}
                   />
                   <TextField
                     label={t("vpnDetail.sshUser")}
                     size="small"
-                    sx={{ flex: 1, minWidth: 110 }}
+                    sx={{ minWidth: 0 }}
                     value={mgmt.ssh_user}
                     onChange={(e) => setMgmt({ ...mgmt, ssh_user: e.target.value })}
                   />
@@ -396,7 +396,7 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
                     size="small"
                     onClick={handleSaveMgmt}
                     disabled={actionLoading || !mgmt.ssh_host.trim()}
-                    sx={{ whiteSpace: "nowrap", height: 40 }}
+                    sx={{ whiteSpace: "nowrap", minHeight: 40, gridColumn: { xs: "1 / -1", sm: "auto" } }}
                   >
                     {t("vpnDetail.mgmtSave")}
                   </Button>
@@ -424,7 +424,7 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
               </Typography>
             ) : (
               <TableContainer sx={{ overflowX: "auto" }}>
-                <Table size="small">
+                <Table size="small" sx={{ minWidth: 840, "& th": { whiteSpace: "nowrap" } }}>
                   <TableHead>
                     <TableRow>
                       <TableCell>{t("vpnDetail.slot")}</TableCell>
@@ -474,7 +474,7 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
               </Typography>
             ) : (
               <TableContainer sx={{ overflowX: "auto" }}>
-                <Table size="small">
+                <Table size="small" sx={{ minWidth: 760, "& th": { whiteSpace: "nowrap" } }}>
                   <TableHead>
                     <TableRow>
                       <TableCell>{t("common.name")}</TableCell>
@@ -488,7 +488,7 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
                     {tunnels.map((tunnel) => (
                       <TableRow key={tunnel.name}>
                         <TableCell>
-                          <Typography variant="body2" sx={{ fontFamily: "monospace", fontSize: "0.8rem" }}>
+                          <Typography variant="body2" sx={{ fontFamily: "monospace", fontSize: "0.8rem", maxWidth: 220, overflowWrap: "anywhere" }}>
                             {tunnel.name}
                           </Typography>
                         </TableCell>
@@ -496,7 +496,7 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
                           <Chip label={tunnel.type} size="small" variant="outlined" />
                         </TableCell>
                         <TableCell>
-                          <Typography variant="body2" sx={{ fontFamily: "monospace", fontSize: "0.8rem" }}>
+                          <Typography variant="body2" sx={{ fontFamily: "monospace", fontSize: "0.8rem", maxWidth: 260, overflowWrap: "anywhere" }}>
                             {tunnel.endpoint}
                           </Typography>
                         </TableCell>
@@ -690,7 +690,7 @@ export default function VpnServerDetailDialog({ vpnServer, open, onClose, onRefr
         )}
       </DialogContent>
 
-      <DialogActions>
+      <DialogActions sx={{ p: 2, gap: 1, flexWrap: "wrap", "& .MuiButton-root": { minHeight: 40 } }}>
         {deleteConfirm ? (
           <>
             <Typography variant="body2" color="error" sx={{ mr: "auto", ml: 1 }}>
@@ -758,7 +758,7 @@ function SlotRow({ slot, onAction, actionLoading }: SlotRowProps) {
               <BlockIcon sx={{ fontSize: 14, color: "text.disabled" }} />
             </Tooltip>
           )}
-          <Typography variant="body2" fontWeight={600}>{slot.active || slot.label || slot.id}</Typography>
+          <Typography variant="body2" fontWeight={600} sx={{ maxWidth: 180, overflowWrap: "anywhere" }}>{slot.active || slot.label || slot.id}</Typography>
         </Box>
       </TableCell>
       <TableCell>
@@ -769,7 +769,7 @@ function SlotRow({ slot, onAction, actionLoading }: SlotRowProps) {
         )}
       </TableCell>
       <TableCell>
-        <Typography variant="body2" sx={{ fontFamily: "monospace", fontSize: "0.75rem" }}>
+        <Typography variant="body2" sx={{ fontFamily: "monospace", fontSize: "0.75rem", maxWidth: 180, overflowWrap: "anywhere" }}>
           {slot.active || t("vpnDetail.noActiveKey")}
         </Typography>
       </TableCell>
