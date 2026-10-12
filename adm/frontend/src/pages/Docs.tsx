@@ -57,10 +57,10 @@ export default function Docs({ onBack }: Props) {
     currentIndex < DOC_TOPICS.length - 1 ? DOC_TOPICS[currentIndex + 1] : null;
 
   return (
-    <Box>
+    <Box sx={{ minWidth: 0 }}>
       {/* Header with back button */}
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
-        <IconButton onClick={onBack} aria-label={t("docs.back")} size="small">
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2, pb: 2, borderBottom: 1, borderColor: "divider" }}>
+        <IconButton onClick={onBack} aria-label={t("docs.back")} size="small" sx={{ width: 40, height: 40 }}>
           <ArrowBackIcon />
         </IconButton>
         <Typography variant="h6" sx={{ fontWeight: 700 }}>
@@ -72,7 +72,7 @@ export default function Docs({ onBack }: Props) {
       <FormControl
         fullWidth
         size="small"
-        sx={{ display: { xs: "block", md: "none" }, mb: 2 }}
+        sx={{ display: { xs: "flex", md: "none" }, minWidth: 0, mb: 2 }}
       >
         <Select value={slug} onChange={(e) => setSlug(e.target.value as string)}>
           {DOC_TOPICS.map((topic) => (
@@ -130,7 +130,7 @@ export default function Docs({ onBack }: Props) {
             <>
               <Paper
                 variant="outlined"
-                sx={{ p: { xs: 2, sm: 3, md: 4 }, maxWidth: 900 }}
+                sx={{ p: { xs: 2, sm: 3, md: 4 }, maxWidth: 900, minWidth: 0, overflowWrap: "anywhere" }}
               >
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
@@ -139,7 +139,7 @@ export default function Docs({ onBack }: Props) {
                       <Typography
                         variant="h4"
                         gutterBottom
-                        sx={{ mt: 1, mb: 2, fontWeight: 600 }}
+                        sx={{ mt: 1, mb: 2, fontWeight: 600, fontSize: { xs: "1.75rem", sm: "2.125rem" } }}
                       >
                         {children}
                       </Typography>
@@ -219,31 +219,10 @@ export default function Docs({ onBack }: Props) {
                         </Box>
                       );
                     },
-                    code: ({ className, children }) => {
-                      const isBlock = className?.startsWith("language-");
-                      if (isBlock) {
-                        return (
-                          <Paper
-                            component="pre"
-                            variant="outlined"
-                            sx={{
-                              p: 2,
-                              my: 2,
-                              overflow: "auto",
-                              bgcolor: "rgba(0,0,0,0.4)",
-                              fontFamily: "'Fira Code', 'Consolas', monospace",
-                              fontSize: "0.85rem",
-                              lineHeight: 1.5,
-                              "& code": { background: "none", p: 0 },
-                            }}
-                          >
-                            <code className={className}>{children}</code>
-                          </Paper>
-                        );
-                      }
-                      return (
+                    code: ({ className, children }) => (
                         <Box
                           component="code"
+                          className={className}
                           sx={{
                             bgcolor: "rgba(255,255,255,0.08)",
                             px: 0.75,
@@ -255,17 +234,26 @@ export default function Docs({ onBack }: Props) {
                         >
                           {children}
                         </Box>
-                      );
-                    },
-                    pre: ({ children }) => <>{children}</>,
+                    ),
+                    pre: ({ children }) => (
+                      <Paper
+                        component="pre"
+                        variant="outlined"
+                        sx={{ p: 2, my: 2, maxWidth: "100%", overflow: "auto", bgcolor: "rgba(0,0,0,0.4)", fontFamily: "'Fira Code', 'Consolas', monospace", fontSize: "0.85rem", lineHeight: 1.5, "& code": { background: "none", p: 0, fontSize: "inherit", fontFamily: "inherit" } }}
+                      >
+                        {children}
+                      </Paper>
+                    ),
                     table: ({ children }) => (
                       <Box sx={{ overflowX: "auto", my: 2 }}>
                         <Box
                           component="table"
                           sx={{
-                            width: "100%",
+                             width: "100%",
+                             minWidth: 520,
                             borderCollapse: "collapse",
                             "& th, & td": {
+                              minWidth: 120,
                               border: "1px solid",
                               borderColor: "divider",
                               px: 1.5,
@@ -336,7 +324,10 @@ export default function Docs({ onBack }: Props) {
               <Box
                 sx={{
                   display: "flex",
-                  justifyContent: "space-between",
+                   justifyContent: "space-between",
+                   flexWrap: "wrap",
+                   gap: 1,
+                   "& .MuiButton-root": { minHeight: 40 },
                   mt: 2,
                   mb: 4,
                   maxWidth: 900,
