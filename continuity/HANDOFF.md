@@ -1,5 +1,12 @@
 # ADM handoff — evidence and boundaries
 
+Latest2026-10-12: entry/registration **cc21806** live; **PROX-62 READY_FOR_REVIEW**.
+Two style-only files, build437 parity/four isolated views/brief QA pass. SSH
+initially timed out; Can's retry request recovered the original route. One deploy
+and one after-check passed service/public+loopback5 hashes/backend32/container72/
+ERG Proxima runtime/static.prev. No real creation/provisioning tests. Next
+provisioning/setup/edit forms. Details: `sessions/notes/2026-10-12-entry-registration.md`.
+
 Latest2026-10-12: Documentation **5b0f931** live; **PROX-61 READY_FOR_REVIEW**.
 Long URLs contained and both fenced-code formats retain lines/text. Lean gate:
 build437 parity/4+2 focused views/brief QA; one after-check passed service,

@@ -4,6 +4,17 @@
 
 ## Active cosmetic web work — 2026-10-10
 
+### Entry/registration forms published — 2026-10-12
+
+ADM **cc21806** live; **PROX-62 READY_FOR_REVIEW**. Login/AddVpnServerDialog
+presentation only: padded dynamic card, wrapped errors and deliberate registration
+grid/footer. Build437 parity/four targeted isolated views/two baseline/brief QA
+passed. Initial ERG SSH timeouts resolved after Can asked to retry; original
+route worked, then one canonical deploy/approved panel restart and one after-gate
+passed service/5 file hashes/backend32/container72/ERG Proxima runtime/static.prev.
+No successful auth/account/server creation/provisioning proof. Next provisioning,
+setup and edit forms. Evidence: `continuity/sessions/notes/2026-10-12-entry-registration.md`.
+
 ### Documentation published — 2026-10-12
 
 ADM **5b0f931** live; **PROX-61 READY_FOR_REVIEW**. Docs.tsx contains long

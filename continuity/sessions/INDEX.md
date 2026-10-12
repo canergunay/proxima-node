@@ -39,3 +39,4 @@ Each entry is a separate snapshot, not the authoritative project backlog.
 - [2026-10-12-adm-admins-cosmetics](notes/2026-10-12-adm-admins-cosmetics.md)
 - [2026-10-12-detail-dialogs](notes/2026-10-12-detail-dialogs.md)
 - [2026-10-12-documentation](notes/2026-10-12-documentation.md)
+- [2026-10-12-entry-registration](notes/2026-10-12-entry-registration.md)
