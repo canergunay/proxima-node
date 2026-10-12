@@ -105,6 +105,7 @@ export default function SetupVpnServerDialog({ open, onClose, onCreated }: Props
       onClose={running && !finished ? undefined : () => { reset(); onClose(); }}
       maxWidth="md"
       fullWidth
+      sx={{ "& .MuiDialogTitle-root, & .MuiAlert-message": { minWidth: 0, overflowWrap: "anywhere" } }}
     >
       <DialogTitle>{t("setupVpn.title")}</DialogTitle>
       <DialogContent dividers>
@@ -128,7 +129,7 @@ export default function SetupVpnServerDialog({ open, onClose, onCreated }: Props
             <Alert severity="info">{t("setupVpn.explainer")}</Alert>
 
             <Box>
-              <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600 }}>
                 {t("setupVpn.identity")}
               </Typography>
               <Grid container spacing={2}>
@@ -156,7 +157,7 @@ export default function SetupVpnServerDialog({ open, onClose, onCreated }: Props
             </Box>
 
             <Box>
-              <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600 }}>
                 {t("setupVpn.access")}
               </Typography>
               <Grid container spacing={2}>
@@ -192,7 +193,7 @@ export default function SetupVpnServerDialog({ open, onClose, onCreated }: Props
             </Box>
 
             <Box>
-              <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600 }}>
                 {t("setupVpn.networks")}
               </Typography>
               <Grid container spacing={2}>
@@ -232,7 +233,8 @@ export default function SetupVpnServerDialog({ open, onClose, onCreated }: Props
                         key={`${r.owner}-${r.network}`}
                         size="small"
                         variant="outlined"
-                        label={`${r.network} — ${r.owner}`}
+                         label={`${r.network} — ${r.owner}`}
+                         sx={{ maxWidth: "100%", height: "auto", minHeight: 24, "& .MuiChip-label": { whiteSpace: "normal", overflowWrap: "anywhere", py: 0.5 } }}
                       />
                     ))}
                   </Box>
@@ -246,7 +248,7 @@ export default function SetupVpnServerDialog({ open, onClose, onCreated }: Props
           </Stack>
         )}
       </DialogContent>
-      <DialogActions>
+      <DialogActions sx={{ p: 2, gap: 1, flexWrap: "wrap", "& .MuiButton-root": { minHeight: 40 } }}>
         {running ? (
           <Button
             variant="contained"

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, TextField, FormControl, InputLabel, Select, MenuItem,
-  FormControlLabel, Checkbox, Alert, Typography,
+  FormControlLabel, Checkbox, Alert, Typography, Box,
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import api from "../api/client";
@@ -112,13 +112,13 @@ export default function ProvisionDialog({ open, onClose, onCreated }: Props) {
   const isProvisionView = operationId !== null;
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
+    <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth sx={{ "& .MuiDialogTitle-root, & .MuiAlert-message": { minWidth: 0, overflowWrap: "anywhere" } }}>
       <DialogTitle>{t("provision.title")}</DialogTitle>
       <DialogContent>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
         {!isProvisionView ? (
-          <>
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0, 1fr)", sm: "repeat(2, minmax(0, 1fr))" }, gap: 2, mt: 1, alignItems: "start", "& .MuiFormControl-root": { m: 0 } }}>
             <TextField
               fullWidth label={t("provision.name")}
               placeholder={t("provision.namePlaceholder")}
@@ -142,7 +142,7 @@ export default function ProvisionDialog({ open, onClose, onCreated }: Props) {
               margin="normal" size="small"
               helperText={t("provision.rootPasswordHelp")}
             />
-            <FormControl fullWidth margin="normal" size="small">
+            <FormControl fullWidth margin="normal" size="small" sx={{ gridColumn: "1 / -1" }}>
               <InputLabel>{t("provision.serverType")}</InputLabel>
               <Select
                 value={serverType} label={t("provision.serverType")}
@@ -173,15 +173,15 @@ export default function ProvisionDialog({ open, onClose, onCreated }: Props) {
                   />
                 }
                 label={t("provision.adguard")}
-                sx={{ mt: 1 }}
+                sx={{ mt: 1, mx: 0, gridColumn: "1 / -1" }}
               />
             )}
-          </>
+          </Box>
         ) : (
           operation && <OutputViewer output={operation.output || ""} status={operation.status} />
         )}
       </DialogContent>
-      <DialogActions>
+      <DialogActions sx={{ p: 2, gap: 1, flexWrap: "wrap", "& .MuiButton-root": { minHeight: 40 } }}>
         {!isProvisionView ? (
           <>
             <Button onClick={handleClose}>{t("provision.cancel")}</Button>
